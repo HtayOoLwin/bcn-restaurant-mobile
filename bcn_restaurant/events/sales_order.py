@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import frappe
 
+from bcn_restaurant.domain.preparation import summarize_statuses
+
 
 def route_kitchen_items(doc, method=None):
-    active_lines = 0
-    ready_lines = 0
+    statuses = []
 
     for row in doc.items:
         item = frappe.get_cached_doc("Item", row.item_code)
@@ -23,15 +24,12 @@ def route_kitchen_items(doc, method=None):
         row.warehouse = counter.warehouse
         if not row.custom_preparation_status:
             row.custom_preparation_status = "New"
+        statuses.append(row.custom_preparation_status)
 
-        if row.custom_preparation_status != "Cancelled":
-            active_lines += 1
-        if row.custom_preparation_status in {"Ready", "Served"}:
-            ready_lines += 1
-
+    summary = summarize_statuses(statuses)
     if hasattr(doc, "custom_total_prep_lines"):
-        doc.custom_total_prep_lines = active_lines
+        doc.custom_total_prep_lines = summary["active_total"]
     if hasattr(doc, "custom_ready_count"):
-        doc.custom_ready_count = ready_lines
-    if hasattr(doc, "custom_preparation_summary") and active_lines and not doc.custom_preparation_summary:
-        doc.custom_preparation_summary = "New"
+        doc.custom_ready_count = summary["ready_count"]
+    if hasattr(doc, "custom_preparation_summary"):
+        doc.custom_preparation_summary = summary["summary"]

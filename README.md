@@ -14,6 +14,8 @@ The **repository root is intentionally the Frappe app root** so the GitHub repos
 
 Phase 1 implements login, role bootstrap, dine-in/takeaway selection, menu, cart, and idempotent Sales Order creation/submission.
 
+Phase 2 adds waiter order progress/ready-to-serve operations and counter-isolated kitchen preparation queues/actions.
+
 ## Start here
 
 1. Read `docs/install.md`.
@@ -24,5 +26,5 @@ Phase 1 implements login, role bootstrap, dine-in/takeaway selection, menu, cart
 Backend fast tests:
 
 ```bash
-PYTHONPATH=. pytest -q tests
+pytest -q
 ```

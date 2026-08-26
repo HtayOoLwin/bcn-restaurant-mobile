@@ -133,3 +133,76 @@ Example response:
 ```
 
 If the same `client_order_id` is retried after a timeout, the API returns the already-created Sales Order with `duplicate: true` instead of creating a second order.
+
+# Phase 2 Waiter + Kitchen API
+
+All Phase 2 list endpoints operate only on submitted Sales Orders linked to a `Restaurant Table Session` whose status is `Open` or `Billing`. This prevents stale historical/unbilled Sales Orders from appearing in mobile operational queues.
+
+## Kitchen Orders
+
+```http
+GET /api/method/bcn_restaurant.api.kitchen.get_orders
+GET /api/method/bcn_restaurant.api.kitchen.get_orders?status=Preparing
+```
+
+Allowed status filters: `New`, `Accepted`, `Preparing`, `Ready`.
+
+Kitchen users only receive rows whose `custom_kitchen_counter` is assigned to them through Kitchen Counter User Permission.
+
+## Kitchen Item Action
+
+```http
+POST /api/method/bcn_restaurant.api.kitchen.update_item_status
+Content-Type: application/x-www-form-urlencoded
+
+item_row_name=<Sales Order Item row name>
+action=Accept
+```
+
+Valid transitions:
+- `New` + `Accept` -> `Accepted`
+- `Accepted` + `Start Preparation` -> `Preparing`
+- `Preparing` + `Mark Ready` -> `Ready`
+
+When an item becomes Ready, prepared qty and ready timestamp are stored and the session waiter receives an in-app Notification Log.
+
+## Waiter Order Progress
+
+```http
+GET /api/method/bcn_restaurant.api.waiter.get_order_progress
+```
+
+For normal Waiter users, only active sessions assigned to the logged-in waiter are returned. The response includes quantity counts and item-level status/note/counter information.
+
+## Waiter Ready Queue
+
+```http
+GET /api/method/bcn_restaurant.api.waiter.get_ready_orders
+```
+
+Returns Ready items grouped by Sales Order/table. `can_serve_whole` is true only when at least one line is Ready and every other active line is already Ready or Served.
+
+## Waiter Item Action
+
+```http
+POST /api/method/bcn_restaurant.api.waiter.item_action
+Content-Type: application/x-www-form-urlencoded
+
+item_row_name=<Sales Order Item row name>
+action=Mark Served
+```
+
+Actions:
+- `Mark Served` is allowed only from `Ready`.
+- `Cancel` is allowed only from `New` and is blocked when a submitted Sales Invoice Item or Delivery Note Item already references the row.
+
+## Serve Whole Order
+
+```http
+POST /api/method/bcn_restaurant.api.waiter.serve_whole_order
+Content-Type: application/x-www-form-urlencoded
+
+order_name=SAL-ORD-2026-00077
+```
+
+All remaining Ready rows become Served in one server-side operation. The endpoint rejects the request while any active item is `New`, `Accepted`, or `Preparing`.

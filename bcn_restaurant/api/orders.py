@@ -3,8 +3,9 @@ from __future__ import annotations
 import frappe
 from frappe.utils import nowdate
 
-from bcn_restaurant.api.common import get_settings, require_any_role
+from bcn_restaurant.api.common import current_roles, get_settings, require_any_role
 from bcn_restaurant.domain.order_payload import normalize_items, validate_client_order_id
+from bcn_restaurant.domain.session_access import can_use_session
 from bcn_restaurant.services.menu import get_active_item_price
 
 
@@ -132,6 +133,8 @@ def _get_or_create_session(
             frappe.throw("Restaurant session does not belong to this customer/table")
         if doc.status != "Open":
             frappe.throw("Restaurant session is not open")
+        if not can_use_session(doc.waiter, frappe.session.user, current_roles()):
+            frappe.throw("Restaurant session belongs to another waiter", frappe.PermissionError)
         return doc.name
 
     existing = frappe.db.get_value(
@@ -141,6 +144,9 @@ def _get_or_create_session(
         order_by="opened_at desc",
     )
     if existing:
+        existing_doc = frappe.get_doc("Restaurant Table Session", existing)
+        if not can_use_session(existing_doc.waiter, frappe.session.user, current_roles()):
+            frappe.throw("Restaurant session belongs to another waiter", frappe.PermissionError)
         return existing
 
     try:

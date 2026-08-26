@@ -44,7 +44,7 @@ def role_flags() -> dict[str, bool]:
 
 
 def get_user_kitchen_counters() -> list[str]:
-    if frappe.session.user == "Administrator":
+    if frappe.session.user == "Administrator" or "System Manager" in set(current_roles()):
         return frappe.get_all(
             "Kitchen Counter",
             filters={"enabled": 1},

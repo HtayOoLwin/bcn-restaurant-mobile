@@ -35,6 +35,16 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
         title: Text(bootstrap?.fullName.isNotEmpty == true ? bootstrap!.fullName : 'Waiter'),
         actions: [
           IconButton(
+            tooltip: 'Ready to Serve',
+            onPressed: () => context.push('/waiter/ready'),
+            icon: const Icon(Icons.room_service),
+          ),
+          IconButton(
+            tooltip: 'Order Progress',
+            onPressed: () => context.push('/waiter/progress'),
+            icon: const Icon(Icons.pending_actions),
+          ),
+          IconButton(
             tooltip: 'Refresh',
             onPressed: () => ref.invalidate(tablesProvider(serviceType)),
             icon: const Icon(Icons.refresh),

@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
+import '../../features/kitchen/presentation/kitchen_orders_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
 import '../../features/waiter/presentation/waiter_tables_screen.dart';
+import '../../features/waiter_progress/presentation/waiter_progress_screen.dart';
+import '../../features/waiter_progress/presentation/waiter_ready_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authControllerProvider);
@@ -25,14 +28,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       final canWaiter = authState?.bootstrap?.permissions.waiter == true;
-      if (!canWaiter) {
+      final canKitchen = authState?.bootstrap?.permissions.kitchen == true;
+      if (!canWaiter && !canKitchen) {
         return state.matchedLocation == '/unsupported' ? null : '/unsupported';
       }
 
       if (state.matchedLocation == '/login' ||
           state.matchedLocation == '/loading' ||
           state.matchedLocation == '/unsupported') {
+        return canWaiter ? '/tables' : '/kitchen';
+      }
+
+      if (state.matchedLocation.startsWith('/kitchen') && !canKitchen) {
         return '/tables';
+      }
+      if ((state.matchedLocation.startsWith('/tables') ||
+              state.matchedLocation.startsWith('/menu') ||
+              state.matchedLocation.startsWith('/cart') ||
+              state.matchedLocation.startsWith('/waiter/')) &&
+          !canWaiter) {
+        return '/kitchen';
       }
       return null;
     },
@@ -45,6 +60,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/tables', builder: (context, state) => const WaiterTablesScreen()),
+      GoRoute(path: '/waiter/ready', builder: (context, state) => const WaiterReadyScreen()),
+      GoRoute(path: '/waiter/progress', builder: (context, state) => const WaiterProgressScreen()),
+      GoRoute(path: '/kitchen', builder: (context, state) => const KitchenOrdersScreen()),
       GoRoute(
         path: '/menu/:customer',
         builder: (context, state) => MenuScreen(
@@ -80,7 +98,7 @@ class UnsupportedRoleScreen extends StatelessWidget {
               const Icon(Icons.construction, size: 64),
               const SizedBox(height: 16),
               const Text(
-                'This role is recognized, but its mobile screen is planned for the next phase.',
+                'This role is recognized, but its mobile screen is planned for a later phase.',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),

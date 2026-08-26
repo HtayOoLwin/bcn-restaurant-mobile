@@ -23,7 +23,10 @@ def before_install():
         "Sales Order Item": [
             "custom_kitchen_counter",
             "custom_preparation_status",
+            "custom_prepared_qty",
             "custom_kitchen_note",
+            "custom_ready_at",
+            "custom_served_at",
         ],
     }
 

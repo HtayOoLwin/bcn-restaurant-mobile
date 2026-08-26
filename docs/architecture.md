@@ -65,3 +65,28 @@ Deferred:
 - Delivery Note auto-submit
 - manager dashboard
 - realtime events
+
+## Phase 2
+
+Implemented:
+- Kitchen active queue isolated by Kitchen Counter User Permission
+- Kitchen transitions New -> Accepted -> Preparing -> Ready
+- Waiter active-order progress
+- Waiter Ready-to-Serve queue
+- item-level Mark Served and New-only cancellation
+- safe Serve Whole Order action
+- shared parent preparation-summary recalculation
+- waiter Notification Log when a kitchen line becomes Ready
+- Flutter Kitchen screen and role routing
+- Flutter Waiter Ready and Progress screens
+- 10-second operational polling plus pull-to-refresh
+- waiter session ownership enforcement when adding orders
+
+Phase 2 operational queries use `Restaurant Table Session` status `Open`/`Billing` as the active boundary instead of querying every unbilled Sales Order. This deliberately excludes stale historical test orders from mobile queues.
+
+Still deferred:
+- Socket.IO realtime
+- consolidated session billing/payment
+- Delivery Note auto-submit
+- manager dashboard/exceptions
+- explicit Restaurant Shift open/close
