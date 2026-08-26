@@ -1,0 +1,94 @@
+{
+  "actions": [],
+  "creation": "2026-08-26 00:00:00.000000",
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "company",
+    "pos_profile",
+    "selling_price_list",
+    "default_currency",
+    "customer_groups_section",
+    "dine_in_customer_group",
+    "takeaway_customer_group"
+  ],
+  "fields": [
+    {
+      "fieldname": "company",
+      "fieldtype": "Link",
+      "label": "Company",
+      "options": "Company",
+      "reqd": 1,
+      "default": "BCN Restaurant"
+    },
+    {
+      "fieldname": "pos_profile",
+      "fieldtype": "Link",
+      "label": "POS Profile",
+      "options": "POS Profile",
+      "reqd": 1,
+      "default": "BCN Restaurant POS"
+    },
+    {
+      "fieldname": "selling_price_list",
+      "fieldtype": "Link",
+      "label": "Selling Price List",
+      "options": "Price List",
+      "reqd": 1,
+      "default": "Restaurant Menu Price"
+    },
+    {
+      "fieldname": "default_currency",
+      "fieldtype": "Link",
+      "label": "Default Currency",
+      "options": "Currency",
+      "reqd": 1,
+      "default": "MMK"
+    },
+    {
+      "fieldname": "customer_groups_section",
+      "fieldtype": "Section Break",
+      "label": "Restaurant Customer Groups"
+    },
+    {
+      "fieldname": "dine_in_customer_group",
+      "fieldtype": "Link",
+      "label": "Dine In Customer Group",
+      "options": "Customer Group",
+      "reqd": 1,
+      "default": "Dine In"
+    },
+    {
+      "fieldname": "takeaway_customer_group",
+      "fieldtype": "Link",
+      "label": "Takeaway Customer Group",
+      "options": "Customer Group",
+      "reqd": 1,
+      "default": "Takeaway"
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "issingle": 1,
+  "links": [],
+  "modified": "2026-08-26 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "BCN Restaurant",
+  "name": "Restaurant Settings",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "print": 1,
+      "read": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": []
+}

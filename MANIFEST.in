@@ -1,0 +1,4 @@
+include README.md
+include license.txt
+recursive-include bcn_restaurant *.css *.csv *.html *.ico *.js *.json *.md *.png *.py *.svg *.txt *.xml *.yml
+recursive-exclude bcn_restaurant *.pyc

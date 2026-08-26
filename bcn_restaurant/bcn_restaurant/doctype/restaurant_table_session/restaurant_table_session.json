@@ -1,0 +1,102 @@
+{
+  "actions": [],
+  "autoname": "format:RTS-.YYYY.-.#####",
+  "creation": "2026-08-26 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "customer",
+    "customer_group",
+    "waiter",
+    "guest_count",
+    "status",
+    "opened_at",
+    "closed_at"
+  ],
+  "fields": [
+    {
+      "fieldname": "customer",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Customer / Table",
+      "options": "Customer",
+      "reqd": 1
+    },
+    {
+      "fetch_from": "customer.customer_group",
+      "fieldname": "customer_group",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Customer Group",
+      "options": "Customer Group",
+      "read_only": 1
+    },
+    {
+      "fieldname": "waiter",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Waiter",
+      "options": "User",
+      "reqd": 1
+    },
+    {
+      "default": "1",
+      "fieldname": "guest_count",
+      "fieldtype": "Int",
+      "label": "Guest Count"
+    },
+    {
+      "default": "Open",
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Status",
+      "options": "Open\nBilling\nPaid\nClosed\nCancelled",
+      "reqd": 1
+    },
+    {
+      "fieldname": "opened_at",
+      "fieldtype": "Datetime",
+      "in_list_view": 1,
+      "label": "Opened At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "closed_at",
+      "fieldtype": "Datetime",
+      "label": "Closed At",
+      "read_only": 1
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "links": [],
+  "modified": "2026-08-26 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "BCN Restaurant",
+  "name": "Restaurant Table Session",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "read": 1,
+      "role": "Waiter",
+      "write": 1
+    },
+    {
+      "create": 1,
+      "read": 1,
+      "role": "Cashier",
+      "write": 1
+    },
+    {
+      "create": 1,
+      "delete": 1,
+      "read": 1,
+      "role": "System Manager",
+      "write": 1
+    }
+  ],
+  "sort_field": "opened_at",
+  "sort_order": "DESC",
+  "states": []
+}

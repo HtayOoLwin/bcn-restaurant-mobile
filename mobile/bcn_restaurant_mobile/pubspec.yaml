@@ -1,0 +1,23 @@
+name: bcn_restaurant_mobile
+description: BCN Restaurant mobile client for ERPNext/Frappe v16
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.11.0
+  flutter_riverpod: ^3.4.2
+  flutter_secure_storage: ^11.0.0
+  go_router: ^17.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
