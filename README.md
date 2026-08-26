@@ -28,3 +28,18 @@ Backend fast tests:
 ```bash
 pytest -q
 ```
+
+## Phase 3: Android end-to-end run
+
+After Phase 2 is deployed to the ERPNext site, use the Windows tooling under `mobile/bcn_restaurant_mobile/scripts/`:
+
+```powershell
+cd C:\Users\htayoolwin\bcn-restaurant-mobile\mobile\bcn_restaurant_mobile
+$Password = Read-Host "ERPNext password" -AsSecureString
+.\scripts\site_preflight.ps1 -User "Administrator" -Password $Password
+.\scripts\setup_android.ps1
+.\scripts\smoke_readonly.ps1 -User "waiter@bcnrestaurant.com" -Password $Password
+.\scripts\run_android.ps1
+```
+
+See `docs/phase3-android-e2e.md` for Frappe Cloud deployment and the full Waiter → Kitchen → Served smoke flow.
