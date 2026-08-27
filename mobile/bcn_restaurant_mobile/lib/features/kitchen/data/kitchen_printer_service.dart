@@ -33,14 +33,14 @@ class KitchenPrinterService {
             : '${counterName.toUpperCase()} KITCHEN',
         bold: true,
         center: true,
-        sizeFactor: 1.35,
+        sizeFactor: 1.25,
       ),
       TicketLine(isReprint ? 'REPRINT' : 'NEW ORDER', bold: true, center: true),
-      const TicketLine('--------------------------------'),
+      const TicketLine.dottedRule(),
       TicketLine(order.customer.toUpperCase(), bold: true),
       TicketLine('Order: ${order.name}'),
       if (order.creation != null) TicketLine('Time: ${_time(order.creation!)}'),
-      const TicketLine('--------------------------------'),
+      const TicketLine.dottedRule(),
       for (final item in items) ...[
         TicketLine(
           '${_qty(item.qty)} x ${item.itemName}',
@@ -52,9 +52,8 @@ class KitchenPrinterService {
             '  *** ${item.kitchenNote!.trim().toUpperCase()} ***',
             bold: true,
           ),
-        const TicketLine(''),
       ],
-      const TicketLine('--------------------------------'),
+      const TicketLine.dottedRule(),
       TicketLine(isReprint ? 'REPRINT' : 'NEW ORDER', bold: true, center: true),
     ];
     final bytes = await ticketBuilder.build(config: config, lines: lines);
