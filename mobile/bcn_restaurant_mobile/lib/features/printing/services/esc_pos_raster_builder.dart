@@ -40,7 +40,7 @@ class TicketLine {
       isDottedRule = true,
       columns = null;
 
-  const TicketLine.columns({
+  TicketLine.columns({
     required String qty,
     required String description,
     required String rate,

@@ -48,7 +48,7 @@ class CashierPrinterService {
       if (_creationDate(invoice.creation) case final value?)
         TicketLine('Date: $value'),
       const TicketLine.dottedRule(),
-      const TicketLine.columns(
+      TicketLine.columns(
         qty: 'QTY',
         description: 'DESCRIPTION',
         rate: 'RATE',

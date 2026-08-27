@@ -77,7 +77,7 @@ void main() {
 
   test('ticket row factories describe full-width rules and amount columns', () {
     const rule = TicketLine.dottedRule();
-    const row = TicketLine.columns(
+    final row = TicketLine.columns(
       qty: '2',
       description: 'Tea',
       rate: '1,000',
