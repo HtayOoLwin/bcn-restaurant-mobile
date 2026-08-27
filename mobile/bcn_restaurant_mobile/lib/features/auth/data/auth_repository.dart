@@ -15,7 +15,7 @@ class AuthRepository {
   }
 
   Future<BootstrapModel> getBootstrap() async {
-    final data = await _apiClient.getMethod('bcn_restaurant.api.bootstrap.get_bootstrap');
+    final data = await _apiClient.getMethod('bcn_mobile_bootstrap');
     return BootstrapModel.fromJson(Map<String, dynamic>.from(data as Map));
   }
 

@@ -1,3 +1,73 @@
+class KitchenPrinterSettings {
+  const KitchenPrinterSettings({
+    required this.counterName,
+    required this.printerIp,
+    required this.printerPort,
+    required this.paperWidth,
+  });
+
+  factory KitchenPrinterSettings.fromJson(Map<String, dynamic> json) {
+    return KitchenPrinterSettings(
+      counterName: json['counter_name']?.toString() ?? json['name']?.toString() ?? '',
+      printerIp: json['printer_ip']?.toString().trim() ?? '',
+      printerPort: (json['printer_port'] as num?)?.toInt() ?? 9100,
+      paperWidth: json['paper_width']?.toString() ?? '80mm',
+    );
+  }
+
+  final String counterName;
+  final String printerIp;
+  final int printerPort;
+  final String paperWidth;
+
+  bool get isConfigured => printerIp.isNotEmpty && printerPort > 0;
+}
+
+class KitchenPrintState {
+  const KitchenPrintState({
+    required this.printCount,
+    this.lastPrintedAt,
+    this.lastPrintedBy,
+  });
+
+  factory KitchenPrintState.fromJson(Map<String, dynamic> json) {
+    return KitchenPrintState(
+      printCount: (json['print_count'] as num?)?.toInt() ?? 0,
+      lastPrintedAt: DateTime.tryParse(json['last_printed_at']?.toString() ?? ''),
+      lastPrintedBy: json['last_printed_by']?.toString(),
+    );
+  }
+
+  final int printCount;
+  final DateTime? lastPrintedAt;
+  final String? lastPrintedBy;
+}
+
+class KitchenPrintSnapshot {
+  const KitchenPrintSnapshot({
+    required this.counterSettings,
+    required this.printState,
+  });
+
+  factory KitchenPrintSnapshot.fromJson(Map<String, dynamic> json) {
+    final rawState = Map<String, dynamic>.from(json['print_state'] as Map? ?? const {});
+    return KitchenPrintSnapshot(
+      counterSettings: (json['counter_settings'] as List? ?? const [])
+          .map((row) => KitchenPrinterSettings.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList(),
+      printState: rawState.map(
+        (key, value) => MapEntry(
+          key,
+          KitchenPrintState.fromJson(Map<String, dynamic>.from(value as Map)),
+        ),
+      ),
+    );
+  }
+
+  final List<KitchenPrinterSettings> counterSettings;
+  final Map<String, KitchenPrintState> printState;
+}
+
 class KitchenOrderItem {
   const KitchenOrderItem({
     required this.rowName,
@@ -9,6 +79,9 @@ class KitchenOrderItem {
     required this.preparationStatus,
     this.kitchenNote,
     this.createdAt,
+    this.printCount = 0,
+    this.lastPrintedAt,
+    this.lastPrintedBy,
   });
 
   factory KitchenOrderItem.fromJson(Map<String, dynamic> json) {
@@ -22,6 +95,9 @@ class KitchenOrderItem {
       preparationStatus: json['preparation_status']?.toString() ?? 'New',
       kitchenNote: json['kitchen_note']?.toString(),
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+      printCount: (json['print_count'] as num?)?.toInt() ?? 0,
+      lastPrintedAt: DateTime.tryParse(json['last_printed_at']?.toString() ?? ''),
+      lastPrintedBy: json['last_printed_by']?.toString(),
     );
   }
 
@@ -34,10 +110,33 @@ class KitchenOrderItem {
   final String preparationStatus;
   final String? kitchenNote;
   final DateTime? createdAt;
+  final int printCount;
+  final DateTime? lastPrintedAt;
+  final String? lastPrintedBy;
+
+  KitchenOrderItem withPrintState(KitchenPrintState? state) {
+    if (state == null) return this;
+    return KitchenOrderItem(
+      rowName: rowName,
+      itemCode: itemCode,
+      itemName: itemName,
+      qty: qty,
+      uom: uom,
+      kitchenCounter: kitchenCounter,
+      preparationStatus: preparationStatus,
+      kitchenNote: kitchenNote,
+      createdAt: createdAt,
+      printCount: state.printCount,
+      lastPrintedAt: state.lastPrintedAt,
+      lastPrintedBy: state.lastPrintedBy,
+    );
+  }
+
+  String get displayPreparationStatus => preparationStatus == 'Accepted' ? 'Preparing' : preparationStatus;
 
   String? get nextAction => switch (preparationStatus) {
-        'New' => 'Accept',
-        'Accepted' => 'Start Preparation',
+        'New' => 'Start Preparation',
+        'Accepted' => 'Mark Ready',
         'Preparing' => 'Mark Ready',
         _ => null,
       };
@@ -75,7 +174,11 @@ class KitchenOrder {
 }
 
 class KitchenOrdersResponse {
-  const KitchenOrdersResponse({required this.orders, required this.allowedCounters});
+  const KitchenOrdersResponse({
+    required this.orders,
+    required this.allowedCounters,
+    required this.counterSettings,
+  });
 
   factory KitchenOrdersResponse.fromJson(Map<String, dynamic> json) {
     return KitchenOrdersResponse(
@@ -85,9 +188,41 @@ class KitchenOrdersResponse {
       allowedCounters: (json['allowed_counters'] as List? ?? const [])
           .map((value) => value.toString())
           .toList(),
+      counterSettings: (json['counter_settings'] as List? ?? const [])
+          .map((row) => KitchenPrinterSettings.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList(),
     );
   }
 
   final List<KitchenOrder> orders;
   final List<String> allowedCounters;
+  final List<KitchenPrinterSettings> counterSettings;
+
+  KitchenOrdersResponse withPrintSnapshot(KitchenPrintSnapshot snapshot) {
+    return KitchenOrdersResponse(
+      orders: orders
+          .map(
+            (order) => KitchenOrder(
+              name: order.name,
+              customer: order.customer,
+              session: order.session,
+              creation: order.creation,
+              preparationSummary: order.preparationSummary,
+              items: order.items
+                  .map((item) => item.withPrintState(snapshot.printState[item.rowName]))
+                  .toList(),
+            ),
+          )
+          .toList(),
+      allowedCounters: allowedCounters,
+      counterSettings: snapshot.counterSettings,
+    );
+  }
+
+  KitchenPrinterSettings? settingsForCounter(String counterName) {
+    for (final settings in counterSettings) {
+      if (settings.counterName == counterName) return settings;
+    }
+    return null;
+  }
 }

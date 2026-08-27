@@ -40,7 +40,7 @@ try {
     }
     Invoke-RestMethod @loginParams | Out-Null
 
-    $bootstrapResponse = Invoke-FrappeGetMethod -Method "bcn_restaurant.api.bootstrap.get_bootstrap"
+    $bootstrapResponse = Invoke-FrappeGetMethod -Method "bcn_mobile_bootstrap"
     $bootstrap = $bootstrapResponse.message
 
     Write-Host "Authenticated as: $($bootstrap.user)" -ForegroundColor Green
@@ -48,21 +48,18 @@ try {
     Write-Host "Company: $($bootstrap.company)"
 
     if ($bootstrap.permissions.waiter) {
-        $tablesResponse = Invoke-FrappeGetMethod -Method "bcn_restaurant.api.tables.get_tables" -Query @{ service_type = "dine_in" }
-        $menuResponse = Invoke-FrappeGetMethod -Method "bcn_restaurant.api.menu.get_menu"
-        $tables = $tablesResponse.message
-        $menu = $menuResponse.message
-        Write-Host "Waiter smoke: $($tables.tables.Count) dine-in tables, $($menu.items.Count) menu items" -ForegroundColor Green
+        $tablesResponse = Invoke-FrappeGetMethod -Method "bcn_mobile_tables" -Query @{ service_type = "dine_in" }
+        $menuResponse = Invoke-FrappeGetMethod -Method "bcn_mobile_menu"
+        Write-Host "Waiter smoke: $($tablesResponse.message.tables.Count) dine-in tables, $($menuResponse.message.items.Count) menu items" -ForegroundColor Green
+
+        $progressResponse = Invoke-FrappeGetMethod -Method "bcn_waiter_order_progress"
+        $readyResponse = Invoke-FrappeGetMethod -Method "bcn_waiter_orders"
+        Write-Host "Waiter progress: $($progressResponse.message.count) active order(s), $($readyResponse.message.item_count) ready item(s)" -ForegroundColor Green
     }
 
-    if ($bootstrap.permissions.kitchen) {
-        $kitchenResponse = Invoke-FrappeGetMethod -Method "bcn_restaurant.api.kitchen.get_orders"
-        $kitchen = $kitchenResponse.message
-        Write-Host "Kitchen smoke: $($kitchen.item_count) active preparation item(s)" -ForegroundColor Green
-    }
-
-    if (-not $bootstrap.permissions.waiter -and -not $bootstrap.permissions.kitchen) {
-        Write-Host "Bootstrap is healthy; this user has no Phase 2 waiter/kitchen screen." -ForegroundColor Yellow
+    if ($bootstrap.permissions.kitchen -and $bootstrap.kitchen_counters.Count -gt 0) {
+        $kitchenResponse = Invoke-FrappeGetMethod -Method "bcn_kitchen_orders"
+        Write-Host "Kitchen smoke: $($kitchenResponse.message.item_count) active preparation item(s)" -ForegroundColor Green
     }
 
     Write-Host "Read-only smoke test completed. No orders or statuses were changed." -ForegroundColor Green

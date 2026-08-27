@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../orders/data/orders_repository.dart';
+import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../domain/cart_controller.dart';
 
 final ordersRepositoryProvider = Provider<OrdersRepository>(
@@ -27,6 +29,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     setState(() => submitting = true);
     try {
       final result = await ref.read(ordersRepositoryProvider).createOrder(cart);
+      ref.invalidate(tablesProvider('dine_in'));
+      ref.invalidate(tablesProvider('takeaway'));
       ref.read(cartProvider.notifier).clear();
       if (!mounted) return;
       await showDialog<void>(
@@ -37,7 +41,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           content: Text(
             'Sales Order: ${result.salesOrder}\n'
             'Session: ${result.session}\n'
-            'Total: ${result.grandTotal.toStringAsFixed(0)}',
+            'Total: ${formatAmount(result.grandTotal)}',
           ),
           actions: [
             FilledButton(
@@ -62,7 +66,23 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
     return Scaffold(
-      appBar: AppBar(title: Text('Cart - ${cart.customer ?? ''}')),
+      appBar: AppBar(
+        leading: BackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+              return;
+            }
+            final customer = cart.customer;
+            if (customer != null && customer.isNotEmpty) {
+              context.go('/menu/${Uri.encodeComponent(customer)}');
+              return;
+            }
+            context.go('/tables');
+          },
+        ),
+        title: Text('Cart - ${cart.customer ?? ''}'),
+      ),
       body: cart.lines.isEmpty
           ? const Center(child: Text('Cart is empty'))
           : ListView.builder(
@@ -98,14 +118,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                               onPressed: () => ref.read(cartProvider.notifier).decrement(line.item.itemCode),
                               icon: const Icon(Icons.remove_circle_outline),
                             ),
-                            Text(line.qty.toStringAsFixed(0)),
+                            Text(formatQuantity(line.qty)),
                             IconButton(
                               onPressed: () => ref.read(cartProvider.notifier).add(line.item),
                               icon: const Icon(Icons.add_circle_outline),
                             ),
                           ],
                         ),
-                        Text('${line.amount.toStringAsFixed(0)} ${line.item.currency}'),
+                        Text(formatMoney(line.amount, line.item.currency)),
                         const SizedBox(height: 8),
                         TextFormField(
                           key: ValueKey('note-${line.item.itemCode}'),
@@ -133,7 +153,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Total: ${cart.grandTotal.toStringAsFixed(0)}',
+                'Total: ${formatAmount(cart.grandTotal)}',
                 textAlign: TextAlign.end,
                 style: Theme.of(context).textTheme.titleLarge,
               ),

@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../auth/presentation/auth_controller.dart';
+import '../../notifications/presentation/mobile_notification_watcher.dart';
+import '../../kitchen/presentation/kitchen_notification_badge.dart';
+import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../cart/domain/cart_controller.dart';
 import '../data/tables_repository.dart';
 import '../domain/table_models.dart';
@@ -29,15 +32,39 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
     final tables = ref.watch(tablesProvider(serviceType));
+    final notificationCount = ref.watch(mobileNotificationsProvider).asData?.value.length ?? 0;
+    final kitchenNewOrderCount = ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(bootstrap?.fullName.isNotEmpty == true ? bootstrap!.fullName : 'Waiter'),
         actions: [
+          if (bootstrap?.permissions.kitchen == true)
+            IconButton(
+              tooltip: 'Kitchen',
+              onPressed: () => context.go('/kitchen'),
+              icon: kitchenNewOrderCount > 0
+                  ? Badge.count(
+                      count: kitchenNewOrderCount,
+                      child: const Icon(Icons.soup_kitchen),
+                    )
+                  : const Icon(Icons.soup_kitchen),
+            ),
+          if (bootstrap?.permissions.cashier == true)
+            IconButton(
+              tooltip: 'Cashier',
+              onPressed: () => context.go('/cashier'),
+              icon: const Icon(Icons.point_of_sale),
+            ),
           IconButton(
             tooltip: 'Ready to Serve',
-            onPressed: () => context.push('/waiter/ready'),
-            icon: const Icon(Icons.room_service),
+            onPressed: _openReadyToServe,
+            icon: notificationCount > 0
+                ? Badge.count(
+                    count: notificationCount,
+                    child: const Icon(Icons.room_service),
+                  )
+                : const Icon(Icons.room_service),
           ),
           IconButton(
             tooltip: 'Order Progress',
@@ -71,6 +98,9 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
               },
             ),
           ),
+          OperationalRefreshIndicator(
+            onRefresh: () => ref.invalidate(tablesProvider(serviceType)),
+          ),
           Expanded(
             child: tables.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -95,7 +125,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                               customer: table.customer,
                               session: table.session,
                             );
-                        context.go('/menu/${Uri.encodeComponent(table.customer)}');
+                        context.push('/menu/${Uri.encodeComponent(table.customer)}');
                       },
                     );
                   },
@@ -107,6 +137,21 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
       ),
     );
   }
+  Future<void> _openReadyToServe() async {
+    final notifications = ref.read(mobileNotificationsProvider).asData?.value;
+    if (notifications?.isNotEmpty == true) {
+      try {
+        await ref.read(mobileNotificationsRepositoryProvider).markAllRead();
+        ref.invalidate(mobileNotificationsProvider);
+      } catch (_) {
+        // Opening Ready to Serve should not be blocked by notification cleanup.
+      }
+    }
+    if (mounted) {
+      context.push('/waiter/ready');
+    }
+  }
+
 }
 
 class _TableCard extends StatelessWidget {

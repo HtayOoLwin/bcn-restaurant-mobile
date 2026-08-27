@@ -18,28 +18,19 @@ try {
     }
     Invoke-RestMethod @loginParams | Out-Null
 
-    $requiredDoctypes = @("Restaurant Settings", "Restaurant Table Session")
-    foreach ($doctype in $requiredDoctypes) {
-        $encoded = [Uri]::EscapeDataString($doctype)
-        $getParams = @{
-            Uri        = "$BaseUrl/api/resource/DocType/$encoded"
-            Method     = "Get"
-            WebSession = $FrappeSession
-        }
-        Invoke-RestMethod @getParams | Out-Null
-        Write-Host "OK: $doctype exists" -ForegroundColor Green
-    }
-
     $bootstrapParams = @{
-        Uri        = "$BaseUrl/api/method/bcn_restaurant.api.bootstrap.get_bootstrap"
+        Uri        = "$BaseUrl/api/method/bcn_mobile_bootstrap"
         Method     = "Get"
         WebSession = $FrappeSession
     }
     $bootstrap = Invoke-RestMethod @bootstrapParams
 
-    Write-Host "OK: bcn_restaurant mobile API is installed" -ForegroundColor Green
+    Write-Host "OK: Server Script mobile API is available" -ForegroundColor Green
+    Write-Host "User: $($bootstrap.message.user)"
     Write-Host "Company: $($bootstrap.message.company)"
     Write-Host "Price List: $($bootstrap.message.selling_price_list)"
+    Write-Host "Waiter: $($bootstrap.message.permissions.waiter)"
+    Write-Host "Kitchen: $($bootstrap.message.permissions.kitchen)"
 } finally {
     $plainPassword = $null
 }

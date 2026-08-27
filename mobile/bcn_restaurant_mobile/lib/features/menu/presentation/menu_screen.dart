@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cart/domain/cart_controller.dart';
 import '../data/menu_repository.dart';
@@ -16,44 +17,79 @@ final menuProvider = FutureProvider<MenuResponse>(
   (ref) => ref.watch(menuRepositoryProvider).getMenu(),
 );
 
-class MenuScreen extends ConsumerWidget {
+class MenuScreen extends ConsumerStatefulWidget {
   const MenuScreen({super.key, required this.customer});
 
   final String customer;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MenuScreen> createState() => _MenuScreenState();
+}
+
+class _MenuScreenState extends ConsumerState<MenuScreen> {
+  String _selectedCategory = 'All';
+
+  @override
+  Widget build(BuildContext context) {
     final menu = ref.watch(menuProvider);
     final cart = ref.watch(cartProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Order - $customer')),
+      appBar: AppBar(title: Text('Order - ${widget.customer}')),
       body: menu.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text(error.toString())),
-        data: (response) => ListView(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-          children: [
-            for (final group in response.groups) ...[
+        data: (response) {
+          final categories = <String>['All', ...response.groups];
+          final visibleItems = _selectedCategory == 'All'
+              ? response.items
+              : response.items
+                  .where((item) => item.itemGroup == _selectedCategory)
+                  .toList();
+
+          return Column(
+            children: [
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(group, style: Theme.of(context).textTheme.titleLarge),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final category in categories) ...[
+                        ChoiceChip(
+                          label: Text(category),
+                          selected: _selectedCategory == category,
+                          onSelected: (_) =>
+                              setState(() => _selectedCategory = category),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-              ...response.items
-                  .where((item) => item.itemGroup == group)
-                  .map((item) => _MenuTile(item: item)),
+              Expanded(
+                child: visibleItems.isEmpty
+                    ? const Center(child: Text('No items in this category.'))
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+                        children: [
+                          ...visibleItems.map((item) => _MenuTile(item: item)),
+                        ],
+                      ),
+              ),
             ],
-          ],
-        ),
+          );
+        },
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: FilledButton.icon(
-            onPressed: cart.lines.isEmpty ? null : () => context.go('/cart'),
+            onPressed: cart.lines.isEmpty ? null : () => context.push('/cart'),
             icon: const Icon(Icons.shopping_cart),
             label: Text(
-              'Cart ${cart.totalQty.toStringAsFixed(0)}  •  ${cart.grandTotal.toStringAsFixed(0)}',
+              'Cart ${formatQuantity(cart.totalQty)}  •  ${formatAmount(cart.grandTotal)}',
             ),
           ),
         ),
@@ -86,13 +122,58 @@ class _MenuTile extends ConsumerWidget {
               )
             : const SizedBox(width: 56, child: Icon(Icons.restaurant, size: 40)),
         title: Text(item.itemName),
-        subtitle: Text('${item.rate.toStringAsFixed(0)} ${item.currency} • ${item.uom}'),
-        trailing: IconButton.filledTonal(
-          tooltip: 'Add',
+        subtitle: Text('${formatMoney(item.rate, item.currency)} • ${item.uom}'),
+        trailing: _QuantityControl(item: item),
+      ),
+    );
+  }
+}
+
+
+class _QuantityControl extends ConsumerWidget {
+  const _QuantityControl({required this.item});
+
+  final MenuItemModel item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cart = ref.watch(cartProvider);
+    var quantity = 0.0;
+    for (final line in cart.lines) {
+      if (line.item.itemCode == item.itemCode) {
+        quantity = line.qty;
+        break;
+      }
+    }
+
+    if (quantity <= 0) {
+      return IconButton.filledTonal(
+        tooltip: 'Add',
+        onPressed: () => ref.read(cartProvider.notifier).add(item),
+        icon: const Icon(Icons.add),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: 'Decrease',
+          onPressed: () => ref.read(cartProvider.notifier).decrement(item.itemCode),
+          icon: const Icon(Icons.remove),
+        ),
+        Text(
+          formatQuantity(quantity),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: 'Increase',
           onPressed: () => ref.read(cartProvider.notifier).add(item),
           icon: const Icon(Icons.add),
         ),
-      ),
+      ],
     );
   }
 }

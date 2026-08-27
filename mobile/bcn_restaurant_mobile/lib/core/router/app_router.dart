@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
+import '../../features/cashier/presentation/cashier_screen.dart';
 import '../../features/kitchen/presentation/kitchen_orders_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
 import '../../features/waiter/presentation/waiter_tables_screen.dart';
@@ -29,25 +30,31 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final canWaiter = authState?.bootstrap?.permissions.waiter == true;
       final canKitchen = authState?.bootstrap?.permissions.kitchen == true;
-      if (!canWaiter && !canKitchen) {
+      final canCashier = authState?.bootstrap?.permissions.cashier == true;
+      if (!canWaiter && !canKitchen && !canCashier) {
         return state.matchedLocation == '/unsupported' ? null : '/unsupported';
       }
 
       if (state.matchedLocation == '/login' ||
           state.matchedLocation == '/loading' ||
           state.matchedLocation == '/unsupported') {
-        return canWaiter ? '/tables' : '/kitchen';
+        if (canWaiter) return '/tables';
+        if (canKitchen) return '/kitchen';
+        return '/cashier';
       }
 
       if (state.matchedLocation.startsWith('/kitchen') && !canKitchen) {
-        return '/tables';
+        return canWaiter ? '/tables' : '/cashier';
+      }
+      if (state.matchedLocation.startsWith('/cashier') && !canCashier) {
+        return canWaiter ? '/tables' : '/kitchen';
       }
       if ((state.matchedLocation.startsWith('/tables') ||
               state.matchedLocation.startsWith('/menu') ||
               state.matchedLocation.startsWith('/cart') ||
               state.matchedLocation.startsWith('/waiter/')) &&
           !canWaiter) {
-        return '/kitchen';
+        return canKitchen ? '/kitchen' : '/cashier';
       }
       return null;
     },
@@ -63,6 +70,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/waiter/ready', builder: (context, state) => const WaiterReadyScreen()),
       GoRoute(path: '/waiter/progress', builder: (context, state) => const WaiterProgressScreen()),
       GoRoute(path: '/kitchen', builder: (context, state) => const KitchenOrdersScreen()),
+      GoRoute(path: '/cashier', builder: (context, state) => const CashierScreen()),
       GoRoute(
         path: '/menu/:customer',
         builder: (context, state) => MenuScreen(

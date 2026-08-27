@@ -8,7 +8,7 @@ class TablesRepository {
 
   Future<TablesResponse> getTables(String serviceType) async {
     final data = await _apiClient.getMethod(
-      'bcn_restaurant.api.tables.get_tables',
+      'bcn_mobile_tables',
       queryParameters: {'service_type': serviceType},
     );
     return TablesResponse.fromJson(Map<String, dynamic>.from(data as Map));

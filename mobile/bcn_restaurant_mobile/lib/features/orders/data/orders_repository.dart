@@ -47,7 +47,7 @@ class OrdersRepository {
     }
 
     final data = await _apiClient.postMethod(
-      'bcn_restaurant.api.orders.create_order',
+      'bcn_mobile_create_order',
       data: payload,
     );
     return OrderResult.fromJson(Map<String, dynamic>.from(data as Map));

@@ -32,6 +32,15 @@ else {
     Write-Host "Android platform files already exist; skipping flutter create." -ForegroundColor DarkGray
 }
 
+$templateTestPath = Join-Path $ProjectRoot "test/widget_test.dart"
+if (Test-Path $templateTestPath) {
+    $templateTest = Get-Content $templateTestPath -Raw
+    if ($templateTest -match 'MyApp') {
+        Remove-Item $templateTestPath -Force
+        Write-Host "Removed Flutter template widget_test.dart (it references MyApp)." -ForegroundColor DarkGray
+    }
+}
+
 $manifestPath = Join-Path $ProjectRoot "android/app/src/main/AndroidManifest.xml"
 if (-not (Test-Path $manifestPath)) {
     throw "AndroidManifest.xml was not generated at $manifestPath"
