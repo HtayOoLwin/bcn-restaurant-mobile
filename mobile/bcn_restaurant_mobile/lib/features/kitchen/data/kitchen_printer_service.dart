@@ -26,7 +26,24 @@ class KitchenPrinterService {
       throw StateError('Printer is not configured on this tablet.');
     }
 
-    final lines = <TicketLine>[
+    final lines = buildTicketLines(
+      order: order,
+      counterName: counterName,
+      items: items,
+      isReprint: isReprint,
+    );
+    final bytes = await ticketBuilder.build(config: config, lines: lines);
+    final result = await printerService.printBytes(config, bytes);
+    if (!result.succeeded) throw StateError(result.message);
+  }
+
+  List<TicketLine> buildTicketLines({
+    required KitchenOrder order,
+    required String counterName,
+    required List<KitchenOrderItem> items,
+    required bool isReprint,
+  }) {
+    return <TicketLine>[
       TicketLine(
         counterName.toUpperCase().contains('KITCHEN')
             ? counterName.toUpperCase()
@@ -39,7 +56,8 @@ class KitchenPrinterService {
       const TicketLine.dottedRule(),
       TicketLine(order.customer.toUpperCase(), bold: true),
       TicketLine('Order: ${order.name}'),
-      if (order.creation != null) TicketLine('Time: ${_time(order.creation!)}'),
+      if (order.creation != null)
+        TicketLine('Date: ${_dateTime(order.creation!)}'),
       const TicketLine.dottedRule(),
       for (final item in items) ...[
         TicketLine(
@@ -56,14 +74,14 @@ class KitchenPrinterService {
       const TicketLine.dottedRule(),
       TicketLine(isReprint ? 'REPRINT' : 'NEW ORDER', bold: true, center: true),
     ];
-    final bytes = await ticketBuilder.build(config: config, lines: lines);
-    final result = await printerService.printBytes(config, bytes);
-    if (!result.succeeded) throw StateError(result.message);
   }
 
-  static String _time(DateTime value) {
+  static String _dateTime(DateTime value) {
     final local = value.toLocal();
-    return '${local.hour.toString().padLeft(2, '0')}:'
+    return '${local.day.toString().padLeft(2, '0')}-'
+        '${local.month.toString().padLeft(2, '0')}-'
+        '${local.year.toString().padLeft(4, '0')} '
+        '${local.hour.toString().padLeft(2, '0')}:'
         '${local.minute.toString().padLeft(2, '0')}';
   }
 

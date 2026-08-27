@@ -45,8 +45,8 @@ class CashierPrinterService {
       TicketLine('Invoice: ${invoice.name}'),
       if (invoice.salesOrders.isNotEmpty)
         TicketLine('Order: ${invoice.salesOrders.join(', ')}'),
-      if (_creationTime(invoice.creation) case final value?)
-        TicketLine('Time: $value'),
+      if (_creationDate(invoice.creation) case final value?)
+        TicketLine('Date: $value'),
       const TicketLine.dottedRule(),
       const TicketLine.columns(
         qty: 'QTY',
@@ -92,11 +92,14 @@ class CashierPrinterService {
     ];
   }
 
-  static String? _creationTime(String? value) {
+  static String? _creationDate(String? value) {
     final parsed = value == null ? null : DateTime.tryParse(value);
     if (parsed == null) return null;
     final local = parsed.toLocal();
-    return '${local.hour.toString().padLeft(2, '0')}:'
+    return '${local.day.toString().padLeft(2, '0')}-'
+        '${local.month.toString().padLeft(2, '0')}-'
+        '${local.year.toString().padLeft(4, '0')} '
+        '${local.hour.toString().padLeft(2, '0')}:'
         '${local.minute.toString().padLeft(2, '0')}';
   }
 }
