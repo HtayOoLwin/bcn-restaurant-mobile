@@ -40,11 +40,16 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
     final billing = ref.watch(cashierBillingProvider);
-    final kitchenNewOrderCount = ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
+    final kitchenNewOrderCount =
+        ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(bootstrap?.fullName.isNotEmpty == true ? bootstrap!.fullName : 'Cashier'),
+        title: Text(
+          bootstrap?.fullName.isNotEmpty == true
+              ? bootstrap!.fullName
+              : 'Cashier',
+        ),
         actions: [
           if (bootstrap?.permissions.waiter == true)
             IconButton(
@@ -69,9 +74,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
-            tooltip: 'Logout',
-            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-            icon: const Icon(Icons.logout),
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings),
           ),
         ],
       ),
@@ -116,33 +121,32 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           ],
                         )
                       : filteredInvoices.isEmpty
-                          ? ListView(
-                              children: const [
-                                SizedBox(height: 180),
-                                Center(child: Text('No bills match your search.')),
-                              ],
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(12),
-                              itemCount: filteredInvoices.length,
-                              itemBuilder: (context, index) {
-                                final invoice = filteredInvoices[index];
-                                return _InvoiceCard(
-                                  invoice: invoice,
-                                  onPrint: () => _printInvoice(
-                                    context: context,
-                                    billing: data,
-                                    invoice: invoice,
-                                  ),
-                                  onPayment: () => _openPaymentSheet(
-                                    context: context,
-                                    ref: ref,
-                                    billing: data,
-                                    invoice: invoice,
-                                  ),
-                                );
-                              },
-                            ),
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 180),
+                            Center(child: Text('No bills match your search.')),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: filteredInvoices.length,
+                          itemBuilder: (context, index) {
+                            final invoice = filteredInvoices[index];
+                            return _InvoiceCard(
+                              invoice: invoice,
+                              onPrint: () => _printInvoice(
+                                context: context,
+                                invoice: invoice,
+                              ),
+                              onPayment: () => _openPaymentSheet(
+                                context: context,
+                                ref: ref,
+                                billing: data,
+                                invoice: invoice,
+                              ),
+                            );
+                          },
+                        ),
                 );
               },
             ),
@@ -154,30 +158,22 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
   Future<void> _printInvoice({
     required BuildContext context,
-    required CashierBillingResponse billing,
     required CashierInvoice invoice,
   }) async {
-    if (invoice.billPrinted) return;
-
     try {
-      await ref.read(cashierPrinterServiceProvider).printBill(
-            invoice: invoice,
-            settings: billing.printerSettings,
-          );
-      await ref.read(cashierRepositoryProvider).recordBillPrint(
-            invoiceName: invoice.name,
-          );
+      await ref.read(cashierPrinterServiceProvider).printBill(invoice: invoice);
+      await ref
+          .read(cashierRepositoryProvider)
+          .recordBillPrint(invoiceName: invoice.name);
       ref.invalidate(cashierBillingProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bill printed.')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Bill printed.')));
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
       }
     }
   }
@@ -195,8 +191,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
     final cashMode = _findModeByName(billing.modes, 'Cash');
     final kpayMode = _findModeByName(billing.modes, 'Kpay');
-    final primaryMode = cashMode ?? (billing.modes.isNotEmpty ? billing.modes.first : null);
-    final secondaryMode = kpayMode ?? _firstOtherMode(billing.modes, primaryMode?.name);
+    final primaryMode =
+        cashMode ?? (billing.modes.isNotEmpty ? billing.modes.first : null);
+    final secondaryMode =
+        kpayMode ?? _firstOtherMode(billing.modes, primaryMode?.name);
 
     bool busy = false;
     String selectedPaymentType = primaryMode?.name ?? '';
@@ -228,7 +226,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     }
 
     void onTenderChanged(String changedMode) {
-      if (selectedPaymentType != 'Split' || primaryMode == null || secondaryMode == null) {
+      if (selectedPaymentType != 'Split' ||
+          primaryMode == null ||
+          secondaryMode == null) {
         return;
       }
       if (changedMode != secondaryMode.name) {
@@ -255,11 +255,15 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             final visibleModes = <CashierPaymentMode>[];
             if (selectedPaymentType == 'Split') {
               if (primaryMode != null) visibleModes.add(primaryMode);
-              if (secondaryMode != null && secondaryMode.name != primaryMode?.name) {
+              if (secondaryMode != null &&
+                  secondaryMode.name != primaryMode?.name) {
                 visibleModes.add(secondaryMode);
               }
             } else {
-              final selectedMode = _findModeByName(billing.modes, selectedPaymentType);
+              final selectedMode = _findModeByName(
+                billing.modes,
+                selectedPaymentType,
+              );
               if (selectedMode != null) visibleModes.add(selectedMode);
             }
 
@@ -271,7 +275,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             for (final mode in visibleModes) {
               final amount = _parseTender(controllers[mode.name]?.text);
               if (amount <= 0) continue;
-              tenders.add(CashierPaymentTender(modeOfPayment: mode.name, amount: amount));
+              tenders.add(
+                CashierPaymentTender(modeOfPayment: mode.name, amount: amount),
+              );
               totalTendered += amount;
               if (_isCashMode(mode.name)) {
                 cashTendered += amount;
@@ -286,9 +292,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             final change = totalTendered > invoice.outstandingAmount
                 ? totalTendered - invoice.outstandingAmount
                 : 0.0;
-            final nonCashOver = nonCashTotal > invoice.outstandingAmount + 0.0001;
+            final nonCashOver =
+                nonCashTotal > invoice.outstandingAmount + 0.0001;
             final overWithoutCash = change > 0 && cashTendered <= 0;
-            final canPay = tenders.isNotEmpty &&
+            final canPay =
+                tenders.isNotEmpty &&
                 remaining <= 0.0001 &&
                 !nonCashOver &&
                 !overWithoutCash &&
@@ -317,7 +325,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         style: Theme.of(sheetContext).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 20),
-                      Text('Payment Type', style: Theme.of(sheetContext).textTheme.titleMedium),
+                      Text(
+                        'Payment Type',
+                        style: Theme.of(sheetContext).textTheme.titleMedium,
+                      ),
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 8,
@@ -329,7 +340,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                               selected: selectedPaymentType == mode.name,
                               onSelected: busy
                                   ? null
-                                  : (_) => setSheetState(() => setPaymentType(mode.name)),
+                                  : (_) => setSheetState(
+                                      () => setPaymentType(mode.name),
+                                    ),
                             ),
                           ),
                           if (primaryMode != null && secondaryMode != null)
@@ -338,7 +351,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                               selected: selectedPaymentType == 'Split',
                               onSelected: busy
                                   ? null
-                                  : (_) => setSheetState(() => setPaymentType('Split')),
+                                  : (_) => setSheetState(
+                                      () => setPaymentType('Split'),
+                                    ),
                             ),
                         ],
                       ),
@@ -349,7 +364,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           child: TextField(
                             controller: controllers[mode.name],
                             enabled: !busy,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             inputFormatters: const [
                               ThousandsSeparatorInputFormatter(),
                             ],
@@ -358,7 +375,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                               suffixText: invoice.currency,
                               border: const OutlineInputBorder(),
                             ),
-                            onChanged: (_) => setSheetState(() => onTenderChanged(mode.name)),
+                            onChanged: (_) =>
+                                setSheetState(() => onTenderChanged(mode.name)),
                           ),
                         ),
                       ),
@@ -378,12 +396,16 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       if (nonCashOver)
                         const Padding(
                           padding: EdgeInsets.only(top: 8),
-                          child: Text('Non-cash payment cannot exceed the outstanding amount.'),
+                          child: Text(
+                            'Non-cash payment cannot exceed the outstanding amount.',
+                          ),
                         ),
                       if (overWithoutCash)
                         const Padding(
                           padding: EdgeInsets.only(top: 8),
-                          child: Text('Only Cash can include an amount that will be returned as change.'),
+                          child: Text(
+                            'Only Cash can include an amount that will be returned as change.',
+                          ),
                         ),
                       const SizedBox(height: 20),
                       FilledButton.icon(
@@ -392,16 +414,20 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             : () async {
                                 setSheetState(() => busy = true);
                                 try {
-                                  final result = await ref.read(cashierRepositoryProvider).paySplit(
+                                  final result = await ref
+                                      .read(cashierRepositoryProvider)
+                                      .paySplit(
                                         invoiceName: invoice.name,
                                         payments: tenders,
                                       );
                                   ref.invalidate(cashierBillingProvider);
                                   ref.invalidate(tablesProvider('dine_in'));
                                   ref.invalidate(tablesProvider('takeaway'));
-                                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                                  if (sheetContext.mounted)
+                                    Navigator.of(sheetContext).pop();
                                   if (context.mounted) {
-                                    final entries = result.paymentEntries.isNotEmpty
+                                    final entries =
+                                        result.paymentEntries.isNotEmpty
                                         ? result.paymentEntries.join(', ')
                                         : (result.paymentEntry ?? '');
                                     final changeText = result.changeAmount > 0
@@ -420,7 +446,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                 } catch (error) {
                                   if (sheetContext.mounted) {
                                     setSheetState(() => busy = false);
-                                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    ScaffoldMessenger.of(
+                                      sheetContext,
+                                    ).showSnackBar(
                                       SnackBar(content: Text(error.toString())),
                                     );
                                   }
@@ -430,7 +458,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.payments),
                         label: Text(busy ? 'Processing…' : 'Confirm Payment'),
@@ -493,10 +523,6 @@ class _InvoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final printedTotalMatches =
-        (invoice.billPrintedTotal - invoice.grandTotal).abs() <= 0.0001;
-    final billChanged = invoice.billPrinted && !printedTotalMatches;
-
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -511,9 +537,15 @@ class _InvoiceCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(invoice.customerName, style: Theme.of(context).textTheme.titleLarge),
+                      Text(
+                        invoice.customerName,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                       const SizedBox(height: 2),
-                      Text(invoice.name, style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        invoice.name,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                       if (invoice.salesOrders.isNotEmpty)
                         Text(
                           "Order: ${invoice.salesOrders.join(', ')}",
@@ -532,7 +564,11 @@ class _InvoiceCard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: Text('${formatQuantity(item.qty)} × ${item.itemName}')),
+                    Expanded(
+                      child: Text(
+                        '${formatQuantity(item.qty)} × ${item.itemName}',
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Text(formatMoney(item.amount, invoice.currency)),
                   ],
@@ -566,34 +602,19 @@ class _InvoiceCard extends StatelessWidget {
                 emphasize: true,
               ),
             const Divider(height: 24),
-            if (billChanged)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'Bill total changed after printing. Payment is locked. Please contact a manager.',
-                ),
-              ),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (!invoice.billPrinted)
-                  FilledButton.icon(
-                    onPressed: onPrint,
-                    icon: const Icon(Icons.print),
-                    label: const Text('Print'),
-                  )
-                else
-                  const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle_outline),
-                      SizedBox(width: 6),
-                      Text('Printed'),
-                    ],
+                FilledButton.icon(
+                  onPressed: onPrint,
+                  icon: const Icon(Icons.print),
+                  label: Text(
+                    invoice.billPrinted ? 'Reprint Bill' : 'Print Bill',
                   ),
+                ),
                 const SizedBox(width: 12),
                 FilledButton.icon(
-                  onPressed: billChanged ? null : onPayment,
+                  onPressed: onPayment,
                   icon: const Icon(Icons.point_of_sale),
                   label: const Text('Payment'),
                 ),
@@ -612,7 +633,10 @@ double _parseTender(String? value) {
 
 bool _isCashMode(String mode) => mode.trim().toLowerCase() == 'cash';
 
-CashierPaymentMode? _findModeByName(List<CashierPaymentMode> modes, String name) {
+CashierPaymentMode? _findModeByName(
+  List<CashierPaymentMode> modes,
+  String name,
+) {
   final wanted = name.trim().toLowerCase();
   for (final mode in modes) {
     if (mode.name.trim().toLowerCase() == wanted) return mode;
@@ -620,7 +644,10 @@ CashierPaymentMode? _findModeByName(List<CashierPaymentMode> modes, String name)
   return null;
 }
 
-CashierPaymentMode? _firstOtherMode(List<CashierPaymentMode> modes, String? excludedName) {
+CashierPaymentMode? _firstOtherMode(
+  List<CashierPaymentMode> modes,
+  String? excludedName,
+) {
   for (final mode in modes) {
     if (mode.name != excludedName) return mode;
   }

@@ -1,95 +1,76 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-
 import '../../../core/formatters/amount_format.dart';
+import '../../printing/data/direct_printer_service.dart';
+import '../../printing/data/printer_settings_repository.dart';
+import '../../printing/services/esc_pos_raster_builder.dart';
 import '../domain/cashier_models.dart';
 
 class CashierPrinterService {
-  const CashierPrinterService();
+  const CashierPrinterService({
+    this.settingsRepository = const PrinterSettingsRepository(),
+    this.printerService = const DirectPrinterService(),
+    this.ticketBuilder = const EscPosRasterBuilder(),
+  });
 
-  Future<void> printBill({
-    required CashierInvoice invoice,
-    required CashierPrinterSettings settings,
-  }) async {
-    if (!settings.isConfigured) {
-      throw StateError('Cashier printer is not configured.');
+  final PrinterSettingsRepository settingsRepository;
+  final DirectPrinterService printerService;
+  final EscPosRasterBuilder ticketBuilder;
+
+  Future<void> printBill({required CashierInvoice invoice}) async {
+    final config = await settingsRepository.load();
+    if (!config.isConfigured) {
+      throw StateError('Printer is not configured on this tablet.');
     }
 
-    Socket? socket;
-    try {
-      socket = await Socket.connect(
-        settings.printerIp,
-        settings.printerPort,
-        timeout: const Duration(seconds: 5),
-      );
-      socket.add(_buildBill(invoice: invoice, settings: settings));
-      await socket.flush();
-      await socket.close();
-    } on SocketException catch (error) {
-      throw StateError(
-        'Cannot connect to cashier printer ${settings.printerIp}:${settings.printerPort}. ${error.message}',
-      );
-    } finally {
-      socket?.destroy();
-    }
+    final lines = <TicketLine>[
+      const TicketLine(
+        'BCN RESTAURANT',
+        bold: true,
+        center: true,
+        sizeFactor: 1.35,
+      ),
+      const TicketLine('BILL', bold: true, center: true),
+      const TicketLine('--------------------------------'),
+      TicketLine(invoice.customerName.toUpperCase(), bold: true),
+      TicketLine('Invoice: ${invoice.name}'),
+      if (invoice.salesOrders.isNotEmpty)
+        TicketLine('Order: ${invoice.salesOrders.join(', ')}'),
+      if (_creationTime(invoice.creation) case final value?)
+        TicketLine('Time: $value'),
+      const TicketLine('--------------------------------'),
+      for (final item in invoice.items) ...[
+        TicketLine('${formatQuantity(item.qty)} x ${item.itemName}'),
+        TicketLine(
+          '  ${formatAmount(item.rate)} x ${formatQuantity(item.qty)} = '
+          '${formatAmount(item.amount)}',
+        ),
+      ],
+      const TicketLine('--------------------------------'),
+      TicketLine('Subtotal: ${formatAmount(invoice.netTotal)}'),
+      for (final tax in invoice.taxes)
+        TicketLine(
+          '${tax.description}${tax.rate == 0 ? '' : ' ${formatQuantity(tax.rate)}%'}: '
+          '${formatAmount(tax.taxAmount)}',
+        ),
+      TicketLine(
+        'Grand Total: ${formatAmount(invoice.grandTotal)} ${invoice.currency}',
+        bold: true,
+        sizeFactor: 1.15,
+      ),
+      if (config.footerRemark.isNotEmpty) ...[
+        const TicketLine('--------------------------------'),
+        TicketLine(config.footerRemark, center: true),
+      ],
+    ];
+    final bytes = await ticketBuilder.build(config: config, lines: lines);
+    final result = await printerService.printBytes(config, bytes);
+    if (!result.succeeded) throw StateError(result.message);
   }
 
-  Uint8List _buildBill({
-    required CashierInvoice invoice,
-    required CashierPrinterSettings settings,
-  }) {
-    final width = settings.paperWidth == '58mm' ? 32 : 48;
-    final separator = '-' * width;
-    final buffer = BytesBuilder();
-
-    void command(List<int> bytes) => buffer.add(bytes);
-    void line([String text = '']) => buffer.add(utf8.encode('$text\n'));
-
-    command(const [0x1B, 0x40]);
-    command(const [0x1B, 0x61, 0x01]);
-    command(const [0x1B, 0x45, 0x01]);
-    line('BCN RESTAURANT');
-    line('BILL');
-    command(const [0x1B, 0x45, 0x00]);
-    command(const [0x1B, 0x61, 0x00]);
-    line(separator);
-    line(invoice.customerName.toUpperCase());
-    line('Invoice: ${invoice.name}');
-    if (invoice.salesOrders.isNotEmpty) {
-      line('Order: ${invoice.salesOrders.join(', ')}');
-    }
-    if (invoice.creation != null) {
-      final created = DateTime.tryParse(invoice.creation!);
-      if (created != null) {
-        final local = created.toLocal();
-        final hh = local.hour.toString().padLeft(2, '0');
-        final mm = local.minute.toString().padLeft(2, '0');
-        line('Time: $hh:$mm');
-      }
-    }
-    line(separator);
-
-    for (final item in invoice.items) {
-      line('${formatQuantity(item.qty)} x ${item.itemName}');
-      line('  ${formatAmount(item.amount)}');
-    }
-
-    line(separator);
-    line('Subtotal: ${formatAmount(invoice.netTotal)}');
-    for (final tax in invoice.taxes) {
-      final rateText = tax.rate == 0 ? '' : ' ${formatQuantity(tax.rate)}%';
-      line('${tax.description}$rateText: ${formatAmount(tax.taxAmount)}');
-    }
-    command(const [0x1B, 0x45, 0x01]);
-    line('Grand Total: ${formatAmount(invoice.grandTotal)} ${invoice.currency}');
-    command(const [0x1B, 0x45, 0x00]);
-    line(separator);
-    command(const [0x1B, 0x61, 0x01]);
-    line('Please present this bill for payment.');
-    line();
-    line();
-    command(const [0x1D, 0x56, 0x00]);
-    return buffer.takeBytes();
+  static String? _creationTime(String? value) {
+    final parsed = value == null ? null : DateTime.tryParse(value);
+    if (parsed == null) return null;
+    final local = parsed.toLocal();
+    return '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
   }
 }

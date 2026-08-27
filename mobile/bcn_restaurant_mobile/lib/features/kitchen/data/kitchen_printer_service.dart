@@ -1,109 +1,73 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-
+import '../../printing/data/direct_printer_service.dart';
+import '../../printing/data/printer_settings_repository.dart';
+import '../../printing/services/esc_pos_raster_builder.dart';
 import '../domain/kitchen_models.dart';
 
 class KitchenPrinterService {
-  const KitchenPrinterService();
+  const KitchenPrinterService({
+    this.settingsRepository = const PrinterSettingsRepository(),
+    this.printerService = const DirectPrinterService(),
+    this.ticketBuilder = const EscPosRasterBuilder(),
+  });
+
+  final PrinterSettingsRepository settingsRepository;
+  final DirectPrinterService printerService;
+  final EscPosRasterBuilder ticketBuilder;
 
   Future<void> printOrder({
     required KitchenOrder order,
     required String counterName,
-    required KitchenPrinterSettings settings,
     required List<KitchenOrderItem> items,
     required bool isReprint,
   }) async {
-    if (!settings.isConfigured) {
-      throw StateError('Printer is not configured for $counterName.');
-    }
-    if (items.isEmpty) {
-      throw StateError('There are no kitchen items to print.');
+    if (items.isEmpty) throw StateError('There are no kitchen items to print.');
+    final config = await settingsRepository.load();
+    if (!config.isConfigured) {
+      throw StateError('Printer is not configured on this tablet.');
     }
 
-    Socket? socket;
-    try {
-      socket = await Socket.connect(
-        settings.printerIp,
-        settings.printerPort,
-        timeout: const Duration(seconds: 5),
-      );
-      socket.add(_buildTicket(
-        order: order,
-        counterName: counterName,
-        settings: settings,
-        items: items,
-        isReprint: isReprint,
-      ));
-      await socket.flush();
-      await socket.close();
-    } on SocketException catch (error) {
-      throw StateError(
-        'Cannot connect to printer ${settings.printerIp}:${settings.printerPort}. ${error.message}',
-      );
-    } finally {
-      if (socket != null) {
-        socket.destroy();
-      }
-    }
+    final lines = <TicketLine>[
+      TicketLine(
+        counterName.toUpperCase().contains('KITCHEN')
+            ? counterName.toUpperCase()
+            : '${counterName.toUpperCase()} KITCHEN',
+        bold: true,
+        center: true,
+        sizeFactor: 1.35,
+      ),
+      TicketLine(isReprint ? 'REPRINT' : 'NEW ORDER', bold: true, center: true),
+      const TicketLine('--------------------------------'),
+      TicketLine(order.customer.toUpperCase(), bold: true),
+      TicketLine('Order: ${order.name}'),
+      if (order.creation != null) TicketLine('Time: ${_time(order.creation!)}'),
+      const TicketLine('--------------------------------'),
+      for (final item in items) ...[
+        TicketLine(
+          '${_qty(item.qty)} x ${item.itemName}',
+          bold: true,
+          sizeFactor: 1.1,
+        ),
+        if (item.kitchenNote?.trim().isNotEmpty == true)
+          TicketLine(
+            '  *** ${item.kitchenNote!.trim().toUpperCase()} ***',
+            bold: true,
+          ),
+        const TicketLine(''),
+      ],
+      const TicketLine('--------------------------------'),
+      TicketLine(isReprint ? 'REPRINT' : 'NEW ORDER', bold: true, center: true),
+    ];
+    final bytes = await ticketBuilder.build(config: config, lines: lines);
+    final result = await printerService.printBytes(config, bytes);
+    if (!result.succeeded) throw StateError(result.message);
   }
 
-  Uint8List _buildTicket({
-    required KitchenOrder order,
-    required String counterName,
-    required KitchenPrinterSettings settings,
-    required List<KitchenOrderItem> items,
-    required bool isReprint,
-  }) {
-    final width = settings.paperWidth == '58mm' ? 32 : 48;
-    final separator = '-' * width;
-    final buffer = BytesBuilder();
-
-    void command(List<int> bytes) => buffer.add(bytes);
-    void line([String text = '']) => buffer.add(utf8.encode('$text\n'));
-
-    command(const [0x1B, 0x40]); // ESC @ - initialize
-    command(const [0x1B, 0x61, 0x01]); // center
-    command(const [0x1B, 0x45, 0x01]); // bold on
-    line(counterName.toUpperCase().contains('KITCHEN')
-        ? counterName.toUpperCase()
-        : '${counterName.toUpperCase()} KITCHEN');
-    command(const [0x1B, 0x45, 0x00]); // bold off
-    if (isReprint) {
-      command(const [0x1B, 0x45, 0x01]);
-      line('***** REPRINT *****');
-      command(const [0x1B, 0x45, 0x00]);
-    }
-    command(const [0x1B, 0x61, 0x00]); // left
-    line(separator);
-    command(const [0x1B, 0x45, 0x01]);
-    line(order.customer.toUpperCase());
-    command(const [0x1B, 0x45, 0x00]);
-    line('Order: ${order.name}');
-    if (order.creation != null) {
-      final created = order.creation!.toLocal();
-      final hh = created.hour.toString().padLeft(2, '0');
-      final mm = created.minute.toString().padLeft(2, '0');
-      line('Time : $hh:$mm');
-    }
-    line(separator);
-    for (final item in items) {
-      command(const [0x1B, 0x45, 0x01]);
-      line('${_qty(item.qty)} x ${item.itemName}');
-      command(const [0x1B, 0x45, 0x00]);
-      if (item.kitchenNote?.trim().isNotEmpty == true) {
-        line('  *** ${item.kitchenNote!.trim().toUpperCase()} ***');
-      }
-      line();
-    }
-    line(separator);
-    command(const [0x1B, 0x61, 0x01]);
-    line(isReprint ? 'REPRINT' : 'NEW ORDER');
-    line();
-    line();
-    command(const [0x1D, 0x56, 0x00]); // cut
-    return buffer.takeBytes();
+  static String _time(DateTime value) {
+    final local = value.toLocal();
+    return '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
   }
 
-  String _qty(double qty) => qty == qty.roundToDouble() ? qty.toInt().toString() : qty.toString();
+  static String _qty(double qty) =>
+      qty == qty.roundToDouble() ? qty.toInt().toString() : qty.toString();
 }

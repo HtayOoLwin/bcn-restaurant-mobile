@@ -20,15 +20,18 @@ final printerServiceProvider = Provider<KitchenPrinterService>(
   (ref) => const KitchenPrinterService(),
 );
 
-final kitchenOrdersProvider = FutureProvider.family<KitchenOrdersResponse, String>(
-  (ref, status) => ref.watch(kitchenRepositoryProvider).getOrders(status: status),
-);
+final kitchenOrdersProvider =
+    FutureProvider.family<KitchenOrdersResponse, String>(
+      (ref, status) =>
+          ref.watch(kitchenRepositoryProvider).getOrders(status: status),
+    );
 
 class KitchenOrdersScreen extends ConsumerStatefulWidget {
   const KitchenOrdersScreen({super.key});
 
   @override
-  ConsumerState<KitchenOrdersScreen> createState() => _KitchenOrdersScreenState();
+  ConsumerState<KitchenOrdersScreen> createState() =>
+      _KitchenOrdersScreenState();
 }
 
 class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
@@ -41,11 +44,16 @@ class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
     final response = ref.watch(kitchenOrdersProvider(_status));
-    final kitchenNewOrderCount = ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
+    final kitchenNewOrderCount =
+        ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(bootstrap?.fullName.isNotEmpty == true ? bootstrap!.fullName : 'Kitchen'),
+        title: Text(
+          bootstrap?.fullName.isNotEmpty == true
+              ? bootstrap!.fullName
+              : 'Kitchen',
+        ),
         actions: [
           if (bootstrap?.permissions.waiter == true)
             IconButton(
@@ -78,9 +86,9 @@ class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
-            tooltip: 'Logout',
-            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-            icon: const Icon(Icons.logout),
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings),
           ),
         ],
       ),
@@ -98,7 +106,8 @@ class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
                   ButtonSegment(value: 'Ready', label: Text('Ready')),
                 ],
                 selected: {_status},
-                onSelectionChanged: (value) => setState(() => _status = value.first),
+                onSelectionChanged: (value) =>
+                    setState(() => _status = value.first),
               ),
             ),
           ),
@@ -139,29 +148,37 @@ class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
                     )
                     .toList();
                 return RefreshIndicator(
-                  onRefresh: () => ref.refresh(kitchenOrdersProvider(_status).future),
+                  onRefresh: () =>
+                      ref.refresh(kitchenOrdersProvider(_status).future),
                   child: data.orders.isEmpty
-                      ? ListView(children: const [
-                          SizedBox(height: 160),
-                          Center(child: Text('No active kitchen items')),
-                        ])
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 160),
+                            Center(child: Text('No active kitchen items')),
+                          ],
+                        )
                       : filteredOrders.isEmpty
-                          ? ListView(children: const [
-                              SizedBox(height: 160),
-                              Center(child: Text('No kitchen orders match your search.')),
-                            ])
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(12),
-                              itemCount: filteredOrders.length,
-                              itemBuilder: (context, index) => _OrderCard(
-                                order: filteredOrders[index],
-                                response: data,
-                                busyRow: _busyRow,
-                                busyPrintKey: _busyPrintKey,
-                                onAction: _runAction,
-                                onPrint: _printOrderCounter,
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 160),
+                            Center(
+                              child: Text(
+                                'No kitchen orders match your search.',
                               ),
                             ),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) => _OrderCard(
+                            order: filteredOrders[index],
+                            busyRow: _busyRow,
+                            busyPrintKey: _busyPrintKey,
+                            onAction: _runAction,
+                            onPrint: _printOrderCounter,
+                          ),
+                        ),
                 );
               },
             ),
@@ -174,40 +191,39 @@ class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
   Future<void> _printOrderCounter(
     KitchenOrder order,
     String counterName,
-    KitchenPrinterSettings? settings,
     List<KitchenOrderItem> items,
   ) async {
-    if (settings == null || !settings.isConfigured) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Printer is not configured for $counterName.')),
-        );
-      }
-      return;
-    }
-
+    final newItems = items.where((item) => item.printCount == 0).toList();
+    final itemsToPrint = newItems.isEmpty ? items : newItems;
     final printKey = '${order.name}|$counterName';
-    final isReprint = items.any((item) => item.printCount > 0);
+    final isReprint = newItems.isEmpty;
     setState(() => _busyPrintKey = printKey);
     var physicalPrintSucceeded = false;
     try {
-      await ref.read(printerServiceProvider).printOrder(
+      await ref
+          .read(printerServiceProvider)
+          .printOrder(
             order: order,
             counterName: counterName,
-            settings: settings,
-            items: items,
+            items: itemsToPrint,
             isReprint: isReprint,
           );
       physicalPrintSucceeded = true;
-      await ref.read(kitchenRepositoryProvider).recordPrint(
+      await ref
+          .read(kitchenRepositoryProvider)
+          .recordPrint(
             orderName: order.name,
             counterName: counterName,
-            rowNames: items.map((item) => item.rowName).toList(),
+            rowNames: itemsToPrint.map((item) => item.rowName).toList(),
           );
       ref.invalidate(kitchenOrdersProvider(_status));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${isReprint ? 'Reprinted' : 'Printed'} · ${order.customer} · $counterName')),
+          SnackBar(
+            content: Text(
+              '${isReprint ? 'Reprinted' : 'Printed'} · ${order.customer} · $counterName',
+            ),
+          ),
         );
       }
     } catch (error) {
@@ -215,9 +231,8 @@ class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
         final prefix = physicalPrintSucceeded
             ? 'Print was sent, but print history could not be recorded. '
             : '';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$prefix$error')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$prefix$error')));
       }
     } finally {
       if (mounted) setState(() => _busyPrintKey = null);
@@ -227,16 +242,22 @@ class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
   Future<void> _runAction(KitchenOrderItem item, String action) async {
     setState(() => _busyRow = item.rowName);
     try {
-      await ref.read(kitchenRepositoryProvider).updateItemStatus(rowName: item.rowName, action: action);
+      await ref
+          .read(kitchenRepositoryProvider)
+          .updateItemStatus(rowName: item.rowName, action: action);
       ref.invalidate(kitchenOrdersProvider(_status));
       ref.invalidate(kitchenNewOrderCountProvider);
       ref.invalidate(tablesProvider('dine_in'));
       ref.invalidate(tablesProvider('takeaway'));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$action · ${item.itemName}')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$action · ${item.itemName}')));
       }
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
     } finally {
       if (mounted) setState(() => _busyRow = null);
     }
@@ -246,7 +267,6 @@ class _KitchenOrdersScreenState extends ConsumerState<KitchenOrdersScreen> {
 class _OrderCard extends StatelessWidget {
   const _OrderCard({
     required this.order,
-    required this.response,
     required this.busyRow,
     required this.busyPrintKey,
     required this.onAction,
@@ -254,16 +274,15 @@ class _OrderCard extends StatelessWidget {
   });
 
   final KitchenOrder order;
-  final KitchenOrdersResponse response;
   final String? busyRow;
   final String? busyPrintKey;
   final Future<void> Function(KitchenOrderItem item, String action) onAction;
   final Future<void> Function(
     KitchenOrder order,
     String counterName,
-    KitchenPrinterSettings? settings,
     List<KitchenOrderItem> items,
-  ) onPrint;
+  )
+  onPrint;
 
   @override
   Widget build(BuildContext context) {
@@ -281,7 +300,12 @@ class _OrderCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: Text(order.customer, style: Theme.of(context).textTheme.titleLarge)),
+                Expanded(
+                  child: Text(
+                    order.customer,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
                 Text(order.preparationSummary),
               ],
             ),
@@ -302,18 +326,14 @@ class _OrderCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         counterName,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                     ),
                     OutlinedButton.icon(
                       onPressed: printing
                           ? null
-                          : () => onPrint(
-                                order,
-                                counterName,
-                                response.settingsForCounter(counterName),
-                                counterItems,
-                              ),
+                          : () => onPrint(order, counterName, counterItems),
                       icon: printing
                           ? const SizedBox(
                               width: 16,
@@ -321,7 +341,11 @@ class _OrderCard extends StatelessWidget {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.print),
-                      label: Text(isReprint ? 'Reprint' : 'Print'),
+                      label: Text(
+                        isReprint
+                            ? 'Reprint Kitchen Ticket'
+                            : 'Print Kitchen Ticket',
+                      ),
                     ),
                   ],
                 ),
@@ -352,7 +376,8 @@ class _OrderCard extends StatelessWidget {
     DateTime? latest;
     for (final item in items) {
       final value = item.lastPrintedAt;
-      if (value != null && (latest == null || value.isAfter(latest))) latest = value;
+      if (value != null && (latest == null || value.isAfter(latest)))
+        latest = value;
     }
     return latest;
   }
@@ -366,7 +391,11 @@ class _OrderCard extends StatelessWidget {
 }
 
 class _KitchenLine extends StatelessWidget {
-  const _KitchenLine({required this.item, required this.busy, required this.onAction});
+  const _KitchenLine({
+    required this.item,
+    required this.busy,
+    required this.onAction,
+  });
 
   final KitchenOrderItem item;
   final bool busy;
@@ -382,17 +411,26 @@ class _KitchenLine extends StatelessWidget {
         children: [
           Text(item.itemName, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text('${item.qty.g} ${item.uom} · ${item.kitchenCounter} · ${item.displayPreparationStatus}'),
+          Text(
+            '${item.qty.g} ${item.uom} · ${item.kitchenCounter} · ${item.displayPreparationStatus}',
+          ),
           if (item.kitchenNote?.isNotEmpty == true) ...[
             const SizedBox(height: 6),
-            Text('Note: ${item.kitchenNote}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(
+              'Note: ${item.kitchenNote}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ],
           if (action != null) ...[
             const SizedBox(height: 8),
             FilledButton(
               onPressed: busy ? null : () => onAction(item, action),
               child: busy
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : Text(action),
             ),
           ],

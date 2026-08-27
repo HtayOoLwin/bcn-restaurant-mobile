@@ -15,7 +15,8 @@ final tablesRepositoryProvider = Provider<TablesRepository>(
 );
 
 final tablesProvider = FutureProvider.family<TablesResponse, String>(
-  (ref, serviceType) => ref.watch(tablesRepositoryProvider).getTables(serviceType),
+  (ref, serviceType) =>
+      ref.watch(tablesRepositoryProvider).getTables(serviceType),
 );
 
 class WaiterTablesScreen extends ConsumerStatefulWidget {
@@ -32,12 +33,18 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
     final tables = ref.watch(tablesProvider(serviceType));
-    final notificationCount = ref.watch(mobileNotificationsProvider).asData?.value.length ?? 0;
-    final kitchenNewOrderCount = ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
+    final notificationCount =
+        ref.watch(mobileNotificationsProvider).asData?.value.length ?? 0;
+    final kitchenNewOrderCount =
+        ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(bootstrap?.fullName.isNotEmpty == true ? bootstrap!.fullName : 'Waiter'),
+        title: Text(
+          bootstrap?.fullName.isNotEmpty == true
+              ? bootstrap!.fullName
+              : 'Waiter',
+        ),
         actions: [
           if (bootstrap?.permissions.kitchen == true)
             IconButton(
@@ -77,9 +84,9 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
-            tooltip: 'Logout',
-            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-            icon: const Icon(Icons.logout),
+            tooltip: 'Settings',
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings),
           ),
         ],
       ),
@@ -89,8 +96,16 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
             padding: const EdgeInsets.all(12),
             child: SegmentedButton<String>(
               segments: const [
-                ButtonSegment(value: 'dine_in', label: Text('Dine In'), icon: Icon(Icons.table_restaurant)),
-                ButtonSegment(value: 'takeaway', label: Text('Takeaway'), icon: Icon(Icons.takeout_dining)),
+                ButtonSegment(
+                  value: 'dine_in',
+                  label: Text('Dine In'),
+                  icon: Icon(Icons.table_restaurant),
+                ),
+                ButtonSegment(
+                  value: 'takeaway',
+                  label: Text('Takeaway'),
+                  icon: Icon(Icons.takeout_dining),
+                ),
               ],
               selected: {serviceType},
               onSelectionChanged: (selection) {
@@ -106,7 +121,8 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(child: Text(error.toString())),
               data: (response) => RefreshIndicator(
-                onRefresh: () => ref.refresh(tablesProvider(serviceType).future),
+                onRefresh: () =>
+                    ref.refresh(tablesProvider(serviceType).future),
                 child: GridView.builder(
                   padding: const EdgeInsets.all(12),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -121,11 +137,15 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                     return _TableCard(
                       table: table,
                       onTap: () {
-                        ref.read(cartProvider.notifier).setOrderContext(
+                        ref
+                            .read(cartProvider.notifier)
+                            .setOrderContext(
                               customer: table.customer,
                               session: table.session,
                             );
-                        context.push('/menu/${Uri.encodeComponent(table.customer)}');
+                        context.push(
+                          '/menu/${Uri.encodeComponent(table.customer)}',
+                        );
                       },
                     );
                   },
@@ -137,6 +157,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
       ),
     );
   }
+
   Future<void> _openReadyToServe() async {
     final notifications = ref.read(mobileNotificationsProvider).asData?.value;
     if (notifications?.isNotEmpty == true) {
@@ -151,7 +172,6 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
       context.push('/waiter/ready');
     }
   }
-
 }
 
 class _TableCard extends StatelessWidget {
@@ -172,13 +192,23 @@ class _TableCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(table.customerName, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                table.customerName,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(table.isOpen ? Icons.circle : Icons.circle_outlined, size: 14),
+                  Icon(
+                    table.isOpen ? Icons.circle : Icons.circle_outlined,
+                    size: 14,
+                  ),
                   const SizedBox(width: 6),
-                  Text(table.isOpen ? (table.sessionStatus ?? 'Open') : 'Available'),
+                  Text(
+                    table.isOpen
+                        ? (table.sessionStatus ?? 'Open')
+                        : 'Available',
+                  ),
                 ],
               ),
             ],
