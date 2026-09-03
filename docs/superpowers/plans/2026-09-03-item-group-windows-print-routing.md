@@ -61,6 +61,7 @@
 ### Windows middleware
 
 - Modify: `socket_app.py` — wake on Socket.IO and drain durable jobs.
+- Modify: `printer_handlers.py` — print one claimed job and return structured success/failure.
 - Create: `print_job_client.py` — claim/acknowledge REST client.
 - Test: `tests/test_print_job_client.py`
 - Test: `tests/test_socket_app.py`
@@ -265,6 +266,7 @@ git commit -m "feat: expose durable print worker APIs"
 **Files:**
 - Create: `print_job_client.py`
 - Modify: `socket_app.py`
+- Modify: `printer_handlers.py`
 - Create: `tests/test_print_job_client.py`
 - Create: `tests/test_socket_app.py`
 
@@ -284,7 +286,7 @@ Expected: FAIL because the durable client is absent.
 
 - [ ] **Step 3: Implement REST job client**
 
-Implement the printer execution adapter inside `socket_app.py` using its existing Windows print call. Reuse the authenticated session/config already used by `socket_app.py`. Deserialize `job_id`, `printer`, `payload`, `ticket_type`, and `attempt_count`. Never log credentials or full base64 payloads.
+Keep orchestration in `socket_app.py` and adapt the existing `printer_handlers.py` execution path to print one claimed job and return a structured result. Reuse the authenticated session/config already used by `socket_app.py`. Deserialize `job_id`, `printer`, `payload`, `ticket_type`, and `attempt_count`. Never log credentials or full base64 payloads.
 
 - [ ] **Step 4: Change Socket.IO handling**
 
@@ -297,7 +299,7 @@ Expected: unit tests PASS; one test job transitions Pending → Printing → Suc
 - [ ] **Step 6: Commit to the authorized Windows middleware repository**
 
 ```bash
-git add socket_app.py print_job_client.py tests
+git add socket_app.py printer_handlers.py print_job_client.py tests
 git commit -m "feat: claim and acknowledge durable print jobs"
 ```
 
