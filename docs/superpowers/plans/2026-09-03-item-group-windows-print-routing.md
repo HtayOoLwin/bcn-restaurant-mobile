@@ -105,7 +105,7 @@ def test_cashier_cannot_be_default_kitchen(site):
 
 - [ ] **Step 2: Run tests and confirm failure**
 
-Run: `bench --site bcn-mobile.s.frappe.cloud run-tests --app local_printers --module local_printers.tests.test_printer_config`  
+Run: `bench --site ourcity.s.frappe.cloud run-tests --app local_printers --module local_printers.tests.test_printer_config`  
 Expected: FAIL because the fields/validation do not exist.
 
 - [ ] **Step 3: Add schema fields and validation**
@@ -116,8 +116,8 @@ Implement `validate()` so disabled records are ignored, defaults require `Sales 
 
 Run:
 ```bash
-bench --site bcn-mobile.s.frappe.cloud migrate
-bench --site bcn-mobile.s.frappe.cloud run-tests --app local_printers --module local_printers.tests.test_printer_config
+bench --site ourcity.s.frappe.cloud migrate
+bench --site ourcity.s.frappe.cloud run-tests --app local_printers --module local_printers.tests.test_printer_config
 ```
 Expected: PASS.
 
