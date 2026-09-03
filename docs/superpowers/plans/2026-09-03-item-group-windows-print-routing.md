@@ -62,7 +62,6 @@
 
 - Modify: `socket_app.py` — wake on Socket.IO and drain durable jobs.
 - Create: `print_job_client.py` — claim/acknowledge REST client.
-- Modify printer execution module discovered with `rg "print|win32print|ShellExecute" .` — return structured success/failure.
 - Test: `tests/test_print_job_client.py`
 - Test: `tests/test_socket_app.py`
 
@@ -105,7 +104,7 @@ def test_cashier_cannot_be_default_kitchen(site):
 
 - [ ] **Step 2: Run tests and confirm failure**
 
-Run: `bench --site <test-site> run-tests --app local_printers --module local_printers.tests.test_printer_config`  
+Run: `bench --site bcn-mobile.s.frappe.cloud run-tests --app local_printers --module local_printers.tests.test_printer_config`  
 Expected: FAIL because the fields/validation do not exist.
 
 - [ ] **Step 3: Add schema fields and validation**
@@ -116,8 +115,8 @@ Implement `validate()` so disabled records are ignored, defaults require `Sales 
 
 Run:
 ```bash
-bench --site <test-site> migrate
-bench --site <test-site> run-tests --app local_printers --module local_printers.tests.test_printer_config
+bench --site bcn-mobile.s.frappe.cloud migrate
+bench --site bcn-mobile.s.frappe.cloud run-tests --app local_printers --module local_printers.tests.test_printer_config
 ```
 Expected: PASS.
 
@@ -266,7 +265,6 @@ git commit -m "feat: expose durable print worker APIs"
 **Files:**
 - Create: `print_job_client.py`
 - Modify: `socket_app.py`
-- Modify: printer execution module located by `rg "win32print|ShellExecute|print" .`
 - Create: `tests/test_print_job_client.py`
 - Create: `tests/test_socket_app.py`
 
@@ -286,7 +284,7 @@ Expected: FAIL because the durable client is absent.
 
 - [ ] **Step 3: Implement REST job client**
 
-Reuse the authenticated session/config already used by `socket_app.py`. Deserialize `job_id`, `printer`, `payload`, `ticket_type`, and `attempt_count`. Never log credentials or full base64 payloads.
+Implement the printer execution adapter inside `socket_app.py` using its existing Windows print call. Reuse the authenticated session/config already used by `socket_app.py`. Deserialize `job_id`, `printer`, `payload`, `ticket_type`, and `attempt_count`. Never log credentials or full base64 payloads.
 
 - [ ] **Step 4: Change Socket.IO handling**
 
