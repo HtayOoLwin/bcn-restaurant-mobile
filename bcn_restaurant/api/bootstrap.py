@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import frappe
 
-from bcn_restaurant.api.common import current_roles, get_settings, get_user_kitchen_counters, role_flags
+from bcn_restaurant.api.common import current_roles, get_settings, role_flags
 
 
 @frappe.whitelist()
@@ -22,5 +22,4 @@ def get_bootstrap():
         "company": settings["company"],
         "currency": settings["default_currency"],
         "selling_price_list": settings["selling_price_list"],
-        "kitchen_counters": get_user_kitchen_counters(),
     }
