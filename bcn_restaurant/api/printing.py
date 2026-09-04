@@ -4,7 +4,7 @@ from uuid import UUID
 
 import frappe
 
-from bcn_restaurant.api.common import get_settings, require_any_role
+from bcn_restaurant.api.common import current_roles, get_settings, require_any_role
 from local_printers.api.print_jobs import get_status, retry_failed
 from local_printers.printing.jobs import create_print_job
 
@@ -66,6 +66,43 @@ def _cashier_configuration(pos_profile: str):
     return configuration
 
 
+def _lock_invoice_for_cashier_job(invoice_name: str) -> None:
+    rows = frappe.db.sql(
+        """
+        SELECT name
+        FROM `tabSales Invoice`
+        WHERE name = %(invoice_name)s
+        FOR UPDATE
+        """,
+        {"invoice_name": invoice_name},
+        as_dict=True,
+    )
+    if not rows:
+        frappe.throw("Unknown Sales Invoice", frappe.ValidationError)
+
+
+def _has_prior_cashier_job(invoice_name: str) -> bool:
+    rows = frappe.db.sql(
+        """
+        SELECT name
+        FROM `tabLocal Print Job`
+        WHERE source_doctype = %(source_doctype)s
+            AND source_name = %(source_name)s
+            AND ticket_type = %(ticket_type)s
+        ORDER BY creation ASC, name ASC
+        LIMIT 1
+        FOR UPDATE
+        """,
+        {
+            "source_doctype": "Sales Invoice",
+            "source_name": invoice_name,
+            "ticket_type": "Cashier",
+        },
+        as_dict=True,
+    )
+    return bool(rows)
+
+
 def _publish_job_wake(job_id: str, pos_profile: str) -> None:
     metadata = {
         "job_id": job_id,
@@ -98,18 +135,15 @@ def request_cashier_bill(invoice_name: str) -> dict[str, str | bool]:
             "Sales Invoice is outside the current POS Profile",
             frappe.PermissionError,
         )
+    roles = set(current_roles())
+    if not roles.intersection({"Administrator", "System Manager"}) and not frappe.has_permission(
+        "POS Profile",
+        ptype="read",
+        doc=settings["pos_profile"],
+    ):
+        frappe.throw("You cannot use the current POS Profile", frappe.PermissionError)
 
     configuration = _cashier_configuration(settings["pos_profile"])
-    is_reprint = bool(
-        frappe.db.exists(
-            "Local Print Job",
-            {
-                "source_doctype": "Sales Invoice",
-                "source_name": invoice.name,
-                "ticket_type": "Cashier",
-            },
-        )
-    )
     payload = frappe.get_print(
         "Sales Invoice",
         invoice.name,
@@ -117,6 +151,10 @@ def request_cashier_bill(invoice_name: str) -> dict[str, str | bool]:
         as_pdf=True,
         no_letterhead=int(configuration.no_letterhead or 0),
     )
+    # The source row is a stable serialization point even when no prior job
+    # exists yet. Locking/current reads avoid a stale REPEATABLE READ snapshot.
+    _lock_invoice_for_cashier_job(invoice.name)
+    is_reprint = _has_prior_cashier_job(invoice.name)
     job = create_print_job(
         source_doc=invoice,
         printer=configuration.printer,

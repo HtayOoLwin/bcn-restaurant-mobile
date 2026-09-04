@@ -14,7 +14,7 @@ from bcn_restaurant.services.preparation import (
 
 def _is_manager() -> bool:
     roles = set(current_roles())
-    return "Administrator" in roles or "System Manager" in roles
+    return bool(roles.intersection({"Administrator", "Restaurant Manager", "System Manager"}))
 
 
 def _current_waiter_filter() -> str | None:
@@ -191,9 +191,11 @@ def get_ready_orders():
 
 @frappe.whitelist(methods=["POST"])
 def item_action(item_row_name: str, action: str):
-    require_any_role("Waiter")
+    require_any_role("Waiter", "Restaurant Manager")
     if action not in {"Mark Served", "Cancel"}:
         frappe.throw("Invalid waiter action")
+    if action == "Cancel" and not _is_manager():
+        frappe.throw("Waiters cannot cancel restaurant orders", frappe.PermissionError)
 
     row = frappe.get_doc("Sales Order Item", item_row_name)
     if row.parenttype != "Sales Order":

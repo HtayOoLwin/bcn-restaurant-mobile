@@ -13,16 +13,45 @@ class _Document(types.SimpleNamespace):
 class _FakeDatabase:
     def __init__(self, frappe_module):
         self._frappe = frappe_module
+        self.sql_calls = []
+        self.inject_concurrent_job_on_invoice_lock = False
+        self._concurrent_job_injected = False
 
-    def exists(self, doctype, filters):
-        if doctype != "Local Print Job":
-            return False
-        return any(
-            job.source_doctype == filters["source_doctype"]
-            and job.source_name == filters["source_name"]
-            and job.ticket_type == filters["ticket_type"]
-            for job in self._frappe.jobs
-        )
+    def sql(self, query, values, as_dict=False):
+        self.sql_calls.append((query, values, as_dict))
+        if "`tabSales Invoice`" in query:
+            if values != {"invoice_name": "SINV-0001"} or "FOR UPDATE" not in query:
+                raise AssertionError((query, values))
+            if self.inject_concurrent_job_on_invoice_lock and not self._concurrent_job_injected:
+                self._frappe.jobs.append(
+                    _Document(
+                        name="LOCAL-PRINT-JOB-CONCURRENT",
+                        job_id="10000000-0000-4000-8000-000000000001",
+                        status="Pending",
+                        source_doctype="Sales Invoice",
+                        source_name="SINV-0001",
+                        ticket_type="Cashier",
+                    )
+                )
+                self._concurrent_job_injected = True
+            return [_Document(name="SINV-0001")]
+        if "`tabLocal Print Job`" in query:
+            expected = {
+                "source_doctype": "Sales Invoice",
+                "source_name": "SINV-0001",
+                "ticket_type": "Cashier",
+            }
+            if values != expected or "FOR UPDATE" not in query:
+                raise AssertionError((query, values))
+            matches = [
+                _Document(name=job.name)
+                for job in self._frappe.jobs
+                if job.source_doctype == values["source_doctype"]
+                and job.source_name == values["source_name"]
+                and job.ticket_type == values["ticket_type"]
+            ]
+            return matches[:1]
+        raise AssertionError(query)
 
 
 class _FakeFrappe(types.ModuleType):
@@ -54,6 +83,9 @@ class _FakeFrappe(types.ModuleType):
             pos_profile="Restaurant POS",
         )
         self.can_read = True
+        self.pos_profile_can_read = True
+        self.permission_checks = []
+        self.config_queries = 0
         self.configs = [
             _Document(
                 name="Cashier Printer",
@@ -98,13 +130,17 @@ class _FakeFrappe(types.ModuleType):
         return self.invoice
 
     def has_permission(self, doctype, ptype=None, doc=None):
-        if (doctype, ptype, doc) != ("Sales Invoice", "read", self.invoice):
-            raise AssertionError((doctype, ptype, doc))
-        return self.can_read
+        self.permission_checks.append((doctype, ptype, doc))
+        if (doctype, ptype, doc) == ("Sales Invoice", "read", self.invoice):
+            return self.can_read
+        if (doctype, ptype, doc) == ("POS Profile", "read", "Restaurant POS"):
+            return self.pos_profile_can_read
+        raise AssertionError((doctype, ptype, doc))
 
     def get_all(self, doctype, **kwargs):
         if doctype != "Printer Item Group":
             raise AssertionError(doctype)
+        self.config_queries += 1
         expected_filters = {
             "enabled": 1,
             "is_cashier": 1,
@@ -247,6 +283,29 @@ class PrintingApiTest(unittest.TestCase):
         self.assertNotIn("event_key", self.frappe.job_calls[0])
         self.assertNotIn("event_key", self.frappe.job_calls[1])
 
+    def test_concurrent_request_uses_current_reads_and_marks_second_job_as_reprint(self):
+        self.frappe.db.inject_concurrent_job_on_invoice_lock = True
+
+        result = self.printing.request_cashier_bill("SINV-0001")
+
+        self.assertTrue(result["is_reprint"])
+        self.assertEqual(len(self.frappe.jobs), 2)
+        self.assertEqual(len(self.frappe.db.sql_calls), 2)
+        invoice_lock, prior_job_read = self.frappe.db.sql_calls
+        self.assertIn("`tabSales Invoice`", invoice_lock[0])
+        self.assertEqual(invoice_lock[1], {"invoice_name": "SINV-0001"})
+        self.assertIn("FOR UPDATE", invoice_lock[0])
+        self.assertIn("`tabLocal Print Job`", prior_job_read[0])
+        self.assertEqual(
+            prior_job_read[1],
+            {
+                "source_doctype": "Sales Invoice",
+                "source_name": "SINV-0001",
+                "ticket_type": "Cashier",
+            },
+        )
+        self.assertIn("FOR UPDATE", prior_job_read[0])
+
     def test_draft_cancelled_and_inaccessible_invoices_create_no_job(self):
         cases = ((0, True), (2, True), (1, False))
         for docstatus, can_read in cases:
@@ -298,6 +357,17 @@ class PrintingApiTest(unittest.TestCase):
                     self.printing.request_cashier_bill(invalid)
         self.assertEqual(self.frappe.job_calls, [])
 
+    def test_cashier_without_current_pos_profile_read_permission_creates_nothing(self):
+        self.frappe.pos_profile_can_read = False
+
+        with self.assertRaises(self.frappe.PermissionError):
+            self.printing.request_cashier_bill("SINV-0001")
+
+        self.assertEqual(self.frappe.config_queries, 0)
+        self.assertEqual(self.frappe.print_calls, [])
+        self.assertEqual(self.frappe.job_calls, [])
+        self.assertEqual(self.frappe.wakes, [])
+
     def test_render_and_job_failures_do_not_publish_a_wake(self):
         self.frappe.render_error = RuntimeError("render failed")
         with self.assertRaises(RuntimeError):
@@ -334,6 +404,22 @@ class PrintingApiTest(unittest.TestCase):
             },
         )
 
+    def test_status_allows_cashier_and_system_manager_but_denies_waiter_and_guest(self):
+        self.assertTrue(self.printing.get_print_status()["online"])
+
+        self.frappe.roles = ["System Manager"]
+        self.assertTrue(self.printing.get_print_status()["online"])
+
+        self.frappe.roles = ["Waiter"]
+        with self.assertRaises(self.frappe.PermissionError):
+            self.printing.get_print_status()
+
+        self.frappe.session.user = "Guest"
+        self.frappe.roles = []
+        with self.assertRaises(self.frappe.AuthenticationError):
+            self.printing.get_print_status()
+        self.assertEqual(self.frappe.status_calls, ["Restaurant POS", "Restaurant POS"])
+
     def test_manager_retry_delegates_and_waiter_is_denied(self):
         self.frappe.roles = ["Restaurant Manager"]
         first_job_id = "72C86FB6-B90F-4572-A5E0-81A46F8BF599"
@@ -356,6 +442,22 @@ class PrintingApiTest(unittest.TestCase):
             self.printing.retry_print_job("not-a-job-uuid")
 
         self.assertEqual(self.frappe.retry_calls, [])
+
+    def test_retry_allows_system_manager_but_denies_cashier_and_guest(self):
+        job_id = "1bf4553c-4ee9-4fd3-afb6-ccbccb06f2b5"
+        self.frappe.roles = ["System Manager"]
+        self.assertEqual(self.printing.retry_print_job(job_id), {"status": "Pending"})
+
+        self.frappe.roles = ["Cashier"]
+        with self.assertRaises(self.frappe.PermissionError):
+            self.printing.retry_print_job(job_id)
+
+        self.frappe.session.user = "Guest"
+        self.frappe.roles = []
+        with self.assertRaises(self.frappe.AuthenticationError):
+            self.printing.retry_print_job(job_id)
+
+        self.assertEqual(self.frappe.retry_calls, [job_id])
 
     def test_mutation_endpoints_are_post_only(self):
         self.assertEqual(self.printing.request_cashier_bill.allowed_http_methods, ("POST",))
