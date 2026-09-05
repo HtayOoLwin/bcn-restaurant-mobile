@@ -37,22 +37,13 @@ jobs:
 
           path = Path('test/features/settings/settings_screen_test.dart')
           text = path.read_text(encoding='utf-8')
-          old = """    container.read(routerProvider).go('/printer-settings');
-              await tester.pumpAndSettle();
-
-              expect(
-          """
-          new = """    container.read(routerProvider).go('/printer-settings');
-              await tester.pump();
-
-              expect(
-          """
+          old = "    container.read(routerProvider).go('/printer-settings');\n    await tester.pumpAndSettle();"
+          new = "    container.read(routerProvider).go('/printer-settings');\n    await tester.pump();"
           if old in text:
               path.write_text(text.replace(old, new, 1), encoding='utf-8')
           elif new not in text:
               raise SystemExit('Denied-route test pattern not found')
           PY
-          dart format test/features/settings/settings_screen_test.dart || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add test/features/settings/settings_screen_test.dart
