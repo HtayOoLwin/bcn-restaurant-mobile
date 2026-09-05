@@ -38,12 +38,13 @@ def test_readonly_smoke_script_never_calls_mutating_restaurant_methods():
     assert 'serve_whole_order' not in script
 
 
-def test_site_preflight_checks_backend_doctypes_without_writing():
+def test_site_preflight_checks_bootstrap_read_only_without_kitchen_monitor():
     script = (MOBILE / 'scripts' / 'site_preflight.ps1').read_text(encoding='utf-8')
-    assert 'Restaurant Settings' in script
-    assert 'Restaurant Table Session' in script
+    assert 'bcn_mobile_bootstrap' in script
     assert 'Invoke-RestMethod' in script
     assert 'Method     = "Get"' in script
+    assert 'permissions.kitchen' not in script
+    assert 'bcn_kitchen_orders' not in script
 
 
 def test_powershell_scripts_do_not_use_bash_line_continuations():
