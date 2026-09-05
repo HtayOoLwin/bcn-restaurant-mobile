@@ -40,41 +40,30 @@ jobs:
         run: flutter pub get
       - name: Format Dart sources
         run: dart format lib test
-      - name: Commit regenerated lockfile and formatting
-        working-directory: .
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile/bcn_restaurant_mobile/pubspec.lock mobile/bcn_restaurant_mobile/lib mobile/bcn_restaurant_mobile/test
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: refresh Flutter formatting and lockfile"
-            git push origin HEAD:bcn-restaurant-mobile-without-kitchen-monitor
-          fi
-      - name: Analyze and capture diagnostics
-        id: analyze
+      - name: Analyze
+        run: flutter analyze
+      - name: Run Flutter tests and capture diagnostics
+        id: flutter_tests
         shell: bash
         run: |
           set +e
-          flutter analyze > ../../flutter_analyze.txt 2>&1
+          flutter test > ../../flutter_test.txt 2>&1
           status=$?
-          cat ../../flutter_analyze.txt
+          cat ../../flutter_test.txt
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Commit analyzer diagnostics on failure
-        if: steps.analyze.outputs.status != '0'
+      - name: Commit Flutter test diagnostics on failure
+        if: steps.flutter_tests.outputs.status != '0'
         working-directory: .
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add flutter_analyze.txt
+          git add flutter_test.txt
           if ! git diff --cached --quiet; then
-            git commit -m "chore: capture Flutter analyzer diagnostics"
+            git commit -m "chore: capture Flutter test diagnostics"
             git push origin HEAD:bcn-restaurant-mobile-without-kitchen-monitor
           fi
-      - name: Fail on analyzer errors
-        if: steps.analyze.outputs.status != '0'
+      - name: Fail on Flutter test errors
+        if: steps.flutter_tests.outputs.status != '0'
         run: exit 1
-      - name: Run Flutter tests
-        run: flutter test
