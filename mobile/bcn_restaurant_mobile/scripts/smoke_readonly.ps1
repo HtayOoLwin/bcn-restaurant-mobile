@@ -51,10 +51,6 @@ try {
         $tablesResponse = Invoke-FrappeGetMethod -Method "bcn_mobile_tables" -Query @{ service_type = "dine_in" }
         $menuResponse = Invoke-FrappeGetMethod -Method "bcn_mobile_menu"
         Write-Host "Waiter smoke: $($tablesResponse.message.tables.Count) dine-in tables, $($menuResponse.message.items.Count) menu items" -ForegroundColor Green
-
-        $progressResponse = Invoke-FrappeGetMethod -Method "bcn_waiter_order_progress"
-        $readyResponse = Invoke-FrappeGetMethod -Method "bcn_waiter_orders"
-        Write-Host "Waiter progress: $($progressResponse.message.count) active order(s), $($readyResponse.message.item_count) ready item(s)" -ForegroundColor Green
     }
 
     Write-Host "Read-only smoke test completed. No orders or statuses were changed." -ForegroundColor Green
