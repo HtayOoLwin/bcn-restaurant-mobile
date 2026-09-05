@@ -24,13 +24,13 @@ def test_android_run_script_passes_base_url_as_dart_define():
     assert 'flutter run' in script
 
 
-def test_readonly_smoke_script_never_calls_mutating_restaurant_methods():
+def test_readonly_smoke_script_never_calls_kitchen_status_or_mutating_restaurant_methods():
     script = (MOBILE / 'scripts' / 'smoke_readonly.ps1').read_text(encoding='utf-8')
     assert 'bcn_mobile_bootstrap' in script
     assert 'bcn_mobile_tables' in script
     assert 'bcn_mobile_menu' in script
-    assert 'bcn_waiter_order_progress' in script
-    assert 'bcn_waiter_orders' in script
+    assert 'bcn_waiter_order_progress' not in script
+    assert 'bcn_waiter_orders' not in script
     assert 'bcn_kitchen_orders' not in script
     assert 'create_order' not in script
     assert 'update_item_status' not in script
