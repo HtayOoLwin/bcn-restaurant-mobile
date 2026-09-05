@@ -1,5 +1,5 @@
 param(
-    [string]$BaseUrl = "https://bcndemo-restaurant.nvi.frappe.cloud",
+    [string]$BaseUrl = "https://ourcity.s.frappe.cloud",
     [string]$DeviceId = ""
 )
 
