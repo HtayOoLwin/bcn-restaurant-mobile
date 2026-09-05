@@ -10,12 +10,22 @@ def _read(relative: str) -> str:
     return (MOBILE / relative).read_text(encoding="utf-8")
 
 
-def test_mobile_router_has_no_kitchen_monitor_destination():
+def test_mobile_server_is_fixed_to_ourcity():
+    config = _read("lib/core/config/app_config.dart")
+    assert "static const baseUrl = 'https://ourcity.s.frappe.cloud';" in config
+    assert "String.fromEnvironment" not in config
+    assert "bcndemo-restaurant.nvi.frappe.cloud" not in config
+
+
+def test_mobile_router_has_no_kitchen_monitor_or_waiter_status_destination():
     router = _read("lib/core/router/app_router.dart")
     assert "features/kitchen" not in router
     assert "KitchenOrdersScreen" not in router
     assert "permissions.kitchen" not in router
     assert "'/kitchen'" not in router
+    assert "waiter_progress" not in router
+    assert "'/waiter/ready'" not in router
+    assert "'/waiter/progress'" not in router
 
 
 def test_waiter_and_cashier_navigation_have_no_kitchen_monitor_controls():
@@ -28,6 +38,19 @@ def test_waiter_and_cashier_navigation_have_no_kitchen_monitor_controls():
         assert "kitchenNewOrderCountProvider" not in source, relative
         assert "'/kitchen'" not in source, relative
         assert "permissions.kitchen" not in source, relative
+
+    waiter = _read("lib/features/waiter/presentation/waiter_tables_screen.dart")
+    assert "Ready to Serve" not in waiter
+    assert "Order Progress" not in waiter
+    assert "mobileNotificationsProvider" not in waiter
+    assert "'/waiter/ready'" not in waiter
+    assert "'/waiter/progress'" not in waiter
+
+
+def test_app_does_not_start_kitchen_status_notification_polling():
+    source = _read("lib/app.dart")
+    assert "MobileNotificationWatcher" not in source
+    assert "features/notifications" not in source
 
 
 def test_mobile_lib_has_no_kitchen_monitor_references():
