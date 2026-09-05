@@ -26,10 +26,12 @@ def test_android_run_script_passes_base_url_as_dart_define():
 
 def test_readonly_smoke_script_never_calls_mutating_restaurant_methods():
     script = (MOBILE / 'scripts' / 'smoke_readonly.ps1').read_text(encoding='utf-8')
-    assert 'get_bootstrap' in script
-    assert 'get_tables' in script
-    assert 'get_menu' in script
-    assert 'get_orders' in script
+    assert 'bcn_mobile_bootstrap' in script
+    assert 'bcn_mobile_tables' in script
+    assert 'bcn_mobile_menu' in script
+    assert 'bcn_waiter_order_progress' in script
+    assert 'bcn_waiter_orders' in script
+    assert 'bcn_kitchen_orders' not in script
     assert 'create_order' not in script
     assert 'update_item_status' not in script
     assert 'item_action' not in script
@@ -43,10 +45,12 @@ def test_site_preflight_checks_backend_doctypes_without_writing():
     assert 'Invoke-RestMethod' in script
     assert 'Method     = "Get"' in script
 
+
 def test_powershell_scripts_do_not_use_bash_line_continuations():
     for name in ('site_preflight.ps1', 'smoke_readonly.ps1'):
         lines = (MOBILE / 'scripts' / name).read_text(encoding='utf-8').splitlines()
         assert not any(line.rstrip().endswith('\\') for line in lines), name
+
 
 def test_android_setup_manifest_patch_uses_real_newline_not_literal_backticks():
     script = (MOBILE / 'scripts' / 'setup_android.ps1').read_text(encoding='utf-8')
