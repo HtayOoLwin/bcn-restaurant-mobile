@@ -45,4 +45,4 @@ Analyzing bcn_restaurant_mobile...
   error • Target of URI doesn't exist: '../../kitchen/presentation/kitchen_notification_badge.dart'. Try creating the file referenced by the URI, or try using a URI for a file that does exist • lib/features/notifications/presentation/mobile_notification_watcher.dart:7:8 • uri_does_not_exist
   error • Undefined name 'kitchenNewOrderCountProvider'. Try correcting the name to one that is defined, or defining the name • lib/features/notifications/presentation/mobile_notification_watcher.dart:46:24 • undefined_identifier
 
-5 issues found. (ran in 8.6s)
+5 issues found. (ran in 10.6s)
