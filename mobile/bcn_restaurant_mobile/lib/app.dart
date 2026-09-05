@@ -21,9 +21,8 @@ class BcnRestaurantApp extends ConsumerWidget {
       ),
       routerConfig: router,
       scaffoldMessengerKey: rootScaffoldMessengerKey,
-      builder: (context, child) => AdaptiveOrientation(
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) =>
+          AdaptiveOrientation(child: child ?? const SizedBox.shrink()),
     );
   }
 }
