@@ -445,7 +445,7 @@ void main() {
     );
 
     container.read(routerProvider).go('/printer-settings');
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(
       container.read(routerProvider).routeInformationProvider.value.uri.path,
