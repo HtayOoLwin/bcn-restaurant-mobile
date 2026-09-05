@@ -1,0 +1,93 @@
+Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 99.0.0 (107.0.0 available)
+  analyzer 12.1.0 (14.3.0 available)
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.2.1 (2.0.0 available)
+  dio 5.11.0 (5.11.1 available)
+  dio_web_adapter 2.2.1 (2.2.2 available)
+  flutter_riverpod 3.4.2 (3.4.3 available)
+  flutter_secure_storage 10.0.0 (11.0.0 available)
+  flutter_secure_storage_darwin 0.2.0 (0.4.0 available)
+  flutter_secure_storage_windows 4.1.0 (4.2.2 available)
+  glob 2.1.3 (2.2.0 available)
+  go_router 17.5.0 (18.0.1 available)
+  hooks 2.0.2 (2.2.0 available)
+  io 1.0.5 (1.1.0 available)
+  jni_flutter 1.0.2 (1.0.3 available)
+  matcher 0.12.19 (0.12.20 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  objective_c 9.5.0 (9.6.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 8.3.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  pool 1.5.2 (1.5.3 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  record_use 0.6.0 (1.1.1 available)
+  riverpod 3.4.2 (3.4.3 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test 1.31.0 (1.32.0 available)
+  test_api 0.7.11 (0.7.14 available)
+  test_core 0.6.17 (0.6.20 available)
+  vector_math 2.2.0 (2.4.2 available)
+  win32 5.15.0 (6.4.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+34 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/waiter_progress_models_test.dart: waiter progress honors explicit non-cancellable New line
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/waiter_progress_models_test.dart: waiter progress parses an authorized cancellable New line
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/waiter_progress_models_test.dart: ready response parses whole-order capability
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/printing/windows_print_repository_test.dart: WindowsPrintRepository requests a cashier bill through the exact POST contract
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/printing/windows_print_repository_test.dart: WindowsPrintRepository gets Windows status through the exact GET contract
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/printing/windows_print_repository_test.dart: WindowsPrintRepository retries one job through the exact POST contract
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/printing/windows_print_repository_test.dart: WindowsPrintRepository preserves an unknown server job status safely
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/printing/windows_print_repository_test.dart: WindowsPrintRepository rejects a malformed response envelope
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/printing/windows_print_repository_test.dart: WindowsPrintRepository consumes the ApiClient Frappe message envelope exactly once
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: bootstrap print flags are parsed as strict server booleans
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/cart_controller_test.dart: cart add increment decrement and total
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: settings preserves printer navigation and logout actions
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: cashier retains and surfaces one accepted job while preventing double taps
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: cashier keeps an API error visible
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: cashier completion after disposal does not touch dead state
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: shows Windows status and retries only the known accepted job
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: failed aggregate without a known job gives ERPNext guidance
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: retry stays hidden when bootstrap denies retry
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: test print stays visible when status loading fails
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: test print requires a named submitted invoice context
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: test-print completion after disposal does not touch dead state
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: direct screen access is denied before status is requested
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: retry prevents duplicate taps and reports API errors
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: manager with print-status permission reaches the destination
+✅ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: accepted cashier job survives navigation to printer settings
+::group::❌ /home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart: waiter without print-status permission is denied the route (failed)
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+pumpAndSettle timed out
+
+When the exception was thrown, this was the stack:
+#0      WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:717:11)
+<asynchronous suspension>
+#1      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#2      main.<anonymous closure> (file:///home/runner/work/bcn-restaurant-mobile/bcn-restaurant-mobile/mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart:442:5)
+<asynchronous suspension>
+#3      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#4      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  waiter without print-status permission is denied the route
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Test failed. See exception logs above.
+The test description was: waiter without print-status permission is denied the route
+
+::endgroup::
+
+::error::25 tests passed, 1 failed.
