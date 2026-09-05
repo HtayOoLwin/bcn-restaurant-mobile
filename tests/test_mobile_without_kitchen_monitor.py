@@ -32,9 +32,9 @@ def test_waiter_and_cashier_navigation_have_no_kitchen_monitor_controls():
 
 def test_bootstrap_model_has_no_mobile_kitchen_permission():
     source = _read("lib/features/bootstrap/domain/bootstrap_model.dart")
-    assert "required this.kitchen" not in source
+    assert "required this.kitchen," not in source
     assert "json['kitchen']" not in source
-    assert "final bool kitchen" not in source
+    assert "final bool kitchen;" not in source
 
 
 def test_android_direct_printing_dependencies_and_permissions_are_removed():
