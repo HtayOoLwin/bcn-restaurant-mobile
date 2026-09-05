@@ -36,7 +36,7 @@ jobs:
       - name: Readonly smoke script contract
         run: python -m pytest -q tests/test_phase3_mobile_tooling.py::test_readonly_smoke_script_never_calls_mutating_restaurant_methods
       - name: Site preflight contract
-        run: python -m pytest -q tests/test_phase3_mobile_tooling.py::test_site_preflight_checks_backend_doctypes_without_writing
+        run: python -m pytest -q tests/test_phase3_mobile_tooling.py::test_site_preflight_checks_bootstrap_read_only_without_kitchen_monitor
       - name: PowerShell continuation contract
         run: python -m pytest -q tests/test_phase3_mobile_tooling.py::test_powershell_scripts_do_not_use_bash_line_continuations
       - name: Manifest patch newline contract
