@@ -44,8 +44,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           final visibleItems = _selectedCategory == 'All'
               ? response.items
               : response.items
-                  .where((item) => item.itemGroup == _selectedCategory)
-                  .toList();
+                    .where((item) => item.itemGroup == _selectedCategory)
+                    .toList();
 
           return Column(
             children: [
@@ -117,18 +117,23 @@ class _MenuTile extends ConsumerWidget {
                   width: 56,
                   height: 56,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.restaurant, size: 40),
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.restaurant, size: 40),
                 ),
               )
-            : const SizedBox(width: 56, child: Icon(Icons.restaurant, size: 40)),
+            : const SizedBox(
+                width: 56,
+                child: Icon(Icons.restaurant, size: 40),
+              ),
         title: Text(item.itemName),
-        subtitle: Text('${formatMoney(item.rate, item.currency)} • ${item.uom}'),
+        subtitle: Text(
+          '${formatMoney(item.rate, item.currency)} • ${item.uom}',
+        ),
         trailing: _QuantityControl(item: item),
       ),
     );
   }
 }
-
 
 class _QuantityControl extends ConsumerWidget {
   const _QuantityControl({required this.item});
@@ -160,7 +165,8 @@ class _QuantityControl extends ConsumerWidget {
         IconButton(
           visualDensity: VisualDensity.compact,
           tooltip: 'Decrease',
-          onPressed: () => ref.read(cartProvider.notifier).decrement(item.itemCode),
+          onPressed: () =>
+              ref.read(cartProvider.notifier).decrement(item.itemCode),
           icon: const Icon(Icons.remove),
         ),
         Text(

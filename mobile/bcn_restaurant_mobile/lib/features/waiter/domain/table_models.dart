@@ -45,7 +45,11 @@ class TablesResponse {
       serviceType: json['service_type']?.toString() ?? 'dine_in',
       customerGroup: json['customer_group']?.toString() ?? '',
       tables: (json['tables'] as List? ?? const [])
-          .map((row) => RestaurantTableModel.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) => RestaurantTableModel.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
           .toList(),
     );
   }

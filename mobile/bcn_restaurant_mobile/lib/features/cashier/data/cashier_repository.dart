@@ -10,7 +10,9 @@ class CashierRepository {
 
   Future<CashierBillingResponse> getBilling() async {
     final data = await _apiClient.getMethod('bcn_cashier_billing');
-    return CashierBillingResponse.fromJson(Map<String, dynamic>.from(data as Map));
+    return CashierBillingResponse.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
   }
 
   Future<CashierBillingResponse> recordBillPrint({
@@ -18,12 +20,11 @@ class CashierRepository {
   }) async {
     final data = await _apiClient.postMethod(
       'bcn_cashier_billing',
-      data: {
-        'action': 'Record Print',
-        'invoice_name': invoiceName,
-      },
+      data: {'action': 'Record Print', 'invoice_name': invoiceName},
     );
-    return CashierBillingResponse.fromJson(Map<String, dynamic>.from(data as Map));
+    return CashierBillingResponse.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
   }
 
   Future<CashierBillingResponse> paySplit({
@@ -47,7 +48,9 @@ class CashierRepository {
         ),
       },
     );
-    return CashierBillingResponse.fromJson(Map<String, dynamic>.from(data as Map));
+    return CashierBillingResponse.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
   }
 
   // Kept for compatibility with older callers while split payment is rolled out.
@@ -65,6 +68,8 @@ class CashierRepository {
         'received_amount': receivedAmount,
       },
     );
-    return CashierBillingResponse.fromJson(Map<String, dynamic>.from(data as Map));
+    return CashierBillingResponse.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
   }
 }

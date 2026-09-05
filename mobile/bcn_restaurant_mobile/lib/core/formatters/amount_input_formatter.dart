@@ -27,7 +27,10 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
     }
 
     final integerDigits = parts.first.isEmpty ? '0' : parts.first;
-    final normalizedInteger = integerDigits.replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    final normalizedInteger = integerDigits.replaceFirst(
+      RegExp(r'^0+(?=\d)'),
+      '',
+    );
     final groupedInteger = normalizedInteger.replaceAllMapped(
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
       (_) => ',',

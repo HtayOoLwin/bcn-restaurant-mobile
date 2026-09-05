@@ -33,7 +33,8 @@ class OrdersRepository {
                 'item_code': line.item.itemCode,
                 'qty': line.qty,
                 'uom': line.item.uom,
-                if (line.kitchenNote.isNotEmpty) 'kitchen_note': line.kitchenNote,
+                if (line.kitchenNote.isNotEmpty)
+                  'kitchen_note': line.kitchenNote,
               },
             )
             .toList(),

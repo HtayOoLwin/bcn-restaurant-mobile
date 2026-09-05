@@ -48,9 +48,14 @@ class MenuResponse {
     return MenuResponse(
       priceList: json['price_list']?.toString() ?? '',
       currency: json['currency']?.toString() ?? '',
-      groups: (json['groups'] as List? ?? const []).map((e) => e.toString()).toList(),
+      groups: (json['groups'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
       items: (json['items'] as List? ?? const [])
-          .map((row) => MenuItemModel.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) =>
+                MenuItemModel.fromJson(Map<String, dynamic>.from(row as Map)),
+          )
           .toList(),
     );
   }

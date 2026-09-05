@@ -71,8 +71,9 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
 
   void _show(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -269,8 +270,10 @@ class _ServiceStatusCard extends StatelessWidget {
                 children: [
                   Text(
                     status.online ? 'Online' : 'Offline',
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(color: color, fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text('Last seen: ${status.lastSeen ?? 'Never'}'),

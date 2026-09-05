@@ -16,10 +16,10 @@ void main() {
               'qty': 1,
               'status': 'New',
               'can_cancel': false,
-            }
+            },
           ],
-        }
-      ]
+        },
+      ],
     });
 
     expect(response.orders.single.items.single.canCancel, isFalse);
@@ -41,8 +41,13 @@ void main() {
   test('ready response parses whole-order capability', () {
     final response = WaiterReadyResponse.fromJson({
       'orders': [
-        {'name': 'SAL-ORD-1', 'customer': 'Table 01', 'can_serve_whole': true, 'items': []}
-      ]
+        {
+          'name': 'SAL-ORD-1',
+          'customer': 'Table 01',
+          'can_serve_whole': true,
+          'items': [],
+        },
+      ],
     });
     expect(response.orders.single.canServeWhole, isTrue);
   });

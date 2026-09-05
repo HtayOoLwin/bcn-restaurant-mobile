@@ -37,7 +37,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: Text(result.duplicate ? 'Order already received' : 'Order placed'),
+          title: Text(
+            result.duplicate ? 'Order already received' : 'Order placed',
+          ),
           content: Text(
             'Sales Order: ${result.salesOrder}\n'
             'Session: ${result.session}\n'
@@ -54,9 +56,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       if (mounted) context.go('/tables');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     } finally {
       if (mounted) setState(() => submitting = false);
     }
@@ -112,15 +114,22 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(line.item.itemName, style: Theme.of(context).textTheme.titleMedium),
+                              child: Text(
+                                line.item.itemName,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
                             ),
                             IconButton(
-                              onPressed: () => ref.read(cartProvider.notifier).decrement(line.item.itemCode),
+                              onPressed: () => ref
+                                  .read(cartProvider.notifier)
+                                  .decrement(line.item.itemCode),
                               icon: const Icon(Icons.remove_circle_outline),
                             ),
                             Text(formatQuantity(line.qty)),
                             IconButton(
-                              onPressed: () => ref.read(cartProvider.notifier).add(line.item),
+                              onPressed: () => ref
+                                  .read(cartProvider.notifier)
+                                  .add(line.item),
                               icon: const Icon(Icons.add_circle_outline),
                             ),
                           ],
@@ -159,7 +168,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               ),
               const SizedBox(height: 8),
               FilledButton(
-                onPressed: cart.lines.isEmpty || submitting ? null : _placeOrder,
+                onPressed: cart.lines.isEmpty || submitting
+                    ? null
+                    : _placeOrder,
                 child: submitting
                     ? const SizedBox(
                         width: 20,

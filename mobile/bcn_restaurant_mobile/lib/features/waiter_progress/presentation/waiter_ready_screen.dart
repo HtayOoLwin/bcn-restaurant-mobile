@@ -82,62 +82,83 @@ class _WaiterReadyScreenState extends ConsumerState<WaiterReadyScreen> {
                           ],
                         )
                       : filteredOrders.isEmpty
-                          ? ListView(
-                              children: const [
-                                SizedBox(height: 180),
-                                Center(child: Text('No ready orders match your search.')),
-                              ],
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(12),
-                              itemCount: filteredOrders.length,
-                              itemBuilder: (context, index) {
-                                final order = filteredOrders[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(order.customer, style: Theme.of(context).textTheme.titleLarge),
-                                  Text(order.name, style: Theme.of(context).textTheme.bodySmall),
-                                  const Divider(height: 24),
-                                  ...order.items.map(
-                                    (item) => ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(item.itemName),
-                                      subtitle: Text(
-                                        '${item.qty.g} ${item.uom} · ${item.kitchenCounter ?? 'Kitchen'}${item.kitchenNote?.isNotEmpty == true ? '\n${item.kitchenNote}' : ''}',
-                                      ),
-                                      trailing: FilledButton(
-                                        onPressed: _busyKey == item.rowName ? null : () => _itemAction(item),
-                                        child: _busyKey == item.rowName
-                                            ? const SizedBox(
-                                                width: 18,
-                                                height: 18,
-                                                child: CircularProgressIndicator(strokeWidth: 2),
-                                              )
-                                            : const Text('Served'),
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 180),
+                            Center(
+                              child: Text('No ready orders match your search.'),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) {
+                            final order = filteredOrders[index];
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      order.customer,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleLarge,
+                                    ),
+                                    Text(
+                                      order.name,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                    const Divider(height: 24),
+                                    ...order.items.map(
+                                      (item) => ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(item.itemName),
+                                        subtitle: Text(
+                                          '${item.qty.g} ${item.uom} · ${item.kitchenCounter ?? 'Kitchen'}${item.kitchenNote?.isNotEmpty == true ? '\n${item.kitchenNote}' : ''}',
+                                        ),
+                                        trailing: FilledButton(
+                                          onPressed: _busyKey == item.rowName
+                                              ? null
+                                              : () => _itemAction(item),
+                                          child: _busyKey == item.rowName
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                )
+                                              : const Text('Served'),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  if (order.canServeWhole) ...[
-                                    const SizedBox(height: 8),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: FilledButton.tonal(
-                                        onPressed: _busyKey == order.name ? null : () => _serveWhole(order),
-                                        child: const Text('Serve Whole Order'),
+                                    if (order.canServeWhole) ...[
+                                      const SizedBox(height: 8),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: FilledButton.tonal(
+                                          onPressed: _busyKey == order.name
+                                              ? null
+                                              : () => _serveWhole(order),
+                                          child: const Text(
+                                            'Serve Whole Order',
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
-                          );
-                              },
-                            ),
+                            );
+                          },
+                        ),
                 );
               },
             ),
@@ -150,17 +171,18 @@ class _WaiterReadyScreenState extends ConsumerState<WaiterReadyScreen> {
   Future<void> _itemAction(WaiterReadyItem item) async {
     setState(() => _busyKey = item.rowName);
     try {
-      await ref.read(waiterOperationsRepositoryProvider).itemAction(
-            rowName: item.rowName,
-            action: 'Mark Served',
-          );
+      await ref
+          .read(waiterOperationsRepositoryProvider)
+          .itemAction(rowName: item.rowName, action: 'Mark Served');
       ref.invalidate(waiterReadyProvider);
       ref.invalidate(waiterProgressProvider);
       ref.invalidate(tablesProvider('dine_in'));
       ref.invalidate(tablesProvider('takeaway'));
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     } finally {
       if (mounted) setState(() => _busyKey = null);
@@ -170,14 +192,18 @@ class _WaiterReadyScreenState extends ConsumerState<WaiterReadyScreen> {
   Future<void> _serveWhole(WaiterReadyOrder order) async {
     setState(() => _busyKey = order.name);
     try {
-      await ref.read(waiterOperationsRepositoryProvider).serveWholeOrder(order.name);
+      await ref
+          .read(waiterOperationsRepositoryProvider)
+          .serveWholeOrder(order.name);
       ref.invalidate(waiterReadyProvider);
       ref.invalidate(waiterProgressProvider);
       ref.invalidate(tablesProvider('dine_in'));
       ref.invalidate(tablesProvider('takeaway'));
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     } finally {
       if (mounted) setState(() => _busyKey = null);

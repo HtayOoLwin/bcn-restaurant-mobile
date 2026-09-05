@@ -8,11 +8,14 @@ import '../../kitchen/presentation/kitchen_notification_badge.dart';
 import '../data/mobile_notifications_repository.dart';
 import '../domain/mobile_notification.dart';
 
-final mobileNotificationsRepositoryProvider = Provider<MobileNotificationsRepository>(
-  (ref) => MobileNotificationsRepository(ref.watch(apiClientProvider)),
-);
+final mobileNotificationsRepositoryProvider =
+    Provider<MobileNotificationsRepository>(
+      (ref) => MobileNotificationsRepository(ref.watch(apiClientProvider)),
+    );
 
-final mobileNotificationsProvider = FutureProvider<List<MobileNotification>>((ref) async {
+final mobileNotificationsProvider = FutureProvider<List<MobileNotification>>((
+  ref,
+) async {
   final auth = ref.watch(authControllerProvider).asData?.value;
   if (auth?.isAuthenticated != true) {
     return const <MobileNotification>[];
@@ -21,18 +24,17 @@ final mobileNotificationsProvider = FutureProvider<List<MobileNotification>>((re
 });
 
 class MobileNotificationWatcher extends ConsumerStatefulWidget {
-  const MobileNotificationWatcher({
-    super.key,
-    required this.child,
-  });
+  const MobileNotificationWatcher({super.key, required this.child});
 
   final Widget child;
 
   @override
-  ConsumerState<MobileNotificationWatcher> createState() => _MobileNotificationWatcherState();
+  ConsumerState<MobileNotificationWatcher> createState() =>
+      _MobileNotificationWatcherState();
 }
 
-class _MobileNotificationWatcherState extends ConsumerState<MobileNotificationWatcher> {
+class _MobileNotificationWatcherState
+    extends ConsumerState<MobileNotificationWatcher> {
   Timer? _timer;
 
   @override

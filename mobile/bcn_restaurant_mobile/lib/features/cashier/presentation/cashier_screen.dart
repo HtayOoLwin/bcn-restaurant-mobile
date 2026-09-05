@@ -179,8 +179,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       );
     } catch (error) {
       if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     } finally {
       if (mounted) {

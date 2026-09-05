@@ -13,10 +13,12 @@ class OperationalRefreshIndicator extends StatefulWidget {
   final Duration interval;
 
   @override
-  State<OperationalRefreshIndicator> createState() => _OperationalRefreshIndicatorState();
+  State<OperationalRefreshIndicator> createState() =>
+      _OperationalRefreshIndicatorState();
 }
 
-class _OperationalRefreshIndicatorState extends State<OperationalRefreshIndicator> {
+class _OperationalRefreshIndicatorState
+    extends State<OperationalRefreshIndicator> {
   Timer? _timer;
   bool _refreshing = false;
 

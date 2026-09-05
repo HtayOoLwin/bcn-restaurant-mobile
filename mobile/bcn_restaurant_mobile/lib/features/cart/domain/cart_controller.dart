@@ -59,19 +59,25 @@ class CartState {
       customer: customer ?? this.customer,
       session: clearSession ? null : (session ?? this.session),
       remarks: remarks ?? this.remarks,
-      clientOrderId: clearClientOrderId ? null : (clientOrderId ?? this.clientOrderId),
+      clientOrderId: clearClientOrderId
+          ? null
+          : (clientOrderId ?? this.clientOrderId),
     );
   }
 }
 
-final cartProvider = NotifierProvider<CartController, CartState>(CartController.new);
+final cartProvider = NotifierProvider<CartController, CartState>(
+  CartController.new,
+);
 
 class CartController extends Notifier<CartState> {
   @override
   CartState build() => const CartState.empty();
 
   void setOrderContext({required String customer, String? session}) {
-    if (state.customer != null && state.customer != customer && state.lines.isNotEmpty) {
+    if (state.customer != null &&
+        state.customer != customer &&
+        state.lines.isNotEmpty) {
       state = CartState(
         lines: const [],
         customer: customer,
@@ -91,7 +97,9 @@ class CartController extends Notifier<CartState> {
 
   void add(MenuItemModel item) {
     final lines = [...state.lines];
-    final index = lines.indexWhere((line) => line.item.itemCode == item.itemCode);
+    final index = lines.indexWhere(
+      (line) => line.item.itemCode == item.itemCode,
+    );
     if (index == -1) {
       lines.add(CartLine(item: item, qty: 1));
     } else {
@@ -115,16 +123,20 @@ class CartController extends Notifier<CartState> {
 
   void remove(String itemCode) {
     state = state.copyWith(
-      lines: state.lines.where((line) => line.item.itemCode != itemCode).toList(),
+      lines: state.lines
+          .where((line) => line.item.itemCode != itemCode)
+          .toList(),
     );
   }
 
   void setKitchenNote(String itemCode, String note) {
     state = state.copyWith(
       lines: state.lines
-          .map((line) => line.item.itemCode == itemCode
-              ? line.copyWith(kitchenNote: note.trim())
-              : line)
+          .map(
+            (line) => line.item.itemCode == itemCode
+                ? line.copyWith(kitchenNote: note.trim())
+                : line,
+          )
           .toList(),
     );
   }

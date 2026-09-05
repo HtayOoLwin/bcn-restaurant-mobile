@@ -17,8 +17,9 @@ void main() {
         },
       );
 
-      final result = await WindowsPrintRepository(api)
-          .requestCashierBill('SINV-0001');
+      final result = await WindowsPrintRepository(
+        api,
+      ).requestCashierBill('SINV-0001');
 
       expect(api.postCalls, hasLength(1));
       expect(
@@ -59,8 +60,9 @@ void main() {
     test('retries one job through the exact POST contract', () async {
       final api = _RecordingApiClient(postResponse: {'status': 'Pending'});
 
-      await WindowsPrintRepository(api)
-          .retryJob('10ba038e-48da-487b-96e8-8d3b99b6d18a');
+      await WindowsPrintRepository(
+        api,
+      ).retryJob('10ba038e-48da-487b-96e8-8d3b99b6d18a');
 
       expect(api.postCalls, hasLength(1));
       expect(
@@ -123,8 +125,9 @@ void main() {
           dio: dio,
         );
 
-        final result = await WindowsPrintRepository(client)
-            .requestCashierBill('SINV-0002');
+        final result = await WindowsPrintRepository(
+          client,
+        ).requestCashierBill('SINV-0002');
 
         expect(result.jobId, '858f9d28-9799-49d7-8a03-7ed83bd37a5b');
         expect(result.status.state, PrintJobState.pending);

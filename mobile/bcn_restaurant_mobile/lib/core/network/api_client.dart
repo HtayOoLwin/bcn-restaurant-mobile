@@ -6,17 +6,18 @@ import 'api_exception.dart';
 
 class ApiClient {
   ApiClient({required SessionStorage sessionStorage, Dio? dio})
-      : _sessionStorage = sessionStorage,
-        _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: AppConfig.baseUrl,
-                connectTimeout: const Duration(seconds: 20),
-                receiveTimeout: const Duration(seconds: 30),
-                sendTimeout: const Duration(seconds: 20),
-                headers: const {'Accept': 'application/json'},
-              ),
-            ) {
+    : _sessionStorage = sessionStorage,
+      _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: AppConfig.baseUrl,
+              connectTimeout: const Duration(seconds: 20),
+              receiveTimeout: const Duration(seconds: 30),
+              sendTimeout: const Duration(seconds: 20),
+              headers: const {'Accept': 'application/json'},
+            ),
+          ) {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -33,7 +34,10 @@ class ApiClient {
   final Dio _dio;
   final SessionStorage _sessionStorage;
 
-  Future<void> login({required String username, required String password}) async {
+  Future<void> login({
+    required String username,
+    required String password,
+  }) async {
     try {
       final response = await _dio.post<dynamic>(
         '/api/method/login',
@@ -43,7 +47,9 @@ class ApiClient {
       final cookies = response.headers['set-cookie'] ?? const <String>[];
       final sid = _extractSid(cookies);
       if (sid == null || sid.isEmpty || sid == 'Guest') {
-        throw const ApiException('Login succeeded but no valid session was returned.');
+        throw const ApiException(
+          'Login succeeded but no valid session was returned.',
+        );
       }
       await _sessionStorage.writeSid(sid);
     } on DioException catch (error) {
@@ -81,7 +87,10 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> postMethod(String method, {Map<String, dynamic>? data}) async {
+  Future<dynamic> postMethod(
+    String method, {
+    Map<String, dynamic>? data,
+  }) async {
     try {
       final response = await _dio.post<dynamic>(
         '/api/method/$method',

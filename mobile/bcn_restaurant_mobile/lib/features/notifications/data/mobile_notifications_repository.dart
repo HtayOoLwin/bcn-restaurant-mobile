@@ -10,7 +10,11 @@ class MobileNotificationsRepository {
     final data = await _apiClient.getMethod('bcn_mobile_notifications');
     final map = Map<String, dynamic>.from(data as Map);
     return (map['notifications'] as List? ?? const [])
-        .map((row) => MobileNotification.fromJson(Map<String, dynamic>.from(row as Map)))
+        .map(
+          (row) => MobileNotification.fromJson(
+            Map<String, dynamic>.from(row as Map),
+          ),
+        )
         .toList();
   }
 

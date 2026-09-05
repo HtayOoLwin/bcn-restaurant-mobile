@@ -12,7 +12,8 @@ class WaiterProgressScreen extends ConsumerStatefulWidget {
   const WaiterProgressScreen({super.key});
 
   @override
-  ConsumerState<WaiterProgressScreen> createState() => _WaiterProgressScreenState();
+  ConsumerState<WaiterProgressScreen> createState() =>
+      _WaiterProgressScreenState();
 }
 
 class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
@@ -69,21 +70,25 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                           ],
                         )
                       : filteredOrders.isEmpty
-                          ? ListView(
-                              children: const [
-                                SizedBox(height: 180),
-                                Center(child: Text('No active orders match your search.')),
-                              ],
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(12),
-                              itemCount: filteredOrders.length,
-                              itemBuilder: (context, index) => _ProgressCard(
-                                order: filteredOrders[index],
-                                busyRow: _busyRow,
-                                onCancel: _cancelItem,
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 180),
+                            Center(
+                              child: Text(
+                                'No active orders match your search.',
                               ),
                             ),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) => _ProgressCard(
+                            order: filteredOrders[index],
+                            busyRow: _busyRow,
+                            onCancel: _cancelItem,
+                          ),
+                        ),
                 );
               },
             ),
@@ -98,10 +103,18 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel item?'),
-        content: Text('Cancel ${item.itemName}? Only New items can be cancelled.'),
+        content: Text(
+          'Cancel ${item.itemName}? Only New items can be cancelled.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancel Item')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cancel Item'),
+          ),
         ],
       ),
     );
@@ -109,17 +122,18 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
 
     setState(() => _busyRow = item.rowName);
     try {
-      await ref.read(waiterOperationsRepositoryProvider).itemAction(
-            rowName: item.rowName,
-            action: 'Cancel',
-          );
+      await ref
+          .read(waiterOperationsRepositoryProvider)
+          .itemAction(rowName: item.rowName, action: 'Cancel');
       ref.invalidate(waiterProgressProvider);
       ref.invalidate(waiterReadyProvider);
       ref.invalidate(tablesProvider('dine_in'));
       ref.invalidate(tablesProvider('takeaway'));
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     } finally {
       if (mounted) setState(() => _busyRow = null);
@@ -149,7 +163,12 @@ class _ProgressCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: Text(order.customer, style: Theme.of(context).textTheme.titleLarge)),
+                Expanded(
+                  child: Text(
+                    order.customer,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
                 Text(order.preparationSummary),
               ],
             ),
@@ -175,7 +194,9 @@ class _ProgressCard extends StatelessWidget {
                 ),
                 trailing: item.canCancel
                     ? TextButton(
-                        onPressed: busyRow == item.rowName ? null : () => onCancel(item),
+                        onPressed: busyRow == item.rowName
+                            ? null
+                            : () => onCancel(item),
                         child: const Text('Cancel'),
                       )
                     : null,
