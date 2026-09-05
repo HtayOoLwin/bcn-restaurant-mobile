@@ -57,6 +57,28 @@ class _FakeFrappe(types.ModuleType):
             custom_preparation_status="New",
         )
         self.order = _Order()
+        self.progress_order = _Document(
+            name="SO-0001",
+            customer="Table 1",
+            customer_name="Table 1",
+            creation="2026-09-04 12:00:00",
+            grand_total=1000,
+            custom_preparation_summary="New",
+            custom_restaurant_session="SESSION-1",
+        )
+        self.progress_item = _Document(
+            name="SO-ITEM-1",
+            parent="SO-0001",
+            item_code="FOOD-1",
+            item_name="Rice",
+            qty=1,
+            uom="Plate",
+            custom_kitchen_counter="Hot Kitchen",
+            custom_preparation_status="New",
+            custom_kitchen_note=None,
+            custom_ready_at=None,
+            custom_served_at=None,
+        )
         self.db = _FakeDatabase(self)
         self.deleted_docs = []
         self.get_doc_calls = []
@@ -83,6 +105,10 @@ class _FakeFrappe(types.ModuleType):
         raise AssertionError((doctype, name))
 
     def get_all(self, doctype, **kwargs):
+        if doctype == "Sales Order":
+            return [self.progress_order]
+        if doctype == "Sales Order Item":
+            return [self.progress_item]
         if doctype == "Sales Invoice Item":
             return []
         raise AssertionError((doctype, kwargs))
@@ -100,7 +126,7 @@ class WaiterItemActionPermissionTest(unittest.TestCase):
 
         preparation_service = types.ModuleType("bcn_restaurant.services.preparation")
         preparation_service.assert_active_restaurant_order = lambda order, waiter: None
-        preparation_service.get_active_session_order_names = lambda waiter: []
+        preparation_service.get_active_session_order_names = lambda waiter: ["SO-0001"]
         preparation_service.recalculate_sales_order = lambda order_name: {
             "summary": "New",
             "active_total": 0,
@@ -150,6 +176,27 @@ class WaiterItemActionPermissionTest(unittest.TestCase):
         self.assertEqual(result["status"], "Served")
         self.assertEqual(self.frappe.row.custom_preparation_status, "Served")
         self.assertFalse(self.frappe.order.cancelled)
+
+    def test_waiter_progress_does_not_advertise_cancel_for_new_item(self):
+        result = self.waiter.get_order_progress()
+
+        self.assertFalse(result["orders"][0]["items"][0]["can_cancel"])
+
+    def test_restaurant_manager_progress_advertises_cancel_for_new_item(self):
+        self.frappe.roles = ["Restaurant Manager"]
+        self.frappe.session.user = "restaurant.manager@example.com"
+
+        result = self.waiter.get_order_progress()
+
+        self.assertTrue(result["orders"][0]["items"][0]["can_cancel"])
+
+    def test_system_manager_progress_advertises_cancel_for_new_item(self):
+        self.frappe.roles = ["System Manager"]
+        self.frappe.session.user = "system.manager@example.com"
+
+        result = self.waiter.get_order_progress()
+
+        self.assertTrue(result["orders"][0]["items"][0]["can_cancel"])
 
 
 if __name__ == "__main__":

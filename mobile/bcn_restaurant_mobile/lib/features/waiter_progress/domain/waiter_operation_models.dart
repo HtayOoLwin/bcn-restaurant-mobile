@@ -17,7 +17,7 @@ class WaiterProgressItem {
       qty: (json['qty'] as num?)?.toDouble() ?? 0,
       uom: json['uom']?.toString() ?? '',
       status: json['status']?.toString() ?? 'New',
-      canCancel: json['can_cancel'] == true || (json['status']?.toString() ?? 'New') == 'New',
+      canCancel: json['can_cancel'] == true,
       kitchenCounter: json['kitchen_counter']?.toString(),
       kitchenNote: json['kitchen_note']?.toString(),
     );

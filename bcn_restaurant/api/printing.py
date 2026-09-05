@@ -66,10 +66,10 @@ def _cashier_configuration(pos_profile: str):
     return configuration
 
 
-def _lock_invoice_for_cashier_job(invoice_name: str) -> None:
+def _lock_invoice_for_cashier_job(invoice_name: str):
     rows = frappe.db.sql(
         """
-        SELECT name
+        SELECT name, docstatus, pos_profile
         FROM `tabSales Invoice`
         WHERE name = %(invoice_name)s
         FOR UPDATE
@@ -79,6 +79,7 @@ def _lock_invoice_for_cashier_job(invoice_name: str) -> None:
     )
     if not rows:
         frappe.throw("Unknown Sales Invoice", frappe.ValidationError)
+    return rows[0]
 
 
 def _has_prior_cashier_job(invoice_name: str) -> bool:
@@ -123,14 +124,22 @@ def request_cashier_bill(invoice_name: str) -> dict[str, str | bool]:
     _require_authenticated()
     require_any_role("Cashier", "Restaurant Manager")
     invoice_name = _canonical_identifier(invoice_name, "invoice_name")
+    locked_invoice = _lock_invoice_for_cashier_job(invoice_name)
     settings = get_settings()
 
     invoice = frappe.get_doc("Sales Invoice", invoice_name)
+    invoice.reload()
+    if (
+        invoice.name != locked_invoice.name
+        or invoice.docstatus != locked_invoice.docstatus
+        or invoice.pos_profile != locked_invoice.pos_profile
+    ):
+        frappe.throw("Sales Invoice changed while the print request was starting")
     if not frappe.has_permission("Sales Invoice", ptype="read", doc=invoice):
         frappe.throw("You are not permitted to read this Sales Invoice", frappe.PermissionError)
-    if invoice.docstatus != 1:
+    if locked_invoice.docstatus != 1:
         frappe.throw("Cashier bills may be printed only for submitted Sales Invoices")
-    if invoice.pos_profile != settings["pos_profile"]:
+    if locked_invoice.pos_profile != settings["pos_profile"]:
         frappe.throw(
             "Sales Invoice is outside the current POS Profile",
             frappe.PermissionError,
@@ -150,10 +159,8 @@ def request_cashier_bill(invoice_name: str) -> dict[str, str | bool]:
         print_format=configuration.print_format,
         as_pdf=True,
         no_letterhead=int(configuration.no_letterhead or 0),
+        doc=invoice,
     )
-    # The source row is a stable serialization point even when no prior job
-    # exists yet. Locking/current reads avoid a stale REPEATABLE READ snapshot.
-    _lock_invoice_for_cashier_job(invoice.name)
     is_reprint = _has_prior_cashier_job(invoice.name)
     job = create_print_job(
         source_doc=invoice,

@@ -15,6 +15,7 @@ class _FakeDatabase:
         self._frappe = frappe_module
         self.sql_calls = []
         self.inject_concurrent_job_on_invoice_lock = False
+        self.cancel_invoice_on_lock = False
         self._concurrent_job_injected = False
 
     def sql(self, query, values, as_dict=False):
@@ -22,6 +23,8 @@ class _FakeDatabase:
         if "`tabSales Invoice`" in query:
             if values != {"invoice_name": "SINV-0001"} or "FOR UPDATE" not in query:
                 raise AssertionError((query, values))
+            if self.cancel_invoice_on_lock:
+                self._frappe.invoice.docstatus = 2
             if self.inject_concurrent_job_on_invoice_lock and not self._concurrent_job_injected:
                 self._frappe.jobs.append(
                     _Document(
@@ -34,7 +37,13 @@ class _FakeDatabase:
                     )
                 )
                 self._concurrent_job_injected = True
-            return [_Document(name="SINV-0001")]
+            return [
+                _Document(
+                    name="SINV-0001",
+                    docstatus=self._frappe.invoice.docstatus,
+                    pos_profile=self._frappe.invoice.pos_profile,
+                )
+            ]
         if "`tabLocal Print Job`" in query:
             expected = {
                 "source_doctype": "Sales Invoice",
@@ -82,6 +91,14 @@ class _FakeFrappe(types.ModuleType):
             docstatus=1,
             pos_profile="Restaurant POS",
         )
+        self.invoice_reload_calls = 0
+        self.get_doc_calls = 0
+
+        def reload_invoice():
+            self.invoice_reload_calls += 1
+            return self.invoice
+
+        self.invoice.reload = reload_invoice
         self.can_read = True
         self.pos_profile_can_read = True
         self.permission_checks = []
@@ -125,6 +142,7 @@ class _FakeFrappe(types.ModuleType):
         return self.settings
 
     def get_doc(self, doctype, name):
+        self.get_doc_calls += 1
         if (doctype, name) != ("Sales Invoice", self.invoice.name):
             raise AssertionError((doctype, name))
         return self.invoice
@@ -245,6 +263,7 @@ class PrintingApiTest(unittest.TestCase):
                         "print_format": "Cashier Receipt",
                         "as_pdf": True,
                         "no_letterhead": 1,
+                        "doc": self.frappe.invoice,
                     },
                 )
             ],
@@ -272,6 +291,7 @@ class PrintingApiTest(unittest.TestCase):
             ],
         )
         self.assertNotIn("%PDF", repr(self.frappe.wakes))
+        self.assertEqual(self.frappe.invoice_reload_calls, 1)
 
     def test_repeat_requests_create_distinct_jobs_and_mark_only_later_request_reprint(self):
         first = self.printing.request_cashier_bill("SINV-0001")
@@ -305,6 +325,20 @@ class PrintingApiTest(unittest.TestCase):
             },
         )
         self.assertIn("FOR UPDATE", prior_job_read[0])
+
+    def test_cancel_committed_before_invoice_lock_prevents_render_job_and_wake(self):
+        self.frappe.db.cancel_invoice_on_lock = True
+
+        with self.assertRaises(self.frappe.ValidationError):
+            self.printing.request_cashier_bill("SINV-0001")
+
+        self.assertEqual(self.frappe.config_queries, 0)
+        self.assertEqual(self.frappe.print_calls, [])
+        self.assertEqual(self.frappe.job_calls, [])
+        self.assertEqual(self.frappe.wakes, [])
+        self.assertEqual(self.frappe.db.sql_calls[0][1], {"invoice_name": "SINV-0001"})
+        self.assertIn("docstatus", self.frappe.db.sql_calls[0][0])
+        self.assertIn("pos_profile", self.frappe.db.sql_calls[0][0])
 
     def test_draft_cancelled_and_inaccessible_invoices_create_no_job(self):
         cases = ((0, True), (2, True), (1, False))

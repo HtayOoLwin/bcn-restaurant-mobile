@@ -27,7 +27,7 @@ def _active_order_names() -> list[str]:
 
 @frappe.whitelist()
 def get_order_progress():
-    require_any_role("Waiter")
+    require_any_role("Waiter", "Restaurant Manager")
     order_names = _active_order_names()
     if not order_names:
         return {"orders": [], "count": 0, "user": frappe.session.user}
@@ -58,6 +58,7 @@ def get_order_progress():
         items_by_order.setdefault(row.parent, []).append(row)
 
     result = []
+    can_cancel = _is_manager()
     for order in orders:
         counts = {"New": 0.0, "Accepted": 0.0, "Preparing": 0.0, "Ready": 0.0, "Served": 0.0, "Cancelled": 0.0}
         details = []
@@ -79,7 +80,7 @@ def get_order_progress():
                     "status": status,
                     "ready_at": row.custom_ready_at,
                     "served_at": row.custom_served_at,
-                    "can_cancel": status == "New",
+                    "can_cancel": can_cancel and status == "New",
                 }
             )
 
