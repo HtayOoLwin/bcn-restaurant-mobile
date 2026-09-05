@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$User,
     [Parameter(Mandatory = $true)][SecureString]$Password,
-    [string]$BaseUrl = "https://bcndemo-restaurant.nvi.frappe.cloud"
+    [string]$BaseUrl = "https://ourcity.s.frappe.cloud"
 )
 
 $ErrorActionPreference = "Stop"
