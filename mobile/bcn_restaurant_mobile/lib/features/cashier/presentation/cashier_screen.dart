@@ -10,6 +10,8 @@ import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/presentation/kitchen_notification_badge.dart';
 import '../../printing/data/windows_print_repository.dart';
+import '../../printing/domain/known_print_job_controller.dart';
+import '../../printing/domain/windows_print_status.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
@@ -164,14 +166,28 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     setState(() => _pendingPrintInvoices.add(invoice.name));
     final repository = ref.read(windowsPrintRepositoryProvider);
     try {
-      await repository.requestCashierBill(invoice.name);
+      final result = await repository.requestCashierBill(invoice.name);
       if (!mounted || !context.mounted) return;
+      final jobContext = KnownPrintJobContext(
+        invoiceName: invoice.name,
+        invoiceDocstatus: invoice.docstatus,
+        request: result,
+      );
+      ref.read(lastAcceptedPrintJobProvider.notifier).retain(jobContext);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Print job sent'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Print job sent'),
+              Text('Job ID: ${result.jobId}'),
+            ],
+          ),
           action: SnackBarAction(
             label: 'View status',
-            onPressed: () => context.push('/printer-settings', extra: invoice),
+            onPressed: () =>
+                context.push('/printer-settings', extra: jobContext),
           ),
         ),
       );

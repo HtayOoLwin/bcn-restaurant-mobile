@@ -25,6 +25,7 @@ class SettingsScreen extends ConsumerWidget {
       user: bootstrap?.user ?? '',
       serverUrl: AppConfig.baseUrl,
       appVersion: version.asData?.value ?? 'Loading…',
+      showPrinterSetup: bootstrap?.permissions.canViewPrintStatus == true,
       onPrinterSetup: () => context.push('/printer-settings'),
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
     );
@@ -38,6 +39,7 @@ class SettingsView extends StatelessWidget {
     required this.user,
     required this.serverUrl,
     required this.appVersion,
+    required this.showPrinterSetup,
     required this.onPrinterSetup,
     required this.onLogout,
   });
@@ -46,6 +48,7 @@ class SettingsView extends StatelessWidget {
   final String user;
   final String serverUrl;
   final String appVersion;
+  final bool showPrinterSetup;
   final VoidCallback onPrinterSetup;
   final VoidCallback onLogout;
 
@@ -108,13 +111,15 @@ class SettingsView extends StatelessWidget {
                         title: 'Server URL',
                         subtitle: serverUrl,
                       ),
-                      const Divider(height: 1, indent: 72),
-                      _SettingsTile(
-                        icon: Icons.print,
-                        title: 'Windows Print Service',
-                        subtitle: 'Server-managed printer jobs and status',
-                        onTap: onPrinterSetup,
-                      ),
+                      if (showPrinterSetup) ...[
+                        const Divider(height: 1, indent: 72),
+                        _SettingsTile(
+                          icon: Icons.print,
+                          title: 'Windows Print Service',
+                          subtitle: 'Server-managed printer jobs and status',
+                          onTap: onPrinterSetup,
+                        ),
+                      ],
                       const Divider(height: 1, indent: 72),
                       _SettingsTile(
                         icon: Icons.info_outline,

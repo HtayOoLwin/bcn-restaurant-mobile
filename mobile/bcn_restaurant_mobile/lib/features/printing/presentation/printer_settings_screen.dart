@@ -2,19 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/presentation/auth_controller.dart';
-import '../../cashier/domain/cashier_models.dart';
 import '../data/windows_print_repository.dart';
+import '../domain/known_print_job_controller.dart';
 import '../domain/windows_print_status.dart';
 
 class PrinterSettingsScreen extends ConsumerStatefulWidget {
-  const PrinterSettingsScreen({
-    super.key,
-    this.invoice,
-    this.canRetryPrintJobs,
-  });
+  const PrinterSettingsScreen({super.key, this.initialJobContext});
 
-  final CashierInvoice? invoice;
-  final bool? canRetryPrintJobs;
+  final KnownPrintJobContext? initialJobContext;
 
   @override
   ConsumerState<PrinterSettingsScreen> createState() =>
@@ -22,35 +17,15 @@ class PrinterSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
-  final _jobIdController = TextEditingController();
   bool _retryPending = false;
   bool _testPrintPending = false;
 
-  bool get _hasSubmittedInvoice {
-    final invoice = widget.invoice;
-    return invoice != null &&
-        invoice.docstatus == 1 &&
-        invoice.name.trim().isNotEmpty;
-  }
-
-  @override
-  void dispose() {
-    _jobIdController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _retryJob() async {
+  Future<void> _retryJob(KnownPrintJobContext jobContext) async {
     if (_retryPending) return;
-    final jobId = _jobIdController.text.trim();
-    if (jobId.isEmpty) {
-      _show('Enter the failed print job ID.');
-      return;
-    }
-
     setState(() => _retryPending = true);
     final repository = ref.read(windowsPrintRepositoryProvider);
     try {
-      await repository.retryJob(jobId);
+      await repository.retryJob(jobContext.jobId);
       if (!mounted) return;
       _show('Print job queued for retry.');
     } catch (error) {
@@ -64,13 +39,24 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     }
   }
 
-  Future<void> _testCashierPrint() async {
-    if (_testPrintPending || !_hasSubmittedInvoice) return;
+  Future<void> _testCashierPrint(KnownPrintJobContext jobContext) async {
+    if (_testPrintPending || !jobContext.hasSubmittedInvoice) return;
     setState(() => _testPrintPending = true);
     final repository = ref.read(windowsPrintRepositoryProvider);
     try {
-      await repository.requestCashierBill(widget.invoice!.name);
+      final result = await repository.requestCashierBill(
+        jobContext.invoiceName,
+      );
       if (!mounted) return;
+      ref
+          .read(lastAcceptedPrintJobProvider.notifier)
+          .retain(
+            KnownPrintJobContext(
+              invoiceName: jobContext.invoiceName,
+              invoiceDocstatus: jobContext.invoiceDocstatus,
+              request: result,
+            ),
+          );
       _show('Print job sent');
     } catch (error) {
       if (!mounted) return;
@@ -91,17 +77,29 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final permissions = ref
+        .watch(authControllerProvider)
+        .asData
+        ?.value
+        .bootstrap
+        ?.permissions;
+    if (permissions?.canViewPrintStatus != true) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Windows Print Service')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('You are not authorized to view print status.'),
+          ),
+        ),
+      );
+    }
+
     final status = ref.watch(windowsPrintStatusProvider);
-    final canRetry =
-        widget.canRetryPrintJobs ??
-        ref
-                .watch(authControllerProvider)
-                .asData
-                ?.value
-                .bootstrap
-                ?.permissions
-                .canRetryPrintJobs ==
-            true;
+    final retainedJob = ref.watch(lastAcceptedPrintJobProvider);
+    final knownJob = retainedJob ?? widget.initialJobContext;
+    final failedCount = status.asData?.value.failed;
+    final canRetry = permissions?.canRetryPrintJobs == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -118,101 +116,127 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
-            child: status.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => _StatusError(
-                message: error.toString(),
-                onRetry: () => ref.invalidate(windowsPrintStatusProvider),
-              ),
-              data: (value) => ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  _ServiceStatusCard(status: value),
-                  const SizedBox(height: 12),
-                  Row(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              children: [
+                status.when(
+                  loading: () => const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+                  error: (error, _) => _StatusError(
+                    message: error.toString(),
+                    onRetry: () => ref.invalidate(windowsPrintStatusProvider),
+                  ),
+                  data: (value) => Column(
                     children: [
-                      Expanded(
-                        child: _CountCard(
-                          label: 'Pending',
-                          count: value.pending,
-                          icon: Icons.schedule,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _CountCard(
-                          label: 'Failed',
-                          count: value.failed,
-                          icon: Icons.error_outline,
-                        ),
+                      _ServiceStatusCard(status: value),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _CountCard(
+                              label: 'Pending',
+                              count: value.pending,
+                              icon: Icons.schedule,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _CountCard(
+                              label: 'Failed',
+                              count: value.failed,
+                              icon: Icons.error_outline,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  if (canRetry && value.failed > 0) ...[
-                    const SizedBox(height: 16),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Retry a failed job',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              key: const Key('failed-print-job-id'),
-                              controller: _jobIdController,
-                              enabled: !_retryPending,
-                              decoration: const InputDecoration(
-                                labelText: 'Failed print job ID',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            FilledButton.icon(
-                              onPressed: _retryPending ? null : _retryJob,
-                              icon: _retryPending
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.refresh),
-                              label: Text(
-                                _retryPending
-                                    ? 'Retrying…'
-                                    : 'Retry Failed Jobs',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (_hasSubmittedInvoice) ...[
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      onPressed: _testPrintPending ? null : _testCashierPrint,
-                      icon: _testPrintPending
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.print),
-                      label: Text(
-                        _testPrintPending ? 'Sending…' : 'Test Cashier Print',
-                      ),
-                    ),
-                  ],
+                ),
+                if (knownJob != null) ...[
+                  const SizedBox(height: 16),
+                  _KnownJobCard(jobContext: knownJob),
                 ],
-              ),
+                if (canRetry && knownJob != null) ...[
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _retryPending ? null : () => _retryJob(knownJob),
+                    icon: _retryPending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    label: Text(_retryPending ? 'Retrying…' : 'Retry This Job'),
+                  ),
+                ],
+                if (failedCount != null &&
+                    failedCount > 0 &&
+                    knownJob == null) ...[
+                  const SizedBox(height: 16),
+                  const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'Ask an administrator to open Local Print Job in ERPNext to identify and retry failed jobs.',
+                      ),
+                    ),
+                  ),
+                ],
+                if (knownJob?.hasSubmittedInvoice == true) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: _testPrintPending
+                        ? null
+                        : () => _testCashierPrint(knownJob!),
+                    icon: _testPrintPending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.print),
+                    label: Text(
+                      _testPrintPending ? 'Sending…' : 'Test Cashier Print',
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KnownJobCard extends StatelessWidget {
+  const _KnownJobCard({required this.jobContext});
+
+  final KnownPrintJobContext jobContext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Last accepted print job',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            SelectableText(jobContext.jobId),
+            const SizedBox(height: 4),
+            Text('Invoice: ${jobContext.invoiceName}'),
+            Text('Accepted state: ${jobContext.request.status.rawValue}'),
+          ],
         ),
       ),
     );
@@ -297,7 +321,7 @@ class _StatusError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(

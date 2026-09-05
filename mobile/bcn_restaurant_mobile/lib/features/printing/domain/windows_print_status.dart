@@ -48,6 +48,23 @@ class PrintRequestResult {
   final bool isReprint;
 }
 
+class KnownPrintJobContext {
+  const KnownPrintJobContext({
+    required this.invoiceName,
+    required this.invoiceDocstatus,
+    required this.request,
+  });
+
+  final String invoiceName;
+  final int invoiceDocstatus;
+  final PrintRequestResult request;
+
+  String get jobId => request.jobId;
+
+  bool get hasSubmittedInvoice =>
+      invoiceDocstatus == 1 && invoiceName.trim().isNotEmpty;
+}
+
 class WindowsPrintStatus {
   const WindowsPrintStatus({
     required this.online,

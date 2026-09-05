@@ -92,7 +92,59 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test(
+      'consumes the ApiClient Frappe message envelope exactly once',
+      () async {
+        final requests = <RequestOptions>[];
+        final dio = Dio(BaseOptions(baseUrl: 'https://restaurant.example.com'));
+        dio.interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              requests.add(options);
+              handler.resolve(
+                Response<dynamic>(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'message': {
+                      'job_id': '858f9d28-9799-49d7-8a03-7ed83bd37a5b',
+                      'status': 'Pending',
+                      'is_reprint': false,
+                    },
+                  },
+                ),
+              );
+            },
+          ),
+        );
+        final client = ApiClient(
+          sessionStorage: _MemorySessionStorage(),
+          dio: dio,
+        );
+
+        final result = await WindowsPrintRepository(client)
+            .requestCashierBill('SINV-0002');
+
+        expect(result.jobId, '858f9d28-9799-49d7-8a03-7ed83bd37a5b');
+        expect(result.status.state, PrintJobState.pending);
+        expect(requests, hasLength(1));
+        expect(
+          requests.single.path,
+          '/api/method/bcn_restaurant.api.printing.request_cashier_bill',
+        );
+        expect(requests.single.method, 'POST');
+        expect(requests.single.data, {'invoice_name': 'SINV-0002'});
+      },
+    );
   });
+}
+
+class _MemorySessionStorage extends SessionStorage {
+  _MemorySessionStorage() : super(storage: const FlutterSecureStorage());
+
+  @override
+  Future<String?> readSid() async => 'test-session';
 }
 
 class _RecordingApiClient extends ApiClient {
