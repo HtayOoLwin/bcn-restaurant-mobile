@@ -11,8 +11,6 @@ import '../../features/printing/domain/windows_print_status.dart';
 import '../../features/printing/presentation/printer_settings_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/waiter/presentation/waiter_tables_screen.dart';
-import '../../features/waiter_progress/presentation/waiter_progress_screen.dart';
-import '../../features/waiter_progress/presentation/waiter_ready_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authControllerProvider);
@@ -57,8 +55,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       if ((state.matchedLocation.startsWith('/tables') ||
               state.matchedLocation.startsWith('/menu') ||
-              state.matchedLocation.startsWith('/cart') ||
-              state.matchedLocation.startsWith('/waiter/')) &&
+              state.matchedLocation.startsWith('/cart')) &&
           !canWaiter) {
         return defaultLocation();
       }
@@ -78,14 +75,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/tables',
         builder: (context, state) => const WaiterTablesScreen(),
-      ),
-      GoRoute(
-        path: '/waiter/ready',
-        builder: (context, state) => const WaiterReadyScreen(),
-      ),
-      GoRoute(
-        path: '/waiter/progress',
-        builder: (context, state) => const WaiterProgressScreen(),
       ),
       GoRoute(
         path: '/cashier',
