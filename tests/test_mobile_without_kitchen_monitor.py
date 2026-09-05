@@ -30,6 +30,23 @@ def test_waiter_and_cashier_navigation_have_no_kitchen_monitor_controls():
         assert "permissions.kitchen" not in source, relative
 
 
+def test_mobile_lib_has_no_kitchen_monitor_references():
+    forbidden = (
+        "features/kitchen",
+        "KitchenOrdersScreen",
+        "kitchenNewOrderCountProvider",
+        "permissions.kitchen",
+        "'/kitchen'",
+    )
+    offenders = []
+    for path in LIB.rglob("*.dart"):
+        source = path.read_text(encoding="utf-8")
+        for token in forbidden:
+            if token in source:
+                offenders.append(f"{path.relative_to(MOBILE)}: {token}")
+    assert offenders == []
+
+
 def test_bootstrap_model_has_no_mobile_kitchen_permission():
     source = _read("lib/features/bootstrap/domain/bootstrap_model.dart")
     assert "required this.kitchen," not in source
