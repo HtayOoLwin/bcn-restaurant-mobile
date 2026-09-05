@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../auth/presentation/auth_controller.dart';
-import '../../notifications/presentation/mobile_notification_watcher.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../cart/domain/cart_controller.dart';
 import '../data/tables_repository.dart';
@@ -32,8 +31,6 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
     final tables = ref.watch(tablesProvider(serviceType));
-    final notificationCount =
-        ref.watch(mobileNotificationsProvider).asData?.value.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -49,21 +46,6 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
               onPressed: () => context.go('/cashier'),
               icon: const Icon(Icons.point_of_sale),
             ),
-          IconButton(
-            tooltip: 'Ready to Serve',
-            onPressed: _openReadyToServe,
-            icon: notificationCount > 0
-                ? Badge.count(
-                    count: notificationCount,
-                    child: const Icon(Icons.room_service),
-                  )
-                : const Icon(Icons.room_service),
-          ),
-          IconButton(
-            tooltip: 'Order Progress',
-            onPressed: () => context.push('/waiter/progress'),
-            icon: const Icon(Icons.pending_actions),
-          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: () => ref.invalidate(tablesProvider(serviceType)),
@@ -142,21 +124,6 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _openReadyToServe() async {
-    final notifications = ref.read(mobileNotificationsProvider).asData?.value;
-    if (notifications?.isNotEmpty == true) {
-      try {
-        await ref.read(mobileNotificationsRepositoryProvider).markAllRead();
-        ref.invalidate(mobileNotificationsProvider);
-      } catch (_) {
-        // Opening Ready to Serve should not be blocked by notification cleanup.
-      }
-    }
-    if (mounted) {
-      context.push('/waiter/ready');
-    }
   }
 }
 
