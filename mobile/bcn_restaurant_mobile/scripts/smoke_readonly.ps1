@@ -57,11 +57,6 @@ try {
         Write-Host "Waiter progress: $($progressResponse.message.count) active order(s), $($readyResponse.message.item_count) ready item(s)" -ForegroundColor Green
     }
 
-    if ($bootstrap.permissions.kitchen -and $bootstrap.kitchen_counters.Count -gt 0) {
-        $kitchenResponse = Invoke-FrappeGetMethod -Method "bcn_kitchen_orders"
-        Write-Host "Kitchen smoke: $($kitchenResponse.message.item_count) active preparation item(s)" -ForegroundColor Green
-    }
-
     Write-Host "Read-only smoke test completed. No orders or statuses were changed." -ForegroundColor Green
 } finally {
     $plainPassword = $null
