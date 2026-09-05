@@ -30,7 +30,8 @@ try {
     Write-Host "Company: $($bootstrap.message.company)"
     Write-Host "Price List: $($bootstrap.message.selling_price_list)"
     Write-Host "Waiter: $($bootstrap.message.permissions.waiter)"
-    Write-Host "Kitchen: $($bootstrap.message.permissions.kitchen)"
+    Write-Host "Cashier: $($bootstrap.message.permissions.cashier)"
+    Write-Host "Print Status: $($bootstrap.message.permissions.can_view_print_status)"
 } finally {
     $plainPassword = $null
 }
