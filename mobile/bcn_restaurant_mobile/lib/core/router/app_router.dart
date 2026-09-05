@@ -6,7 +6,6 @@ import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/cashier/presentation/cashier_screen.dart';
-import '../../features/kitchen/presentation/kitchen_orders_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
 import '../../features/printing/domain/windows_print_status.dart';
 import '../../features/printing/presentation/printer_settings_screen.dart';
@@ -32,20 +31,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       final canWaiter = authState?.bootstrap?.permissions.waiter == true;
-      final canKitchen = authState?.bootstrap?.permissions.kitchen == true;
       final canCashier = authState?.bootstrap?.permissions.cashier == true;
       final canViewPrintStatus =
           authState?.bootstrap?.permissions.canViewPrintStatus == true;
 
       String defaultLocation() {
         if (canWaiter) return '/tables';
-        if (canKitchen) return '/kitchen';
         if (canCashier) return '/cashier';
         if (canViewPrintStatus) return '/settings';
         return '/unsupported';
       }
 
-      if (!canWaiter && !canKitchen && !canCashier && !canViewPrintStatus) {
+      if (!canWaiter && !canCashier && !canViewPrintStatus) {
         return state.matchedLocation == '/unsupported' ? null : '/unsupported';
       }
 
@@ -55,9 +52,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         return defaultLocation();
       }
 
-      if (state.matchedLocation.startsWith('/kitchen') && !canKitchen) {
-        return defaultLocation();
-      }
       if (state.matchedLocation.startsWith('/cashier') && !canCashier) {
         return defaultLocation();
       }
@@ -92,10 +86,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/waiter/progress',
         builder: (context, state) => const WaiterProgressScreen(),
-      ),
-      GoRoute(
-        path: '/kitchen',
-        builder: (context, state) => const KitchenOrdersScreen(),
       ),
       GoRoute(
         path: '/cashier',

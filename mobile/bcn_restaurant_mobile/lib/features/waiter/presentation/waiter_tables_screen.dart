@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../auth/presentation/auth_controller.dart';
 import '../../notifications/presentation/mobile_notification_watcher.dart';
-import '../../kitchen/presentation/kitchen_notification_badge.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../cart/domain/cart_controller.dart';
 import '../data/tables_repository.dart';
@@ -35,8 +34,6 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
     final tables = ref.watch(tablesProvider(serviceType));
     final notificationCount =
         ref.watch(mobileNotificationsProvider).asData?.value.length ?? 0;
-    final kitchenNewOrderCount =
-        ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -46,17 +43,6 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
               : 'Waiter',
         ),
         actions: [
-          if (bootstrap?.permissions.kitchen == true)
-            IconButton(
-              tooltip: 'Kitchen',
-              onPressed: () => context.go('/kitchen'),
-              icon: kitchenNewOrderCount > 0
-                  ? Badge.count(
-                      count: kitchenNewOrderCount,
-                      child: const Icon(Icons.soup_kitchen),
-                    )
-                  : const Icon(Icons.soup_kitchen),
-            ),
           if (bootstrap?.permissions.cashier == true)
             IconButton(
               tooltip: 'Cashier',

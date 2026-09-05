@@ -8,7 +8,6 @@ import '../../../core/search/order_search.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
-import '../../kitchen/presentation/kitchen_notification_badge.dart';
 import '../../printing/data/windows_print_repository.dart';
 import '../../printing/domain/known_print_job_controller.dart';
 import '../../printing/domain/windows_print_status.dart';
@@ -39,8 +38,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
     final billing = ref.watch(cashierBillingProvider);
-    final kitchenNewOrderCount =
-        ref.watch(kitchenNewOrderCountProvider).asData?.value ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -55,17 +52,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               tooltip: 'Waiter',
               onPressed: () => context.go('/tables'),
               icon: const Icon(Icons.table_restaurant),
-            ),
-          if (bootstrap?.permissions.kitchen == true)
-            IconButton(
-              tooltip: 'Kitchen',
-              onPressed: () => context.go('/kitchen'),
-              icon: kitchenNewOrderCount > 0
-                  ? Badge.count(
-                      count: kitchenNewOrderCount,
-                      child: const Icon(Icons.soup_kitchen),
-                    )
-                  : const Icon(Icons.soup_kitchen),
             ),
           IconButton(
             tooltip: 'Refresh',
@@ -449,8 +435,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                   ref.invalidate(cashierBillingProvider);
                                   ref.invalidate(tablesProvider('dine_in'));
                                   ref.invalidate(tablesProvider('takeaway'));
-                                  if (sheetContext.mounted)
+                                  if (sheetContext.mounted) {
                                     Navigator.of(sheetContext).pop();
+                                  }
                                   if (context.mounted) {
                                     final entries =
                                         result.paymentEntries.isNotEmpty

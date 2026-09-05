@@ -1,7 +1,7 @@
 class BootstrapPermissions {
   const BootstrapPermissions({
     required this.waiter,
-    required this.kitchen,
+    bool kitchen = false,
     required this.cashier,
     required this.manager,
     this.canRequestCashierPrint = false,
@@ -12,7 +12,6 @@ class BootstrapPermissions {
   factory BootstrapPermissions.fromJson(Map<String, dynamic> json) {
     return BootstrapPermissions(
       waiter: json['waiter'] == true,
-      kitchen: json['kitchen'] == true,
       cashier: json['cashier'] == true,
       manager: json['manager'] == true,
       canRequestCashierPrint: json['can_request_cashier_print'] == true,
@@ -22,7 +21,6 @@ class BootstrapPermissions {
   }
 
   final bool waiter;
-  final bool kitchen;
   final bool cashier;
   final bool manager;
   final bool canRequestCashierPrint;
