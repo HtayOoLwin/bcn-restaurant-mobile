@@ -29,7 +29,7 @@ jobs:
         working-directory: mobile/bcn_restaurant_mobile
     steps:
       - uses: actions/checkout@v4
-      - name: Stabilize denied-route redirect test
+      - name: Isolate waiter route test from network providers
         shell: bash
         run: |
           python - <<'PY'
@@ -37,32 +37,49 @@ jobs:
 
           path = Path('test/features/settings/settings_screen_test.dart')
           text = path.read_text(encoding='utf-8')
-          old_initial = "    await tester.pumpWidget(\n      _routerHarness(repository, _bootstrap(waiter: true)),\n    );\n    await tester.pumpAndSettle();"
-          new_initial = "    await tester.pumpWidget(\n      _routerHarness(repository, _bootstrap(waiter: true)),\n    );\n    await tester.pump();"
-          old_redirect = "    container.read(routerProvider).go('/printer-settings');\n    await tester.pumpAndSettle();"
-          new_redirect = "    container.read(routerProvider).go('/printer-settings');\n    await tester.pump();"
 
-          changed = False
-          if old_initial in text:
-              text = text.replace(old_initial, new_initial, 1)
-              changed = True
-          elif new_initial not in text:
-              raise SystemExit('Waiter route initialization pattern not found')
+          import_anchor = "import 'package:bcn_restaurant_mobile/features/settings/presentation/settings_screen.dart';\n"
+          imports = (
+              "import 'package:bcn_restaurant_mobile/features/notifications/domain/mobile_notification.dart';\n"
+              "import 'package:bcn_restaurant_mobile/features/notifications/presentation/mobile_notification_watcher.dart';\n"
+              "import 'package:bcn_restaurant_mobile/features/waiter/domain/table_models.dart';\n"
+              "import 'package:bcn_restaurant_mobile/features/waiter/presentation/waiter_tables_screen.dart';\n"
+          )
+          if "features/waiter/presentation/waiter_tables_screen.dart" not in text:
+              if import_anchor not in text:
+                  raise SystemExit('Import anchor not found')
+              text = text.replace(import_anchor, import_anchor + imports, 1)
 
-          if old_redirect in text:
-              text = text.replace(old_redirect, new_redirect, 1)
-              changed = True
-          elif new_redirect not in text:
-              raise SystemExit('Denied-route redirect pattern not found')
+          harness_anchor = """      cashierBillingProvider.overrideWith((ref) async => _billing()),
+    ],
+    child: const _RouterTestApp(),
+"""
+          harness_replacement = """      cashierBillingProvider.overrideWith((ref) async => _billing()),
+      tablesProvider.overrideWith(
+        (ref, serviceType) async => TablesResponse(
+          serviceType: serviceType,
+          customerGroup: '',
+          tables: const [],
+        ),
+      ),
+      mobileNotificationsProvider.overrideWith(
+        (ref) async => const <MobileNotification>[],
+      ),
+    ],
+    child: const _RouterTestApp(),
+"""
+          if "tablesProvider.overrideWith(" not in text:
+              if harness_anchor not in text:
+                  raise SystemExit('Router harness anchor not found')
+              text = text.replace(harness_anchor, harness_replacement, 1)
 
-          if changed:
-              path.write_text(text, encoding='utf-8')
+          path.write_text(text, encoding='utf-8')
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add test/features/settings/settings_screen_test.dart
           if ! git diff --cached --quiet; then
-            git commit -m "test: bound waiter route initialization pump"
+            git commit -m "test: isolate waiter route from live providers"
             git push origin HEAD:bcn-restaurant-mobile-without-kitchen-monitor
           fi
       - uses: subosito/flutter-action@v2
