@@ -3,7 +3,7 @@ class AppConfig {
 
   static const baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'https://bcndemo-restaurant.nvi.frappe.cloud',
+    defaultValue: 'https://ourcity.s.frappe.cloud',
   );
 
   static Uri resolveAssetUrl(String? path) {
