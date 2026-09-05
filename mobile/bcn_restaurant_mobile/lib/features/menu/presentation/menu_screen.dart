@@ -117,7 +117,7 @@ class _MenuTile extends ConsumerWidget {
                   width: 56,
                   height: 56,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
+                  errorBuilder: (_, _, _) =>
                       const Icon(Icons.restaurant, size: 40),
                 ),
               )

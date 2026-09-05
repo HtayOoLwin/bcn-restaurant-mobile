@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/presentation/auth_controller.dart';
-import '../../kitchen/presentation/kitchen_notification_badge.dart';
 import '../data/mobile_notifications_repository.dart';
 import '../domain/mobile_notification.dart';
 
@@ -43,7 +42,6 @@ class _MobileNotificationWatcherState
     _timer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (mounted) {
         ref.invalidate(mobileNotificationsProvider);
-        ref.invalidate(kitchenNewOrderCountProvider);
       }
     });
   }

@@ -6,6 +6,8 @@ import 'api_exception.dart';
 
 class ApiClient {
   ApiClient({required SessionStorage sessionStorage, Dio? dio})
+    // Keep the public named argument `sessionStorage` while the field stays private.
+    // ignore: prefer_initializing_formals
     : _sessionStorage = sessionStorage,
       _dio =
           dio ??
