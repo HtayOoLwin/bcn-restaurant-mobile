@@ -1,10 +1,7 @@
 class AppConfig {
   const AppConfig._();
 
-  static const baseUrl = String.fromEnvironment(
-    'BASE_URL',
-    defaultValue: 'https://ourcity.s.frappe.cloud',
-  );
+  static const baseUrl = 'https://ourcity.s.frappe.cloud';
 
   static Uri resolveAssetUrl(String? path) {
     if (path == null || path.trim().isEmpty) {
