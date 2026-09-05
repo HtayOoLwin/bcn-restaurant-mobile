@@ -12,6 +12,10 @@ import 'package:bcn_restaurant_mobile/features/printing/domain/known_print_job_c
 import 'package:bcn_restaurant_mobile/features/printing/domain/windows_print_status.dart';
 import 'package:bcn_restaurant_mobile/features/printing/presentation/printer_settings_screen.dart';
 import 'package:bcn_restaurant_mobile/features/settings/presentation/settings_screen.dart';
+import 'package:bcn_restaurant_mobile/features/notifications/domain/mobile_notification.dart';
+import 'package:bcn_restaurant_mobile/features/notifications/presentation/mobile_notification_watcher.dart';
+import 'package:bcn_restaurant_mobile/features/waiter/domain/table_models.dart';
+import 'package:bcn_restaurant_mobile/features/waiter/presentation/waiter_tables_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -496,6 +500,16 @@ Widget _routerHarness(
       appVersionProvider.overrideWith((ref) async => 'v1.2.3'),
       windowsPrintRepositoryProvider.overrideWithValue(repository),
       cashierBillingProvider.overrideWith((ref) async => _billing()),
+      tablesProvider.overrideWith(
+        (ref, serviceType) async => TablesResponse(
+          serviceType: serviceType,
+          customerGroup: '',
+          tables: const [],
+        ),
+      ),
+      mobileNotificationsProvider.overrideWith(
+        (ref) async => const <MobileNotification>[],
+      ),
     ],
     child: const _RouterTestApp(),
   );
