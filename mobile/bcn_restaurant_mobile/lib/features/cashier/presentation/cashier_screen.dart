@@ -9,17 +9,13 @@ import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/presentation/kitchen_notification_badge.dart';
+import '../../printing/data/windows_print_repository.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
-import '../data/cashier_printer_service.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
 
 final cashierRepositoryProvider = Provider<CashierRepository>(
   (ref) => CashierRepository(ref.watch(apiClientProvider)),
-);
-
-final cashierPrinterServiceProvider = Provider<CashierPrinterService>(
-  (ref) => const CashierPrinterService(),
 );
 
 final cashierBillingProvider = FutureProvider<CashierBillingResponse>(
@@ -35,6 +31,7 @@ class CashierScreen extends ConsumerStatefulWidget {
 
 class _CashierScreenState extends ConsumerState<CashierScreen> {
   String _searchQuery = '';
+  final Set<String> _pendingPrintInvoices = {};
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +131,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             final invoice = filteredInvoices[index];
                             return _InvoiceCard(
                               invoice: invoice,
+                              printPending: _pendingPrintInvoices.contains(
+                                invoice.name,
+                              ),
                               onPrint: () => _printInvoice(
                                 context: context,
                                 invoice: invoice,
@@ -160,20 +160,30 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required BuildContext context,
     required CashierInvoice invoice,
   }) async {
+    if (_pendingPrintInvoices.contains(invoice.name)) return;
+    setState(() => _pendingPrintInvoices.add(invoice.name));
+    final repository = ref.read(windowsPrintRepositoryProvider);
     try {
-      await ref.read(cashierPrinterServiceProvider).printBill(invoice: invoice);
-      await ref
-          .read(cashierRepositoryProvider)
-          .recordBillPrint(invoiceName: invoice.name);
-      ref.invalidate(cashierBillingProvider);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Bill printed.')));
-      }
+      await repository.requestCashierBill(invoice.name);
+      if (!mounted || !context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Print job sent'),
+          action: SnackBarAction(
+            label: 'View status',
+            onPressed: () => context.push('/printer-settings', extra: invoice),
+          ),
+        ),
+      );
     } catch (error) {
-      if (context.mounted) {
+      if (mounted && context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) {
+        ref.invalidate(windowsPrintStatusProvider);
+        setState(() => _pendingPrintInvoices.remove(invoice.name));
       }
     }
   }
@@ -513,11 +523,13 @@ class _AmountSummaryRow extends StatelessWidget {
 class _InvoiceCard extends StatelessWidget {
   const _InvoiceCard({
     required this.invoice,
+    required this.printPending,
     required this.onPrint,
     required this.onPayment,
   });
 
   final CashierInvoice invoice;
+  final bool printPending;
   final VoidCallback onPrint;
   final VoidCallback onPayment;
 
@@ -606,10 +618,20 @@ class _InvoiceCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 FilledButton.icon(
-                  onPressed: onPrint,
-                  icon: const Icon(Icons.print),
+                  onPressed: printPending ? null : onPrint,
+                  icon: printPending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.print),
                   label: Text(
-                    invoice.billPrinted ? 'Reprint Bill' : 'Print Bill',
+                    printPending
+                        ? 'Sending…'
+                        : invoice.billPrinted
+                        ? 'Reprint Bill'
+                        : 'Print Bill',
                   ),
                 ),
                 const SizedBox(width: 12),

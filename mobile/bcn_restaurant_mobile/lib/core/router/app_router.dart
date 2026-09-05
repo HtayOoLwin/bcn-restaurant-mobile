@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
+import '../../features/cashier/domain/cashier_models.dart';
 import '../../features/cashier/presentation/cashier_screen.dart';
 import '../../features/kitchen/presentation/kitchen_orders_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
@@ -89,7 +90,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/printer-settings',
-        builder: (context, state) => const PrinterSettingsScreen(),
+        builder: (context, state) => PrinterSettingsScreen(
+          invoice: state.extra is CashierInvoice
+              ? state.extra as CashierInvoice
+              : null,
+        ),
       ),
       GoRoute(
         path: '/settings',

@@ -1,149 +1,86 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/direct_printer_service.dart';
-import '../data/printer_settings_repository.dart';
-import '../domain/printer_config.dart';
-import '../services/esc_pos_raster_builder.dart';
+import '../../auth/presentation/auth_controller.dart';
+import '../../cashier/domain/cashier_models.dart';
+import '../data/windows_print_repository.dart';
+import '../domain/windows_print_status.dart';
 
-class PrinterSettingsScreen extends StatefulWidget {
-  const PrinterSettingsScreen({super.key});
+class PrinterSettingsScreen extends ConsumerStatefulWidget {
+  const PrinterSettingsScreen({
+    super.key,
+    this.invoice,
+    this.canRetryPrintJobs,
+  });
+
+  final CashierInvoice? invoice;
+  final bool? canRetryPrintJobs;
 
   @override
-  State<PrinterSettingsScreen> createState() => _PrinterSettingsScreenState();
+  ConsumerState<PrinterSettingsScreen> createState() =>
+      _PrinterSettingsScreenState();
 }
 
-class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
-  final _repository = const PrinterSettingsRepository();
-  final _printerService = const DirectPrinterService();
-  final _ticketBuilder = const EscPosRasterBuilder();
-  final _nameController = TextEditingController();
-  final _ipController = TextEditingController();
-  final _portController = TextEditingController(text: '9100');
-  final _footerController = TextEditingController();
+class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
+  final _jobIdController = TextEditingController();
+  bool _retryPending = false;
+  bool _testPrintPending = false;
 
-  PrinterConfig _config = const PrinterConfig.defaults();
-  bool _loading = true;
-  bool _busy = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
+  bool get _hasSubmittedInvoice {
+    final invoice = widget.invoice;
+    return invoice != null &&
+        invoice.docstatus == 1 &&
+        invoice.name.trim().isNotEmpty;
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _ipController.dispose();
-    _portController.dispose();
-    _footerController.dispose();
+    _jobIdController.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    final value = await _repository.load();
-    if (!mounted) return;
-    setState(() {
-      _config = value;
-      _applyConfig(value);
-      _loading = false;
-    });
-  }
-
-  void _applyConfig(PrinterConfig value) {
-    _nameController.text = value.printerName;
-    _ipController.text = value.wifiIpAddress;
-    _portController.text = value.wifiPort.toString();
-    _footerController.text = value.footerRemark;
-  }
-
-  PrinterConfig _currentConfig() {
-    return _config.copyWith(
-      printerName: _nameController.text.trim(),
-      wifiIpAddress: _ipController.text.trim(),
-      wifiPort: int.tryParse(_portController.text.trim()) ?? 9100,
-      footerRemark: _footerController.text.trim(),
-    );
-  }
-
-  Future<void> _chooseBluetoothPrinter() async {
-    setState(() => _busy = true);
-    try {
-      final printers = await _printerService.pairedBluetoothPrinters();
-      if (!mounted) return;
-      final selected = await showModalBottomSheet<PrinterDevice>(
-        context: context,
-        showDragHandle: true,
-        builder: (context) => SafeArea(
-          child: printers.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text(
-                    'No paired Bluetooth printers found. Pair the printer in Android Settings first.',
-                  ),
-                )
-              : ListView(
-                  shrinkWrap: true,
-                  children: printers
-                      .map(
-                        (printer) => ListTile(
-                          leading: const Icon(Icons.print),
-                          title: Text(
-                            printer.name.isEmpty
-                                ? 'Bluetooth Printer'
-                                : printer.name,
-                          ),
-                          subtitle: Text(printer.address),
-                          onTap: () => Navigator.of(context).pop(printer),
-                        ),
-                      )
-                      .toList(),
-                ),
-        ),
-      );
-      if (selected != null && mounted) {
-        setState(() {
-          _nameController.text = selected.name;
-          _config = _config.copyWith(
-            printerName: selected.name,
-            bluetoothMacAddress: selected.address,
-          );
-        });
-      }
-    } catch (error) {
-      _show(error.toString());
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _testPrint() async {
-    final config = _currentConfig();
-    if (!config.isConfigured) {
-      _show('Complete the printer connection details first.');
+  Future<void> _retryJob() async {
+    if (_retryPending) return;
+    final jobId = _jobIdController.text.trim();
+    if (jobId.isEmpty) {
+      _show('Enter the failed print job ID.');
       return;
     }
-    setState(() => _busy = true);
+
+    setState(() => _retryPending = true);
+    final repository = ref.read(windowsPrintRepositoryProvider);
     try {
-      final bytes = await _ticketBuilder.buildTestTicket(
-        config,
-        DateTime.now(),
-      );
-      final result = await _printerService.printBytes(config, bytes);
-      _show(result.message);
+      await repository.retryJob(jobId);
+      if (!mounted) return;
+      _show('Print job queued for retry.');
     } catch (error) {
-      _show('Test print failed: $error');
+      if (!mounted) return;
+      _show(error.toString());
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        ref.invalidate(windowsPrintStatusProvider);
+        setState(() => _retryPending = false);
+      }
     }
   }
 
-  Future<void> _save() async {
-    final config = _currentConfig();
-    await _repository.save(config);
-    if (!mounted) return;
-    setState(() => _config = config);
-    _show('Printer setup saved.');
+  Future<void> _testCashierPrint() async {
+    if (_testPrintPending || !_hasSubmittedInvoice) return;
+    setState(() => _testPrintPending = true);
+    final repository = ref.read(windowsPrintRepositoryProvider);
+    try {
+      await repository.requestCashierBill(widget.invoice!.name);
+      if (!mounted) return;
+      _show('Print job sent');
+    } catch (error) {
+      if (!mounted) return;
+      _show(error.toString());
+    } finally {
+      if (mounted) {
+        ref.invalidate(windowsPrintStatusProvider);
+        setState(() => _testPrintPending = false);
+      }
+    }
   }
 
   void _show(String message) {
@@ -154,17 +91,26 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+    final status = ref.watch(windowsPrintStatusProvider);
+    final canRetry =
+        widget.canRetryPrintJobs ??
+        ref
+                .watch(authControllerProvider)
+                .asData
+                ?.value
+                .bootstrap
+                ?.permissions
+                .canRetryPrintJobs ==
+            true;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Printer Setup'),
+        title: const Text('Windows Print Service'),
         actions: [
           IconButton(
-            onPressed: _busy ? null : _load,
-            icon: const Icon(Icons.sync),
-            tooltip: 'Reload',
+            onPressed: () => ref.invalidate(windowsPrintStatusProvider),
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh print status',
           ),
         ],
       ),
@@ -172,189 +118,99 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: [
-                Text(
-                  'Bluetooth or Wi-Fi receipt preferences',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 16),
-                _SettingsCard(
-                  title: 'Printer Interface',
-                  child: SegmentedButton<PrinterConnectionType>(
-                    segments: const [
-                      ButtonSegment(
-                        value: PrinterConnectionType.bluetooth,
-                        label: Text('Bluetooth'),
-                        icon: Icon(Icons.bluetooth),
+            child: status.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => _StatusError(
+                message: error.toString(),
+                onRetry: () => ref.invalidate(windowsPrintStatusProvider),
+              ),
+              data: (value) => ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _ServiceStatusCard(status: value),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _CountCard(
+                          label: 'Pending',
+                          count: value.pending,
+                          icon: Icons.schedule,
+                        ),
                       ),
-                      ButtonSegment(
-                        value: PrinterConnectionType.wifi,
-                        label: Text('Wi-Fi'),
-                        icon: Icon(Icons.wifi),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _CountCard(
+                          label: 'Failed',
+                          count: value.failed,
+                          icon: Icons.error_outline,
+                        ),
                       ),
                     ],
-                    selected: {_config.connectionType},
-                    onSelectionChanged: _busy
-                        ? null
-                        : (value) => setState(
-                            () => _config = _config.copyWith(
-                              connectionType: value.first,
-                            ),
-                          ),
                   ),
-                ),
-                _SettingsCard(
-                  title: 'Selected Printer',
-                  child:
-                      _config.connectionType == PrinterConnectionType.bluetooth
-                      ? Column(
+                  if (canRetry && value.failed > 0) ...[
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              _config.bluetoothMacAddress.isEmpty
-                                  ? 'No Bluetooth printer selected'
-                                  : '${_nameController.text}\n${_config.bluetoothMacAddress}',
+                              'Retry a failed job',
+                              style: Theme.of(context).textTheme.titleMedium,
                             ),
                             const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: _busy ? null : _chooseBluetoothPrinter,
-                              icon: const Icon(Icons.bluetooth_searching),
-                              label: const Text('Choose Bluetooth Printer'),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          children: [
                             TextField(
-                              controller: _nameController,
+                              key: const Key('failed-print-job-id'),
+                              controller: _jobIdController,
+                              enabled: !_retryPending,
                               decoration: const InputDecoration(
-                                labelText: 'Printer Name (optional)',
+                                labelText: 'Failed print job ID',
                                 border: OutlineInputBorder(),
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: TextField(
-                                    controller: _ipController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: const InputDecoration(
-                                      labelText: 'IP Address',
-                                      hintText: '192.168.1.100',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _portController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Port',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            FilledButton.icon(
+                              onPressed: _retryPending ? null : _retryJob,
+                              icon: _retryPending
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.refresh),
+                              label: Text(
+                                _retryPending
+                                    ? 'Retrying…'
+                                    : 'Retry Failed Jobs',
+                              ),
                             ),
                           ],
                         ),
-                ),
-                _SettingsCard(
-                  title: 'Paper Size',
-                  child: SegmentedButton<int>(
-                    segments: const [
-                      ButtonSegment(value: 58, label: Text('58 mm')),
-                      ButtonSegment(value: 80, label: Text('80 mm')),
-                    ],
-                    selected: {_config.paperWidthMm},
-                    onSelectionChanged: (value) => setState(
-                      () =>
-                          _config = _config.copyWith(paperWidthMm: value.first),
+                      ),
                     ),
-                  ),
-                ),
-                _SettingsCard(
-                  title: 'Font Size',
-                  child: Column(
-                    children: [
-                      Slider(
-                        value: _config.fontSizePx,
-                        min: 15,
-                        max: 25,
-                        divisions: 10,
-                        label: '${_config.fontSizePx.round()}px',
-                        onChanged: (value) => setState(
-                          () => _config = _config.copyWith(fontSizePx: value),
-                        ),
+                  ],
+                  if (_hasSubmittedInvoice) ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _testPrintPending ? null : _testCashierPrint,
+                      icon: _testPrintPending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.print),
+                      label: Text(
+                        _testPrintPending ? 'Sending…' : 'Test Cashier Print',
                       ),
-                      Text(
-                        '${_config.fontSizePx.round()}px',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'Sample receipt text\nမြန်မာစာ စမ်းသပ်မှု',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: _config.fontSizePx),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _SettingsCard(
-                  title: 'Receipt Footer',
-                  child: TextField(
-                    controller: _footerController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'Footer remark shown on the cashier bill',
-                      border: OutlineInputBorder(),
                     ),
-                  ),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Auto Cut'),
-                  value: _config.autoCut,
-                  onChanged: (value) => setState(
-                    () => _config = _config.copyWith(autoCut: value),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _testPrint,
-                  icon: _busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.print),
-                  label: Text(_busy ? 'Please wait…' : 'Test Print'),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: _busy ? null : _save,
-                  icon: const Icon(Icons.save),
-                  label: const Text('Save Printer Setup'),
-                ),
-              ],
+                  ],
+                ],
+              ),
             ),
           ),
         ),
@@ -363,28 +219,96 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   }
 }
 
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.title, required this.child});
+class _ServiceStatusCard extends StatelessWidget {
+  const _ServiceStatusCard({required this.status});
 
-  final String title;
-  final Widget child;
+  final WindowsPrintStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final color = status.online ? Colors.green : colors.error;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Icon(
+              status.online ? Icons.cloud_done : Icons.cloud_off,
+              color: color,
+              size: 36,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    status.online ? 'Online' : 'Offline',
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(color: color, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Last seen: ${status.lastSeen ?? 'Never'}'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CountCard extends StatelessWidget {
+  const _CountCard({
+    required this.label,
+    required this.count,
+    required this.icon,
+  });
+
+  final String label;
+  final int count;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 14),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+            Icon(icon),
+            const SizedBox(height: 8),
+            Text('$count', style: Theme.of(context).textTheme.headlineMedium),
+            Text(label),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusError extends StatelessWidget {
+  const _StatusError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: onRetry,
+              child: const Text('Retry Status'),
             ),
-            const SizedBox(height: 14),
-            child,
           ],
         ),
       ),

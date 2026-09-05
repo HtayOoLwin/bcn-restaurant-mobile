@@ -4,6 +4,9 @@ class BootstrapPermissions {
     required this.kitchen,
     required this.cashier,
     required this.manager,
+    this.canRequestCashierPrint = false,
+    this.canViewPrintStatus = false,
+    this.canRetryPrintJobs = false,
   });
 
   factory BootstrapPermissions.fromJson(Map<String, dynamic> json) {
@@ -12,6 +15,9 @@ class BootstrapPermissions {
       kitchen: json['kitchen'] == true,
       cashier: json['cashier'] == true,
       manager: json['manager'] == true,
+      canRequestCashierPrint: json['can_request_cashier_print'] == true,
+      canViewPrintStatus: json['can_view_print_status'] == true,
+      canRetryPrintJobs: json['can_retry_print_jobs'] == true,
     );
   }
 
@@ -19,6 +25,9 @@ class BootstrapPermissions {
   final bool kitchen;
   final bool cashier;
   final bool manager;
+  final bool canRequestCashierPrint;
+  final bool canViewPrintStatus;
+  final bool canRetryPrintJobs;
 }
 
 class BootstrapModel {
@@ -37,7 +46,9 @@ class BootstrapModel {
     return BootstrapModel(
       user: json['user']?.toString() ?? '',
       fullName: json['full_name']?.toString() ?? '',
-      roles: (json['roles'] as List? ?? const []).map((e) => e.toString()).toList(),
+      roles: (json['roles'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
       permissions: BootstrapPermissions.fromJson(
         Map<String, dynamic>.from(json['permissions'] as Map? ?? const {}),
       ),
