@@ -37,18 +37,32 @@ jobs:
 
           path = Path('test/features/settings/settings_screen_test.dart')
           text = path.read_text(encoding='utf-8')
-          old = "    container.read(routerProvider).go('/printer-settings');\n    await tester.pumpAndSettle();"
-          new = "    container.read(routerProvider).go('/printer-settings');\n    await tester.pump();"
-          if old in text:
-              path.write_text(text.replace(old, new, 1), encoding='utf-8')
-          elif new not in text:
-              raise SystemExit('Denied-route test pattern not found')
+          old_initial = "    await tester.pumpWidget(\n      _routerHarness(repository, _bootstrap(waiter: true)),\n    );\n    await tester.pumpAndSettle();"
+          new_initial = "    await tester.pumpWidget(\n      _routerHarness(repository, _bootstrap(waiter: true)),\n    );\n    await tester.pump();"
+          old_redirect = "    container.read(routerProvider).go('/printer-settings');\n    await tester.pumpAndSettle();"
+          new_redirect = "    container.read(routerProvider).go('/printer-settings');\n    await tester.pump();"
+
+          changed = False
+          if old_initial in text:
+              text = text.replace(old_initial, new_initial, 1)
+              changed = True
+          elif new_initial not in text:
+              raise SystemExit('Waiter route initialization pattern not found')
+
+          if old_redirect in text:
+              text = text.replace(old_redirect, new_redirect, 1)
+              changed = True
+          elif new_redirect not in text:
+              raise SystemExit('Denied-route redirect pattern not found')
+
+          if changed:
+              path.write_text(text, encoding='utf-8')
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add test/features/settings/settings_screen_test.dart
           if ! git diff --cached --quiet; then
-            git commit -m "test: use bounded pump for denied print route"
+            git commit -m "test: bound waiter route initialization pump"
             git push origin HEAD:bcn-restaurant-mobile-without-kitchen-monitor
           fi
       - uses: subosito/flutter-action@v2
