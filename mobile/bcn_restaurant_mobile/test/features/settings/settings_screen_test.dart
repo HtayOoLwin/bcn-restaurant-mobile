@@ -439,7 +439,7 @@ void main() {
     await tester.pumpWidget(
       _routerHarness(repository, _bootstrap(waiter: true)),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
     final container = ProviderScope.containerOf(
       tester.element(find.byType(_RouterTestApp)),
     );
