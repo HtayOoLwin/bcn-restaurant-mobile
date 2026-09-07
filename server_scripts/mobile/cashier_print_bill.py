@@ -76,6 +76,14 @@ if not request_id:
 if not frappe.db.exists("DocType", "BCN Print Job"):
     frappe.throw("BCN Print Job is not configured")
 
+serialization_rows = frappe.db.sql(
+    "SELECT name FROM `tabPOS Profile` WHERE name=%(name)s FOR UPDATE",
+    {"name": POS_PROFILE},
+    as_dict=True,
+)
+if not serialization_rows:
+    frappe.throw("POS Profile not found: " + POS_PROFILE)
+
 existing_job_name = frappe.db.exists("BCN Print Job", {"request_id": request_id})
 if existing_job_name:
     existing_job = frappe.get_doc("BCN Print Job", existing_job_name)
