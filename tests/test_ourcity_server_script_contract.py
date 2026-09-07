@@ -128,6 +128,22 @@ def test_print_job_result_is_owned_and_retry_safe():
     assert "conflict" in source.lower()
 
 
+def test_cashier_pay_finalizes_sales_order_invoice_and_payments_atomically():
+    source = _read(SERVER_SCRIPTS / "cashier_billing.py")
+    assert 'action == "Pay"' in source
+    assert "FOR UPDATE" in source
+    assert 'custom_restaurant_status = "Closed"' in source
+    assert ".submit()" in source
+    assert "update_stock = 1" in source
+    assert "Payment Entry" in source
+    assert "Sales Invoice Item" in source
+    assert "Payment Entry Reference" in source
+    assert '"duplicate"' in source
+    assert "frappe.db.commit" not in source
+    assert "frappe.db.rollback" not in source
+    assert "Delivery Note" not in source
+
+
 def test_create_order_blocks_new_waiter_orders_while_table_is_billing():
     source = _read(SERVER_SCRIPTS / "create_order.py")
     assert '"custom_restaurant_status": ["in", ["Open", "Billing"]]' in source
