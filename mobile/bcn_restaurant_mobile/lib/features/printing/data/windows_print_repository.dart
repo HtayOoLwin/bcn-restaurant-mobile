@@ -6,12 +6,15 @@ import '../domain/cashier_bill_print_result.dart';
 import '../domain/windows_print_status.dart';
 
 abstract interface class WindowsPrintGateway {
-  Future<CashierBillPrintResult> requestCashierBill([
-    String? legacySalesOrder,
-  ], {
-    String? salesOrder,
-    String? requestId,
+  Future<CashierBillPrintResult> requestCashierBill({
+    required String salesOrder,
+    required String requestId,
   });
+
+  // Transitional compile surface for screens that are refactored in Task 8.
+  // It deliberately performs no network request because cashier printing now
+  // requires an explicit request id for idempotency.
+  Future<PrintRequestResult> requestCashierBillLegacy(String salesOrder);
 
   // Transitional surface retained so the existing printer-settings screen
   // continues to compile until its legacy status UI is removed/refactored.
@@ -28,14 +31,12 @@ class WindowsPrintRepository implements WindowsPrintGateway {
   final ApiClient _apiClient;
 
   @override
-  Future<CashierBillPrintResult> requestCashierBill([
-    String? legacySalesOrder,
-  ], {
-    String? salesOrder,
-    String? requestId,
+  Future<CashierBillPrintResult> requestCashierBill({
+    required String salesOrder,
+    required String requestId,
   }) async {
-    final resolvedSalesOrder = (salesOrder ?? legacySalesOrder ?? '').trim();
-    final resolvedRequestId = (requestId ?? '').trim();
+    final resolvedSalesOrder = salesOrder.trim();
+    final resolvedRequestId = requestId.trim();
 
     if (resolvedSalesOrder.isEmpty) {
       throw const FormatException('salesOrder is required for cashier print.');
@@ -52,6 +53,13 @@ class WindowsPrintRepository implements WindowsPrintGateway {
       },
     );
     return CashierBillPrintResult.fromJson(_responseMap(data));
+  }
+
+  @override
+  Future<PrintRequestResult> requestCashierBillLegacy(String salesOrder) {
+    throw UnsupportedError(
+      'Cashier printing requires a request id. Use the cashier print action.',
+    );
   }
 
   @override
