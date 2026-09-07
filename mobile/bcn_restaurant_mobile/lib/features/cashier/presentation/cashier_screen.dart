@@ -9,8 +9,6 @@ import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../printing/data/windows_print_repository.dart';
-import '../../printing/domain/known_print_job_controller.dart';
-import '../../printing/domain/windows_print_status.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
@@ -32,7 +30,7 @@ class CashierScreen extends ConsumerStatefulWidget {
 
 class _CashierScreenState extends ConsumerState<CashierScreen> {
   String _searchQuery = '';
-  final Set<String> _pendingPrintInvoices = {};
+  final Set<String> _pendingPrintSalesOrders = {};
 
   @override
   Widget build(BuildContext context) {
@@ -87,25 +85,25 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 ),
               ),
               data: (data) {
-                final filteredInvoices = data.invoices
+                final filteredBills = data.bills
                     .where(
-                      (invoice) => matchesOrderSearch(
+                      (bill) => matchesOrderSearch(
                         queryText: _searchQuery,
-                        tableName: invoice.customerName,
-                        orderNumbers: invoice.salesOrders,
+                        tableName: bill.customerName,
+                        orderNumbers: [bill.salesOrder],
                       ),
                     )
                     .toList();
                 return RefreshIndicator(
                   onRefresh: () => ref.refresh(cashierBillingProvider.future),
-                  child: data.invoices.isEmpty
+                  child: data.bills.isEmpty
                       ? ListView(
                           children: const [
                             SizedBox(height: 180),
                             Center(child: Text('No bills ready for payment.')),
                           ],
                         )
-                      : filteredInvoices.isEmpty
+                      : filteredBills.isEmpty
                       ? ListView(
                           children: const [
                             SizedBox(height: 180),
@@ -114,23 +112,23 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.all(12),
-                          itemCount: filteredInvoices.length,
+                          itemCount: filteredBills.length,
                           itemBuilder: (context, index) {
-                            final invoice = filteredInvoices[index];
-                            return _InvoiceCard(
-                              invoice: invoice,
-                              printPending: _pendingPrintInvoices.contains(
-                                invoice.name,
+                            final bill = filteredBills[index];
+                            return _BillCard(
+                              bill: bill,
+                              printPending: _pendingPrintSalesOrders.contains(
+                                bill.salesOrder,
                               ),
-                              onPrint: () => _printInvoice(
+                              onPrint: () => _printBill(
                                 context: context,
-                                invoice: invoice,
+                                bill: bill,
                               ),
                               onPayment: () => _openPaymentSheet(
                                 context: context,
                                 ref: ref,
                                 billing: data,
-                                invoice: invoice,
+                                bill: bill,
                               ),
                             );
                           },
@@ -144,38 +142,18 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     );
   }
 
-  Future<void> _printInvoice({
+  Future<void> _printBill({
     required BuildContext context,
-    required CashierInvoice invoice,
+    required CashierBill bill,
   }) async {
-    if (_pendingPrintInvoices.contains(invoice.name)) return;
-    setState(() => _pendingPrintInvoices.add(invoice.name));
+    if (_pendingPrintSalesOrders.contains(bill.salesOrder)) return;
+    setState(() => _pendingPrintSalesOrders.add(bill.salesOrder));
     final repository = ref.read(windowsPrintRepositoryProvider);
     try {
-      final result = await repository.requestCashierBill(invoice.name);
+      final result = await repository.requestCashierBill(bill.salesOrder);
       if (!mounted || !context.mounted) return;
-      final jobContext = KnownPrintJobContext(
-        invoiceName: invoice.name,
-        invoiceDocstatus: invoice.docstatus,
-        request: result,
-      );
-      ref.read(lastAcceptedPrintJobProvider.notifier).retain(jobContext);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Print job sent'),
-              Text('Job ID: ${result.jobId}'),
-            ],
-          ),
-          action: SnackBarAction(
-            label: 'View status',
-            onPressed: () =>
-                context.push('/printer-settings', extra: jobContext),
-          ),
-        ),
+        SnackBar(content: Text('Print job sent · ${result.jobId}')),
       );
     } catch (error) {
       if (mounted && context.mounted) {
@@ -185,8 +163,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       }
     } finally {
       if (mounted) {
-        ref.invalidate(windowsPrintStatusProvider);
-        setState(() => _pendingPrintInvoices.remove(invoice.name));
+        setState(() => _pendingPrintSalesOrders.remove(bill.salesOrder));
       }
     }
   }
@@ -195,7 +172,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required BuildContext context,
     required WidgetRef ref,
     required CashierBillingResponse billing,
-    required CashierInvoice invoice,
+    required CashierBill bill,
   }) async {
     final controllers = <String, TextEditingController>{};
     for (final mode in billing.modes) {
@@ -211,7 +188,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
     bool busy = false;
     String selectedPaymentType = primaryMode?.name ?? '';
-    final fullAmountText = formatAmount(invoice.outstandingAmount);
+    final fullAmountText = formatAmount(bill.grandTotal);
 
     void setControllerAmount(TextEditingController? controller, double amount) {
       if (controller == null) return;
@@ -241,15 +218,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     void onTenderChanged(String changedMode) {
       if (selectedPaymentType != 'Split' ||
           primaryMode == null ||
-          secondaryMode == null) {
-        return;
-      }
-      if (changedMode != secondaryMode.name) {
+          secondaryMode == null ||
+          changedMode != secondaryMode.name) {
         return;
       }
 
       final secondAmount = _parseTender(controllers[secondaryMode.name]?.text);
-      final balance = (invoice.outstandingAmount - secondAmount)
+      final balance = (bill.grandTotal - secondAmount)
           .clamp(0, double.infinity)
           .toDouble();
       setControllerAmount(controllers[primaryMode.name], balance);
@@ -299,14 +274,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               }
             }
 
-            final remaining = totalTendered < invoice.outstandingAmount
-                ? invoice.outstandingAmount - totalTendered
+            final remaining = totalTendered < bill.grandTotal
+                ? bill.grandTotal - totalTendered
                 : 0.0;
-            final change = totalTendered > invoice.outstandingAmount
-                ? totalTendered - invoice.outstandingAmount
+            final change = totalTendered > bill.grandTotal
+                ? totalTendered - bill.grandTotal
                 : 0.0;
-            final nonCashOver =
-                nonCashTotal > invoice.outstandingAmount + 0.0001;
+            final nonCashOver = nonCashTotal > bill.grandTotal + 0.0001;
             final overWithoutCash = change > 0 && cashTendered <= 0;
             final canPay =
                 tenders.isNotEmpty &&
@@ -329,12 +303,12 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        '${invoice.customerName} · ${invoice.name}',
+                        '${bill.customerName} · ${bill.salesOrder}',
                         style: Theme.of(sheetContext).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Amount Due: ${formatMoney(invoice.outstandingAmount, invoice.currency)}',
+                        'Amount Due: ${formatMoney(bill.grandTotal, bill.currency)}',
                         style: Theme.of(sheetContext).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 20),
@@ -385,7 +359,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             ],
                             decoration: InputDecoration(
                               labelText: mode.name,
-                              suffixText: invoice.currency,
+                              suffixText: bill.currency,
                               border: const OutlineInputBorder(),
                             ),
                             onChanged: (_) =>
@@ -395,15 +369,15 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       ),
                       _AmountSummaryRow(
                         label: 'Total Tendered',
-                        value: formatMoney(totalTendered, invoice.currency),
+                        value: formatMoney(totalTendered, bill.currency),
                       ),
                       _AmountSummaryRow(
                         label: 'Remaining',
-                        value: formatMoney(remaining, invoice.currency),
+                        value: formatMoney(remaining, bill.currency),
                       ),
                       _AmountSummaryRow(
                         label: 'Change',
-                        value: formatMoney(change, invoice.currency),
+                        value: formatMoney(change, bill.currency),
                         emphasize: change > 0,
                       ),
                       if (nonCashOver)
@@ -430,7 +404,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                   final result = await ref
                                       .read(cashierRepositoryProvider)
                                       .paySplit(
-                                        invoiceName: invoice.name,
+                                        salesOrder: bill.salesOrder,
                                         payments: tenders,
                                       );
                                   ref.invalidate(cashierBillingProvider);
@@ -440,12 +414,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     Navigator.of(sheetContext).pop();
                                   }
                                   if (context.mounted) {
-                                    final entries =
-                                        result.paymentEntries.isNotEmpty
-                                        ? result.paymentEntries.join(', ')
-                                        : (result.paymentEntry ?? '');
+                                    final entries = result.paymentEntries.join(', ');
                                     final changeText = result.changeAmount > 0
-                                        ? ' · Change ${formatMoney(result.changeAmount, invoice.currency)}'
+                                        ? ' · Change ${formatMoney(result.changeAmount, bill.currency)}'
                                         : '';
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -472,9 +443,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.payments),
                         label: Text(busy ? 'Processing…' : 'Confirm Payment'),
@@ -524,21 +493,23 @@ class _AmountSummaryRow extends StatelessWidget {
   }
 }
 
-class _InvoiceCard extends StatelessWidget {
-  const _InvoiceCard({
-    required this.invoice,
+class _BillCard extends StatelessWidget {
+  const _BillCard({
+    required this.bill,
     required this.printPending,
     required this.onPrint,
     required this.onPayment,
   });
 
-  final CashierInvoice invoice;
+  final CashierBill bill;
   final bool printPending;
   final VoidCallback onPrint;
   final VoidCallback onPayment;
 
   @override
   Widget build(BuildContext context) {
+    final hasPrinted = bill.lastPrintJob?.isNotEmpty == true;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -554,27 +525,26 @@ class _InvoiceCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        invoice.customerName,
+                        bill.customerName,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        invoice.name,
+                        bill.salesOrder,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      if (invoice.salesOrders.isNotEmpty)
-                        Text(
-                          "Order: ${invoice.salesOrders.join(', ')}",
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
                     ],
                   ),
                 ),
-                Chip(label: Text(invoice.paymentStatus)),
+                Chip(label: Text(bill.restaurantStatus)),
               ],
             ),
+            if (bill.lastPrintStatus?.isNotEmpty == true) ...[
+              const SizedBox(height: 6),
+              Text('Last Print: ${bill.lastPrintStatus}'),
+            ],
             const Divider(height: 24),
-            ...invoice.items.map(
+            ...bill.items.map(
               (item) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -586,7 +556,7 @@ class _InvoiceCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(formatMoney(item.amount, invoice.currency)),
+                    Text(formatMoney(item.amount, bill.currency)),
                   ],
                 ),
               ),
@@ -594,29 +564,22 @@ class _InvoiceCard extends StatelessWidget {
             const Divider(height: 24),
             _AmountSummaryRow(
               label: 'Subtotal',
-              value: formatMoney(invoice.netTotal, invoice.currency),
+              value: formatMoney(bill.netTotal, bill.currency),
             ),
-            ...invoice.taxes.map(
+            ...bill.taxes.map(
               (tax) => _AmountSummaryRow(
                 label: tax.rate == 0
                     ? tax.description
                     : '${tax.description} ${formatQuantity(tax.rate)}%',
-                value: formatMoney(tax.taxAmount, invoice.currency),
+                value: formatMoney(tax.taxAmount, bill.currency),
               ),
             ),
             const SizedBox(height: 4),
             _AmountSummaryRow(
               label: 'Grand Total',
-              value: formatMoney(invoice.grandTotal, invoice.currency),
+              value: formatMoney(bill.grandTotal, bill.currency),
               emphasize: true,
             ),
-            if (invoice.docstatus == 1 &&
-                (invoice.outstandingAmount - invoice.grandTotal).abs() > 0.0001)
-              _AmountSummaryRow(
-                label: 'Outstanding',
-                value: formatMoney(invoice.outstandingAmount, invoice.currency),
-                emphasize: true,
-              ),
             const Divider(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -633,7 +596,7 @@ class _InvoiceCard extends StatelessWidget {
                   label: Text(
                     printPending
                         ? 'Sending…'
-                        : invoice.billPrinted
+                        : hasPrinted
                         ? 'Reprint Bill'
                         : 'Print Bill',
                   ),
