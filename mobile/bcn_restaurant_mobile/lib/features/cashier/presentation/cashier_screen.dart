@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../../core/search/order_search.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../printing/data/windows_print_repository.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
@@ -20,6 +23,16 @@ final cashierBillingProvider = FutureProvider<CashierBillingResponse>(
   (ref) => ref.watch(cashierRepositoryProvider).getBilling(),
 );
 
+typedef CashierPrintRequestIdFactory = String Function();
+
+final cashierPrintRequestIdFactoryProvider =
+    Provider<CashierPrintRequestIdFactory>((ref) => _newPrintRequestId);
+
+String _newPrintRequestId() {
+  final entropy = Random.secure().nextInt(0x7fffffff).toRadixString(16);
+  return 'cashier-${DateTime.now().microsecondsSinceEpoch}-$entropy';
+}
+
 class CashierScreen extends ConsumerStatefulWidget {
   const CashierScreen({super.key});
 
@@ -29,6 +42,9 @@ class CashierScreen extends ConsumerStatefulWidget {
 
 class _CashierScreenState extends ConsumerState<CashierScreen> {
   String _searchQuery = '';
+  final Set<String> _pendingPrintSalesOrders = {};
+  final Map<String, String> _retryPrintRequestIds = {};
+  CashierPaymentResult? _lastPaymentResult;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +89,41 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               onChanged: (value) => setState(() => _searchQuery = value),
             ),
           ),
+          if (_lastPaymentResult != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Payment completed'),
+                            const SizedBox(height: 2),
+                            Text(_lastPaymentResult!.salesOrder),
+                          ],
+                        ),
+                      ),
+                      FilledButton.icon(
+                        onPressed: _pendingPrintSalesOrders.contains(
+                          _lastPaymentResult!.salesOrder,
+                        )
+                            ? null
+                            : () => _printBill(
+                                  context: context,
+                                  salesOrder: _lastPaymentResult!.salesOrder,
+                                ),
+                        icon: const Icon(Icons.print),
+                        label: const Text('Reprint Bill'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           Expanded(
             child: billing.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -115,8 +166,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             final bill = filteredBills[index];
                             return _BillCard(
                               bill: bill,
-                              printPending: false,
-                              onPrint: null,
+                              printPending: _pendingPrintSalesOrders.contains(
+                                bill.salesOrder,
+                              ),
+                              onPrint: () => _printBill(
+                                context: context,
+                                salesOrder: bill.salesOrder,
+                              ),
                               onPayment: () => _openPaymentSheet(
                                 context: context,
                                 ref: ref,
@@ -133,6 +189,46 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _printBill({
+    required BuildContext context,
+    required String salesOrder,
+  }) async {
+    if (_pendingPrintSalesOrders.contains(salesOrder)) return;
+
+    final requestId =
+        _retryPrintRequestIds[salesOrder] ??
+        ref.read(cashierPrintRequestIdFactoryProvider)();
+
+    setState(() => _pendingPrintSalesOrders.add(salesOrder));
+    try {
+      final result = await ref
+          .read(windowsPrintRepositoryProvider)
+          .requestCashierBill(
+            salesOrder: salesOrder,
+            requestId: requestId,
+          );
+      if (!mounted || !context.mounted) return;
+      setState(() => _retryPrintRequestIds.remove(salesOrder));
+      ref.invalidate(cashierBillingProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Print job sent · ${result.printJob}')),
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() => _retryPrintRequestIds[salesOrder] = requestId);
+      }
+      if (mounted && context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _pendingPrintSalesOrders.remove(salesOrder));
+      }
+    }
   }
 
   Future<void> _openPaymentSheet({
@@ -374,6 +470,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                         salesOrder: bill.salesOrder,
                                         payments: tenders,
                                       );
+                                  if (mounted) {
+                                    setState(() {
+                                      _retryPrintRequestIds.remove(
+                                        result.salesOrder,
+                                      );
+                                      _lastPaymentResult = result;
+                                    });
+                                  }
                                   ref.invalidate(cashierBillingProvider);
                                   ref.invalidate(tablesProvider('dine_in'));
                                   ref.invalidate(tablesProvider('takeaway'));
@@ -470,12 +574,13 @@ class _BillCard extends StatelessWidget {
 
   final CashierBill bill;
   final bool printPending;
-  final VoidCallback? onPrint;
+  final VoidCallback onPrint;
   final VoidCallback onPayment;
 
   @override
   Widget build(BuildContext context) {
     final hasPrinted = bill.lastPrintJob?.isNotEmpty == true;
+    final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'billing';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -563,7 +668,7 @@ class _BillCard extends StatelessWidget {
                   label: Text(
                     printPending
                         ? 'Sending…'
-                        : hasPrinted
+                        : isBilling || hasPrinted
                         ? 'Reprint Bill'
                         : 'Print Bill',
                   ),
