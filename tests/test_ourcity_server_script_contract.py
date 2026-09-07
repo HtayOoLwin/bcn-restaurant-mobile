@@ -44,6 +44,21 @@ def test_create_order_applies_and_recalculates_dmt_taxes():
     assert "sales_order.calculate_taxes_and_totals()" in source
 
 
+def test_cashier_billing_lists_open_and_billing_sales_order_bills():
+    path = SERVER_SCRIPTS / "cashier_billing.py"
+    assert path.exists()
+    source = _read(path)
+    assert 'COMPANY = "Doh Myot Daw BBQ & Restaurant"' in source
+    assert 'POS_PROFILE = "DMT"' in source
+    assert '"docstatus": 0' in source
+    assert '["Open", "Billing"]' in source
+    assert '"bills"' in source
+    assert '"modes"' in source
+    assert '"last_print_status"' in source
+    assert '"last_print_job"' in source
+    assert "Restaurant Table Session" not in source
+
+
 def test_create_order_blocks_new_waiter_orders_while_table_is_billing():
     source = _read(SERVER_SCRIPTS / "create_order.py")
     assert '"custom_restaurant_status": ["in", ["Open", "Billing"]]' in source
