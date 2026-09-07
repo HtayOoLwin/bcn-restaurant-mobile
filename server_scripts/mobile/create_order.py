@@ -130,10 +130,6 @@ if not is_duplicate:
         if profile.warehouse:
             sales_order.set_warehouse = profile.warehouse
 
-        if profile.taxes_and_charges:
-            sales_order.taxes_and_charges = profile.taxes_and_charges
-            sales_order.set_taxes()
-
     allowed_item_groups = []
     for group_row in profile.item_groups:
         if (
@@ -250,7 +246,15 @@ if not is_duplicate:
 
     if profile.taxes_and_charges and not sales_order.taxes_and_charges:
         sales_order.taxes_and_charges = profile.taxes_and_charges
-        sales_order.set_taxes()
+
+    if sales_order.taxes_and_charges and not sales_order.taxes:
+        taxes = frappe.call(
+            "erpnext.accounts.services.taxes.get_taxes_and_charges",
+            master_doctype="Sales Taxes and Charges Template",
+            master_name=sales_order.taxes_and_charges,
+        ) or []
+        for tax in taxes:
+            sales_order.append("taxes", tax)
 
     sales_order.calculate_taxes_and_totals()
     sales_order.custom_client_order_id = client_order_id
