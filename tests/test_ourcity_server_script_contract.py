@@ -25,7 +25,7 @@ def test_create_order_reuses_open_draft_sales_order_and_preserves_print_delta():
     assert "json.loads" in source
     assert "frappe.parse_json" not in source
     assert '"docstatus": 0' in source
-    assert '"custom_restaurant_status": "Open"' in source
+    assert 'sales_order.custom_restaurant_status = "Open"' in source
     assert "custom_client_order_id" in source
     assert "custom_kitchen_note" in source
     assert "custom_kitchen_counter" in source
