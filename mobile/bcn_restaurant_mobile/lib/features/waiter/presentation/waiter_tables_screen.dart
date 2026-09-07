@@ -151,8 +151,8 @@ class _TableCard extends StatelessWidget {
 
     switch (status.toLowerCase()) {
       case 'occupied':
-        cardColor = Colors.orange.shade50;
-        statusColor = Colors.orange.shade800;
+        cardColor = Colors.red.shade50;
+        statusColor = Colors.red.shade800;
         statusIcon = Icons.restaurant;
         break;
 
