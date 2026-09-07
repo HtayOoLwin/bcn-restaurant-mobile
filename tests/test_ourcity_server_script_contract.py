@@ -144,6 +144,12 @@ def test_cashier_pay_finalizes_sales_order_invoice_and_payments_atomically():
     assert "Delivery Note" not in source
 
 
+def test_cashier_pay_skips_non_positive_tender_rows():
+    source = _read(SERVER_SCRIPTS / "cashier_billing.py")
+    assert 'if amount <= 0:\n            continue' in source
+    assert "Payment amount must be greater than zero" not in source
+
+
 def test_create_order_blocks_new_waiter_orders_while_table_is_billing():
     source = _read(SERVER_SCRIPTS / "create_order.py")
     assert '"custom_restaurant_status": ["in", ["Open", "Billing"]]' in source
