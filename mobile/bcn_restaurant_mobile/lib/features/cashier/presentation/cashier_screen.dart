@@ -8,7 +8,6 @@ import '../../../core/search/order_search.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
-import '../../printing/data/windows_print_repository.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
@@ -30,7 +29,6 @@ class CashierScreen extends ConsumerStatefulWidget {
 
 class _CashierScreenState extends ConsumerState<CashierScreen> {
   String _searchQuery = '';
-  final Set<String> _pendingPrintSalesOrders = {};
 
   @override
   Widget build(BuildContext context) {
@@ -117,13 +115,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             final bill = filteredBills[index];
                             return _BillCard(
                               bill: bill,
-                              printPending: _pendingPrintSalesOrders.contains(
-                                bill.salesOrder,
-                              ),
-                              onPrint: () => _printBill(
-                                context: context,
-                                bill: bill,
-                              ),
+                              printPending: false,
+                              onPrint: null,
                               onPayment: () => _openPaymentSheet(
                                 context: context,
                                 ref: ref,
@@ -140,32 +133,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _printBill({
-    required BuildContext context,
-    required CashierBill bill,
-  }) async {
-    if (_pendingPrintSalesOrders.contains(bill.salesOrder)) return;
-    setState(() => _pendingPrintSalesOrders.add(bill.salesOrder));
-    final repository = ref.read(windowsPrintRepositoryProvider);
-    try {
-      final result = await repository.requestCashierBillLegacy(bill.salesOrder);
-      if (!mounted || !context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print job sent · ${result.jobId}')),
-      );
-    } catch (error) {
-      if (mounted && context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _pendingPrintSalesOrders.remove(bill.salesOrder));
-      }
-    }
   }
 
   Future<void> _openPaymentSheet({
@@ -503,7 +470,7 @@ class _BillCard extends StatelessWidget {
 
   final CashierBill bill;
   final bool printPending;
-  final VoidCallback onPrint;
+  final VoidCallback? onPrint;
   final VoidCallback onPayment;
 
   @override
