@@ -15,27 +15,15 @@ class CashierRepository {
     );
   }
 
-  Future<CashierBillingResponse> recordBillPrint({
-    required String invoiceName,
-  }) async {
-    final data = await _apiClient.postMethod(
-      'bcn_cashier_billing',
-      data: {'action': 'Record Print', 'invoice_name': invoiceName},
-    );
-    return CashierBillingResponse.fromJson(
-      Map<String, dynamic>.from(data as Map),
-    );
-  }
-
-  Future<CashierBillingResponse> paySplit({
-    required String invoiceName,
+  Future<CashierPaymentResult> paySplit({
+    required String salesOrder,
     required List<CashierPaymentTender> payments,
   }) async {
     final data = await _apiClient.postMethod(
       'bcn_cashier_billing',
       data: {
         'action': 'Pay',
-        'invoice_name': invoiceName,
+        'sales_order': salesOrder,
         'payments': jsonEncode(
           payments
               .map(
@@ -48,27 +36,7 @@ class CashierRepository {
         ),
       },
     );
-    return CashierBillingResponse.fromJson(
-      Map<String, dynamic>.from(data as Map),
-    );
-  }
-
-  // Kept for compatibility with older callers while split payment is rolled out.
-  Future<CashierBillingResponse> pay({
-    required String invoiceName,
-    required String modeOfPayment,
-    required double receivedAmount,
-  }) async {
-    final data = await _apiClient.postMethod(
-      'bcn_cashier_billing',
-      data: {
-        'action': 'Pay',
-        'invoice_name': invoiceName,
-        'mode_of_payment': modeOfPayment,
-        'received_amount': receivedAmount,
-      },
-    );
-    return CashierBillingResponse.fromJson(
+    return CashierPaymentResult.fromJson(
       Map<String, dynamic>.from(data as Map),
     );
   }
