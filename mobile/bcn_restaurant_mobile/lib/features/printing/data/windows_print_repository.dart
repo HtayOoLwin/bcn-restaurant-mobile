@@ -2,11 +2,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../domain/cashier_bill_print_result.dart';
 import '../domain/windows_print_status.dart';
 
 abstract interface class WindowsPrintGateway {
-  Future<PrintRequestResult> requestCashierBill(String invoiceName);
+  Future<CashierBillPrintResult> requestCashierBill([
+    String? legacySalesOrder,
+  ], {
+    String? salesOrder,
+    String? requestId,
+  });
 
+  // Transitional surface retained so the existing printer-settings screen
+  // continues to compile until its legacy status UI is removed/refactored.
   Future<WindowsPrintStatus> getStatus();
 
   Future<void> retryJob(String jobId);
@@ -15,37 +23,49 @@ abstract interface class WindowsPrintGateway {
 class WindowsPrintRepository implements WindowsPrintGateway {
   const WindowsPrintRepository(this._apiClient);
 
-  static const _requestCashierBillMethod =
-      'bcn_restaurant.api.printing.request_cashier_bill';
-  static const _getStatusMethod =
-      'bcn_restaurant.api.printing.get_print_status';
-  static const _retryJobMethod = 'bcn_restaurant.api.printing.retry_print_job';
+  static const _requestCashierBillMethod = 'bcn_cashier_print_bill';
 
   final ApiClient _apiClient;
 
   @override
-  Future<PrintRequestResult> requestCashierBill(String invoiceName) async {
+  Future<CashierBillPrintResult> requestCashierBill([
+    String? legacySalesOrder,
+  ], {
+    String? salesOrder,
+    String? requestId,
+  }) async {
+    final resolvedSalesOrder = (salesOrder ?? legacySalesOrder ?? '').trim();
+    final resolvedRequestId = (requestId ?? '').trim();
+
+    if (resolvedSalesOrder.isEmpty) {
+      throw const FormatException('salesOrder is required for cashier print.');
+    }
+    if (resolvedRequestId.isEmpty) {
+      throw const FormatException('requestId is required for cashier print.');
+    }
+
     final data = await _apiClient.postMethod(
       _requestCashierBillMethod,
-      data: {'invoice_name': invoiceName},
+      data: {
+        'sales_order': resolvedSalesOrder,
+        'request_id': resolvedRequestId,
+      },
     );
-    return PrintRequestResult.fromJson(_responseMap(data));
+    return CashierBillPrintResult.fromJson(_responseMap(data));
   }
 
   @override
-  Future<WindowsPrintStatus> getStatus() async {
-    final data = await _apiClient.getMethod(_getStatusMethod);
-    return WindowsPrintStatus.fromJson(_responseMap(data));
+  Future<WindowsPrintStatus> getStatus() {
+    throw UnsupportedError(
+      'Mobile Windows print status is unavailable in the polling queue flow.',
+    );
   }
 
   @override
-  Future<void> retryJob(String jobId) async {
-    final data = await _apiClient.postMethod(
-      _retryJobMethod,
-      data: {'job_id': jobId},
+  Future<void> retryJob(String jobId) {
+    throw UnsupportedError(
+      'Automatic print-job retry is disabled. Reprint from the cashier bill.',
     );
-    final response = _responseMap(data);
-    PrintJobStatusValue.parse(response['status']);
   }
 }
 
