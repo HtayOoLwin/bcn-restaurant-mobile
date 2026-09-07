@@ -100,6 +100,34 @@ def test_cashier_print_bill_closed_reprint_copies_existing_snapshot():
     assert "previous_job.pdf_base64" in source
 
 
+def test_print_jobs_times_out_stale_processing_instead_of_requeueing():
+    path = SERVER_SCRIPTS / "print_jobs.py"
+    assert path.exists()
+    source = _read(path)
+    assert "BCN Printer Client" in source
+    assert "FOR UPDATE" in source
+    assert "60" in source
+    assert "Print result unknown after client timeout" in source
+    assert 'stale_job.status = "Failed"' in source
+    assert 'stale_job.status = "Pending"' not in source
+    assert 'job.status = "Processing"' in source
+    assert "claimed_by" in source
+    assert "claimed_at" in source
+    assert "attempt_count" in source
+
+
+def test_print_job_result_is_owned_and_retry_safe():
+    path = SERVER_SCRIPTS / "print_job_result.py"
+    assert path.exists()
+    source = _read(path)
+    assert "BCN Printer Client" in source
+    assert "claimed_by" in source
+    assert '["Printed", "Failed"]' in source
+    assert '"duplicate": True' in source
+    assert "FOR UPDATE" in source
+    assert "conflict" in source.lower()
+
+
 def test_create_order_blocks_new_waiter_orders_while_table_is_billing():
     source = _read(SERVER_SCRIPTS / "create_order.py")
     assert '"custom_restaurant_status": ["in", ["Open", "Billing"]]' in source
