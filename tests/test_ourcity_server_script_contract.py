@@ -85,6 +85,14 @@ def test_cashier_print_bill_duplicate_request_returns_existing_job():
     assert "Print request ID is already used for another document" in source
 
 
+def test_cashier_print_bill_serializes_request_id_check_before_job_creation():
+    source = _read(SERVER_SCRIPTS / "cashier_print_bill.py")
+    lock_marker = "SELECT name FROM `tabPOS Profile` WHERE name=%(name)s FOR UPDATE"
+    request_check = 'frappe.db.exists("BCN Print Job", {"request_id": request_id})'
+    assert lock_marker in source
+    assert source.index(lock_marker) < source.index(request_check)
+
+
 def test_cashier_print_bill_closed_reprint_copies_existing_snapshot():
     source = _read(SERVER_SCRIPTS / "cashier_print_bill.py")
     assert 'custom_restaurant_status == "Closed"' in source
