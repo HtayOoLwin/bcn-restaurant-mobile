@@ -59,6 +59,39 @@ def test_cashier_billing_lists_open_and_billing_sales_order_bills():
     assert "Restaurant Table Session" not in source
 
 
+def test_cashier_print_bill_requires_request_id_and_queues_snapshot():
+    path = SERVER_SCRIPTS / "cashier_print_bill.py"
+    assert path.exists()
+    source = _read(path)
+    assert 'POS_PROFILE = "DMT"' in source
+    assert 'request_id = (frappe.form_dict.get("request_id") or "").strip()' in source
+    assert "request_id is required" in source
+    assert 'frappe.db.exists("BCN Print Job", {"request_id": request_id})' in source
+    assert 'job.request_id = request_id' in source
+    assert 'job.status = "Pending"' in source
+    assert 'sales_order.custom_restaurant_status = "Billing"' in source
+    assert "custom_cashier_printer" in source
+    assert "custom_cashier_print_format" in source
+    assert "frappe.get_print(" in source
+    assert '"Sales Order"' in source
+    assert "pdf_base64" in source
+    assert "publish_realtime" not in source
+    assert "Sales Invoice" not in source
+
+
+def test_cashier_print_bill_duplicate_request_returns_existing_job():
+    source = _read(SERVER_SCRIPTS / "cashier_print_bill.py")
+    assert '"duplicate": True' in source
+    assert "Print request ID is already used for another document" in source
+
+
+def test_cashier_print_bill_closed_reprint_copies_existing_snapshot():
+    source = _read(SERVER_SCRIPTS / "cashier_print_bill.py")
+    assert 'custom_restaurant_status == "Closed"' in source
+    assert "No printable cashier snapshot exists" in source
+    assert "previous_job.pdf_base64" in source
+
+
 def test_create_order_blocks_new_waiter_orders_while_table_is_billing():
     source = _read(SERVER_SCRIPTS / "create_order.py")
     assert '"custom_restaurant_status": ["in", ["Open", "Billing"]]' in source
