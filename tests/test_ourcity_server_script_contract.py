@@ -34,6 +34,14 @@ def test_create_order_reuses_open_draft_sales_order_and_preserves_print_delta():
     assert "Restaurant Table Session" not in source
 
 
+def test_create_order_applies_and_recalculates_dmt_taxes():
+    source = _read(SERVER_SCRIPTS / "create_order.py")
+    assert "profile.taxes_and_charges" in source
+    assert "sales_order.taxes_and_charges" in source
+    assert "sales_order.set_taxes()" in source
+    assert "sales_order.calculate_taxes_and_totals()" in source
+
+
 def test_create_order_blocks_new_waiter_orders_while_table_is_billing():
     source = _read(SERVER_SCRIPTS / "create_order.py")
     assert '"custom_restaurant_status": ["in", ["Open", "Billing"]]' in source
