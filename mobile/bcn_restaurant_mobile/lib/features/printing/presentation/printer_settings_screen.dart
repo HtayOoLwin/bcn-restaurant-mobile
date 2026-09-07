@@ -44,7 +44,7 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
     setState(() => _testPrintPending = true);
     final repository = ref.read(windowsPrintRepositoryProvider);
     try {
-      final result = await repository.requestCashierBill(
+      final result = await repository.requestCashierBillLegacy(
         jobContext.invoiceName,
       );
       if (!mounted) return;
