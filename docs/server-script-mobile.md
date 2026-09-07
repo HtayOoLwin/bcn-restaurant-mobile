@@ -29,7 +29,7 @@ Currency     = MMK
 
 A later waiter order for the same table reuses that Draft Sales Order. Matching rows are identified by item code, UOM, kitchen note and kitchen counter. The new quantity is added to the existing quantity.
 
-The Sales Order is **not submitted** by the waiter order API.
+The Sales Order is **not submitted** by the waiter order API. If the active Draft Sales Order is already in `Billing`, the waiter API rejects new items so a second active order cannot be opened for the same table during checkout.
 
 Required custom fields:
 
