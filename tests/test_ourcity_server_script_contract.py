@@ -34,6 +34,12 @@ def test_create_order_reuses_open_draft_sales_order_and_preserves_print_delta():
     assert "Restaurant Table Session" not in source
 
 
+def test_create_order_blocks_new_waiter_orders_while_table_is_billing():
+    source = _read(SERVER_SCRIPTS / "create_order.py")
+    assert '"custom_restaurant_status": ["in", ["Open", "Billing"]]' in source
+    assert "Table is currently in Billing" in source
+
+
 def test_tables_reports_available_occupied_and_billing_from_draft_sales_orders():
     source = _read(SERVER_SCRIPTS / "tables.py")
     assert "Sales Order" in source
