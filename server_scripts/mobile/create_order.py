@@ -130,6 +130,10 @@ if not is_duplicate:
         if profile.warehouse:
             sales_order.set_warehouse = profile.warehouse
 
+        if profile.taxes_and_charges:
+            sales_order.taxes_and_charges = profile.taxes_and_charges
+            sales_order.set_taxes()
+
     allowed_item_groups = []
     for group_row in profile.item_groups:
         if (
@@ -244,6 +248,11 @@ if not is_duplicate:
     if not sales_order.items:
         frappe.throw("Sales Order has no items.")
 
+    if profile.taxes_and_charges and not sales_order.taxes_and_charges:
+        sales_order.taxes_and_charges = profile.taxes_and_charges
+        sales_order.set_taxes()
+
+    sales_order.calculate_taxes_and_totals()
     sales_order.custom_client_order_id = client_order_id
     sales_order.custom_restaurant_status = "Open"
     sales_order.flags.ignore_permissions = True
