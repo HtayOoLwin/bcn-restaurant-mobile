@@ -38,7 +38,9 @@ def test_create_order_applies_and_recalculates_dmt_taxes():
     source = _read(SERVER_SCRIPTS / "create_order.py")
     assert "profile.taxes_and_charges" in source
     assert "sales_order.taxes_and_charges" in source
-    assert "sales_order.set_taxes()" in source
+    assert "erpnext.accounts.services.taxes.get_taxes_and_charges" in source
+    assert 'sales_order.append("taxes", tax)' in source
+    assert "sales_order.set_taxes()" not in source
     assert "sales_order.calculate_taxes_and_totals()" in source
 
 
