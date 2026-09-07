@@ -49,6 +49,7 @@ The bill printed before payment is rendered from the Draft Sales Order. A Sales 
 - Do not install the BCN Restaurant custom app on OurCity as a requirement for mobile API aliases.
 - Do not use ERPNext Workflow as the primary state engine for restaurant order printing or payment.
 - Kitchen delta printing is a separate phase; this design covers cashier bill printing and checkout.
+- Durable printer-job acknowledgements are not required in the Server-Script-only cashier path; cashier recovery is manual Reprint Bill.
 
 ## Existing Restaurant State
 
@@ -75,26 +76,52 @@ Billing Draft SO         -> Billing
 - Cashier GET may display the bill without changing state.
 - Waiter may continue adding items.
 - `Print Bill` changes the order to `Billing` before the print request is accepted.
-- Starting Payment also changes the order to `Billing` before finalization begins.
+- Starting Payment also changes the order to `Billing` inside the payment transaction before finalization begins.
 
 ### Billing
 
 - Waiter changes are blocked.
 - Cashier may reprint the bill.
 - Cashier may complete payment.
-- Printer failure after the print request has been accepted does not reopen the order.
+- Printer failure after the print event has been accepted does not reopen the order.
 
 ### Closed
 
 - The order is no longer returned by the active cashier list.
 - The table is Available because there is no active Open/Billing Draft Sales Order.
-- Closed is reached only after Sales Order submission, Sales Invoice submission, and required Payment Entry submission succeed.
+- Closed is externally visible only after the whole payment transaction commits.
+
+To avoid needing an after-submit edit on Sales Order, payment finalization sets `custom_restaurant_status = "Closed"` on the in-memory Draft Sales Order immediately before submission. Sales Order submission, Sales Invoice submission, Payment Entry submission, and the Closed value commit together. Any later failure rolls the transaction back, so other users never observe a partially finalized Closed order.
+
+## Required Site Configuration
+
+The restaurant uses:
+
+```text
+Company      = Doh Myot Daw BBQ & Restaurant
+POS Profile  = DMT
+Price List   = Standard Selling
+Currency     = MMK
+```
+
+Cashier printing is configured on POS Profile `DMT` with two custom fields:
+
+```text
+custom_cashier_printer      Data
+custom_cashier_print_format Link -> Print Format
+```
+
+`custom_cashier_printer` stores the exact Windows printer system name expected by the Windows local-printer application. `custom_cashier_print_format` must point to a Print Format for `Sales Order`.
+
+A missing printer, missing print format, or a print format for the wrong DocType is a configuration error. The server does not select an arbitrary printer or silently fall back to Standard format.
+
+Payment modes are read from the payment rows configured on POS Profile `DMT`. Each allowed Mode of Payment must resolve to a usable company account before checkout is enabled.
 
 ## API Design
 
 ### `bcn_cashier_billing` — GET
 
-Returns active Draft Sales Orders in `Open` or `Billing` state.
+Returns active Draft Sales Orders in `Open` or `Billing` state plus the payment modes available from POS Profile `DMT`.
 
 Response shape:
 
@@ -112,18 +139,17 @@ Response shape:
       "currency": "MMK",
       "restaurant_status": "Open",
       "items": [],
-      "taxes": [],
-      "bill_printed": false,
-      "bill_printed_at": null,
-      "bill_printed_by": null
+      "taxes": []
     }
   ],
-  "modes": [],
-  "printer_settings": {}
+  "modes": [
+    {"name": "Cash", "default": true},
+    {"name": "Kpay", "default": false}
+  ]
 }
 ```
 
-The response is Sales Order based. It does not require a Sales Invoice to exist.
+The response is Sales Order based. It does not create or require a Sales Invoice.
 
 ### `bcn_cashier_print_bill` — POST
 
@@ -137,16 +163,25 @@ Input:
 
 Rules:
 
-1. Require an authenticated cashier/manager role.
+1. Require an authenticated Cashier, Restaurant Manager, Administrator, or System Manager.
 2. Load and lock the Draft Sales Order.
-3. Reject cancelled, submitted, Closed, unknown, or unrelated orders.
+3. Reject cancelled, submitted, Closed, unknown, or out-of-scope orders.
 4. If status is `Open`, set `custom_restaurant_status = "Billing"`.
 5. If status is already `Billing`, treat the request as a reprint.
-6. Render the cashier bill from the Draft Sales Order.
-7. Publish a Windows print event.
-8. Return an accepted print result.
+6. Validate the DMT cashier printer and Sales Order print format configuration.
+7. Render the cashier bill from the Draft Sales Order.
+8. Publish `document_print_event` with one cashier PDF job.
+9. Return the accepted result:
 
-A failure before the print event is accepted rolls back the Open -> Billing transition. A failure in the Windows printer after event acceptance leaves the order in Billing.
+```json
+{
+  "sales_order": "SAL-ORD-2026-00001",
+  "status": "accepted",
+  "is_reprint": false
+}
+```
+
+A failure before the print event is published rolls back the Open -> Billing transition. A failure on the Windows machine after event publication leaves the order in Billing; the cashier uses Reprint Bill.
 
 ### `bcn_cashier_billing` — POST `action=Pay`
 
@@ -165,17 +200,34 @@ Input:
 
 Rules:
 
-1. Require an authenticated cashier/manager role.
-2. Lock the Sales Order and validate it is active.
-3. Move `Open` to `Billing` if payment started without a prior bill print.
-4. Validate tenders before creating accounting documents.
-5. Submit the Sales Order.
-6. Create one Sales Invoice from the Sales Order with `update_stock = 1`.
-7. Submit the Sales Invoice.
-8. Create one submitted Payment Entry per positive tender.
-9. Verify the invoice is fully settled except for permitted cash change handling.
-10. Mark the Sales Order `custom_restaurant_status = "Closed"`.
-11. Return the Sales Invoice, Payment Entry names, and change amount.
+1. Require an authenticated Cashier, Restaurant Manager, Administrator, or System Manager.
+2. Lock the Sales Order and validate it is the one active restaurant order for its customer/table.
+3. If the Sales Order is already submitted and Closed, resolve and return its existing finalized documents instead of creating new ones.
+4. Move `Open` to `Billing` inside the transaction if payment started without a prior bill print.
+5. Validate all tenders and payment-mode accounts before creating accounting documents.
+6. Freeze the Draft Sales Order totals and validate its tax/service-charge state.
+7. Set the in-memory Sales Order restaurant status to `Closed` and submit the Sales Order.
+8. Create one Sales Invoice from the Sales Order with `update_stock = 1`.
+9. Preserve Sales Order references on Sales Invoice Items.
+10. Validate Sales Invoice totals against the frozen Sales Order totals.
+11. Submit the Sales Invoice.
+12. Create one submitted Payment Entry per positive usable tender allocation.
+13. Verify the Sales Invoice is fully settled.
+14. Return the final result.
+
+Response shape:
+
+```json
+{
+  "sales_order": "SAL-ORD-2026-00001",
+  "sales_invoice": "ACC-SINV-2026-00001",
+  "payment_entries": ["ACC-PAY-2026-00001"],
+  "change_amount": 0,
+  "duplicate": false
+}
+```
+
+A retry after successful finalization returns the same final document identities with `duplicate = true`.
 
 ## Cashier Bill Model
 
@@ -195,12 +247,11 @@ currency
 restaurantStatus
 items
 taxes
-billPrinted
-billPrintedAt
-billPrintedBy
 ```
 
-The current mobile payment tender model remains suitable for Cash, Kpay, and split payment.
+No extra Sales Order fields are needed to track `bill_printed`. An externally visible `Billing` Draft Sales Order is the frozen/reprint state. A payment request that fails rolls back to the pre-request state; a successful payment becomes Closed and disappears from the active list.
+
+The current mobile payment tender concept remains suitable for Cash, Kpay, and split payment.
 
 ## UI Behavior
 
@@ -223,13 +274,17 @@ The current mobile payment tender model remains suitable for Cash, Kpay, and spl
 - Dine In and Takeaway table providers refresh.
 - The table becomes Available.
 
+### Print status handling
+
+The cashier flow does not depend on the existing custom-app print-status/retry endpoints. Server acceptance means the realtime print event was published; it does not prove that paper physically printed. Operational recovery is `Reprint Bill` while the Sales Order remains Billing.
+
 ## Print Source and Windows Print Transport
 
 The cashier bill is rendered from the Draft Sales Order, not from a Sales Invoice.
 
-The Windows client already listens for `document_print_event` and accepts a payload containing a list of jobs with a base64 PDF, printer name, print format, and document identifiers. The new cashier print API will use that existing event contract so the Windows application does not need Android/Bluetooth printing support.
+The existing Windows client listens for `document_print_event` and accepts jobs containing a base64 PDF, printer name, print format, and document identifiers. The cashier print API uses that event contract.
 
-Expected event shape:
+Representative event shape:
 
 ```json
 {
@@ -241,18 +296,20 @@ Expected event shape:
       "doctype": "Sales Order",
       "document_name": "SAL-ORD-2026-00001",
       "invoice_name": "SAL-ORD-2026-00001",
-      "printer": "<configured cashier printer>",
+      "printer": "Windows Cashier Printer",
       "is_cashier": true,
-      "print_format": "<configured cashier print format>",
-      "pdf_base64": "<rendered PDF>"
+      "print_format": "Restaurant Cashier Bill",
+      "pdf_base64": "BASE64_PDF_CONTENT"
     }
   ]
 }
 ```
 
-The printer name and print format are deployment configuration, not restaurant-order state. Missing or ambiguous cashier printer configuration is an error and must not silently select an arbitrary printer.
+The values above are example payload values; runtime printer and print-format values come from POS Profile `DMT` configuration.
 
-OurCity continues to expose mobile endpoints through Frappe Server Script API aliases. The implementation must use APIs available inside Server Script safe execution. It must not depend on importing `bcn_restaurant` or `local_printers` Python modules on OurCity. The implementation plan must verify the safe-exec PDF-render/base64/realtime path before the production print endpoint is finalized.
+OurCity continues to expose mobile endpoints through Frappe Server Script API aliases. The implementation must use APIs available inside Server Script safe execution. It must not depend on importing `bcn_restaurant` or `local_printers` Python modules on OurCity.
+
+Because PDF rendering, base64 encoding, and realtime publishing are platform-sensitive inside Server Script safe execution, the implementation plan begins by proving this exact path on OurCity. If safe execution blocks any required primitive, that is treated as a deployment blocker for the Server-Script-only print path; the implementation must not silently change the approved architecture to a custom-app installation.
 
 ## Payment Validation
 
@@ -260,14 +317,24 @@ The server validates all tender amounts before submitting the Sales Order.
 
 Rules:
 
-- Ignore or reject zero/negative tender rows rather than creating zero-value Payment Entries.
+- A tender row must have a configured Mode of Payment and a positive amount.
 - At least one positive tender is required.
 - Non-cash tender total may not exceed the invoice amount.
 - Cash may exceed the remaining amount; the excess is returned as `change_amount`.
 - Overpayment is valid only when the excess is represented by Cash.
 - The total usable tender must cover the amount due.
+- Each Payment Entry allocates at most the remaining invoice amount. Cash tender above the amount due is not posted as extra receivable settlement; it is returned as change.
 
-For split payment, each positive tender creates its own Payment Entry after Sales Invoice submission.
+Example:
+
+```text
+Amount due: 10,500
+Kpay tender: 5,500 -> Payment Entry allocation 5,500
+Cash tender: 6,000 -> Payment Entry allocation 5,000
+Change: 1,000
+```
+
+For split payment, each positive usable tender allocation creates its own Payment Entry after Sales Invoice submission.
 
 ## Stock Handling
 
@@ -280,23 +347,25 @@ update_stock = 1
 
 No Delivery Note is created. Stock reduction happens when the Sales Invoice is submitted.
 
-The generated Sales Invoice must preserve Sales Order item references so ERPNext order/invoice linkage remains traceable.
+The generated Sales Invoice must preserve standard Sales Order linkage on each invoice item, including the Sales Order name and source Sales Order Item reference where ERPNext supports them.
 
 ## Tax and Service Charge Consistency
 
-The Draft Sales Order is the source of the bill that the customer sees before payment. Therefore tax/service-charge configuration must be applied before the order is printed.
+The Draft Sales Order is the source of the bill the customer sees before payment. Therefore tax/service-charge configuration must already be applied while the Sales Order is Draft.
+
+`bcn_mobile_create_order` must apply the DMT selling/tax configuration when a Draft Sales Order is created and must preserve/recalculate the same tax rows when later waiter rounds modify quantities.
 
 The DMT POS Profile and its configured selling/tax setup are the source of truth for restaurant checkout.
 
-Required consistency rule:
+Required consistency rules, subject only to normal currency rounding tolerance:
 
 ```text
+Billing Sales Order Net Total == Final Sales Invoice Net Total
+Billing Sales Order Total Taxes and Charges == Final Sales Invoice Total Taxes and Charges
 Billing Sales Order Grand Total == Final Sales Invoice Grand Total
 ```
 
-The same applies to Net Total and Total Taxes and Charges within normal currency rounding tolerance.
-
-If the generated Sales Invoice total differs from the frozen Billing Sales Order total, payment finalization stops and the transaction rolls back. The server does not silently accept a changed amount.
+If the generated Sales Invoice differs from the frozen Billing Sales Order, payment finalization stops and the transaction rolls back. The server does not silently accept a changed amount.
 
 ## Idempotency and Concurrency
 
@@ -304,11 +373,15 @@ If the generated Sales Invoice total differs from the frozen Billing Sales Order
 
 Payment finalization must be retry-safe.
 
-Before creating a new Sales Invoice, the server checks whether the Sales Order has already been finalized. If the request is retried after a timeout and the final Sales Invoice/Payment Entries already exist, the API returns the existing result rather than creating duplicates.
+The Sales Order is locked during finalization so two cashier devices cannot finalize the same table simultaneously.
 
-The Sales Order must be locked during finalization so two cashier devices cannot finalize the same table simultaneously.
+The standard Sales Invoice Item -> Sales Order linkage is the deterministic finalization link. On retry of a submitted Closed Sales Order, the server finds submitted Sales Invoices whose items reference that Sales Order:
 
-A deterministic linkage from Sales Order to final Sales Invoice is required. Existing ERPNext Sales Order references on Sales Invoice Items are used for traceability; the implementation also records enough finalized-document state to resolve a retry without guessing.
+- exactly one matching Sales Invoice -> reuse it;
+- no matching Sales Invoice -> treat as an inconsistent finalization and return an error;
+- more than one matching Sales Invoice -> return a conflict error instead of guessing.
+
+Payment Entries are resolved through their submitted Payment Entry Reference rows for that Sales Invoice. The retry response returns those existing document names instead of creating duplicates.
 
 ### Print
 
@@ -316,36 +389,38 @@ An Open -> Billing transition occurs once. Further print requests while Billing 
 
 ## Transaction Boundaries
 
-Payment finalization is one server request and one database transaction from validation through Closed state.
+Payment finalization is one server request and one database transaction from validation through final document creation.
 
 If any of these fail:
 
 - Sales Order submit
 - Sales Invoice creation
+- Sales Invoice total validation
 - Sales Invoice submit
 - Payment Entry creation/submission
-- amount consistency validation
+- final outstanding validation
 
-then the request returns an error and the database transaction is rolled back. The system must not leave a half-finalized order as the normal result of a failed request.
+then the request returns an error and the database transaction is rolled back. The externally visible table/order state remains at its pre-request state.
 
-The print path is separate from payment. A print event accepted by the server may still fail later on the Windows machine; that operational failure does not reopen the bill.
+The print path is separate from payment. A realtime print event accepted by the server may still fail later on the Windows machine; that operational failure does not reopen the bill.
 
 ## Error Handling
 
-User-facing failures should identify the actionable condition without exposing stack traces.
+User-facing failures identify the actionable condition without exposing stack traces.
 
 Examples:
 
 - Table/order no longer exists.
-- Order is already submitted/cancelled/closed.
+- Order is already cancelled or is in an invalid state.
 - More than one active Draft Sales Order exists for the same table.
 - Order is Billing and waiter tries to add more items.
-- No cashier printer configuration exists.
-- Payment mode is invalid or unavailable.
+- DMT cashier printer or Sales Order print format is not configured.
+- Payment mode is unavailable or has no usable company account.
 - Tender total is insufficient.
 - Non-cash overpayment is not allowed.
 - Sales Invoice amount does not match the frozen bill.
 - Stock validation prevents Sales Invoice submission.
+- Submitted Closed Sales Order has zero or multiple linked final Sales Invoices.
 
 ## Files and Components Expected to Change
 
@@ -354,7 +429,7 @@ Server-script mirror and docs:
 ```text
 server_scripts/mobile/cashier_billing.py
 server_scripts/mobile/cashier_print_bill.py
-server_scripts/mobile/create_order.py        # only if final lock/idempotency integration needs adjustment
+server_scripts/mobile/create_order.py
 docs/server-script-mobile.md
 ```
 
@@ -384,12 +459,14 @@ Verify source-controlled mirrors enforce:
 
 - active list uses Open/Billing Draft Sales Orders;
 - waiter order is blocked while Billing;
+- create-order applies/preserves DMT tax/service-charge configuration;
 - print changes Open to Billing and supports Billing reprint;
+- print reads DMT cashier printer and Sales Order print format configuration;
 - payment uses the Sales Order identifier rather than invoice-first input;
 - final Sales Invoice uses Update Stock;
-- payment completion marks Closed;
+- payment completion commits Closed state;
 - amount mismatch blocks completion;
-- retry logic prevents duplicate finalization.
+- retry logic resolves the one linked final Sales Invoice instead of duplicating it.
 
 ### Flutter tests
 
@@ -400,7 +477,19 @@ Verify:
 - Billing card shows Reprint Bill + Payment;
 - payment request sends Sales Order and tender list;
 - successful payment refreshes cashier and table providers;
-- closed bill disappears after refresh.
+- closed bill disappears after refresh;
+- cashier printing calls the OurCity Server Script alias rather than custom-app dotted print methods.
+
+### OurCity print-path proof
+
+Before production print wiring, prove on OurCity Server Script safe execution that the implementation can:
+
+1. render the configured Sales Order Print Format as PDF;
+2. base64-encode the result;
+3. publish `document_print_event` to the site realtime namespace;
+4. deliver a representative PDF job to the connected Windows client.
+
+This proof is required because OurCity uses Server Script API aliases rather than importing the custom printing app.
 
 ### OurCity live smoke test
 
@@ -424,21 +513,23 @@ Waiter order
 
 Also verify:
 
-- Print/reprint while printer is offline leaves the table Billing after server acceptance.
-- Retrying a timed-out payment request does not create a second Sales Invoice or duplicate Payment Entry.
-- Printed Sales Order total and final Sales Invoice total match.
+- Reprint while the Windows printer is unavailable leaves the table Billing after server event acceptance.
+- Retrying a timed-out successful payment request does not create a second Sales Invoice or duplicate Payment Entry.
+- Printed Sales Order totals and final Sales Invoice totals match.
+- Cash over-tender creates the correct change without over-allocating the Payment Entry.
 
 ## Acceptance Criteria
 
 The cashier phase is accepted when all of the following are true:
 
 1. Cashier sees active Open/Billing Draft Sales Orders without creating Sales Invoices during read-only refresh.
-2. Print Bill freezes an Open order into Billing and prints the Draft Sales Order bill through the Windows printing path.
+2. Print Bill freezes an Open order into Billing and publishes the Draft Sales Order bill through the Windows printing path.
 3. A Billing order rejects further waiter additions.
 4. Payment can start from either Open or Billing.
-5. Successful payment submits the Sales Order, creates/submits one Sales Invoice with Update Stock enabled, creates/submits required Payment Entries, and marks the restaurant order Closed.
-6. Split payment works for Cash/Kpay style tenders and returns correct change behavior.
-7. Retry does not duplicate final documents.
-8. Amount mismatch stops checkout.
-9. Table becomes Available only after successful finalization.
+5. Successful payment submits the Sales Order, creates/submits one Sales Invoice with Update Stock enabled, creates/submits required Payment Entries, and commits the restaurant order as Closed.
+6. Split payment works for configured Cash/Kpay-style tenders and returns correct change behavior.
+7. Retry resolves existing final documents and does not duplicate them.
+8. Amount mismatch stops checkout and rolls back the payment request.
+9. Table becomes Available only after successful finalization commits.
 10. No Kitchen Monitor UI or Android direct printing dependency is reintroduced.
+11. Cashier printing uses the Server-Script-compatible `document_print_event` path without requiring BCN Restaurant or Local Printers Python module imports on OurCity.
