@@ -4,6 +4,7 @@
 # Restaurant flow:
 # - one Open Draft Sales Order per table/customer
 # - later orders reuse the same Draft Sales Order
+# - Billing locks the table against new waiter orders
 # - Sales Order Item stores kitchen note, kitchen counter snapshot, printed qty
 # - this script does not submit the Sales Order and does not print directly
 
@@ -71,31 +72,39 @@ if customer_row.disabled:
 if customer_row.customer_group not in ("Dine In", "Takeaway"):
     frappe.throw("Customer must belong to Dine In or Takeaway Customer Group.")
 
-open_orders = frappe.get_all(
+active_orders = frappe.get_all(
     "Sales Order",
     filters={
         "customer": customer,
         "docstatus": 0,
-        "custom_restaurant_status": "Open",
+        "custom_restaurant_status": ["in", ["Open", "Billing"]],
     },
-    fields=["name", "custom_client_order_id", "grand_total"],
+    fields=[
+        "name",
+        "custom_client_order_id",
+        "grand_total",
+        "custom_restaurant_status",
+    ],
     order_by="creation asc",
     limit_page_length=2,
 )
 
-if len(open_orders) > 1:
+if len(active_orders) > 1:
     frappe.throw(
-        "More than one Open Sales Order exists for "
+        "More than one active Draft Sales Order exists for "
         + customer
         + ". Please check ERPNext."
     )
 
-is_new_order = not bool(open_orders)
+if active_orders and active_orders[0].custom_restaurant_status == "Billing":
+    frappe.throw("Table is currently in Billing: " + customer)
+
+is_new_order = not bool(active_orders)
 
 if is_new_order:
     sales_order = frappe.new_doc("Sales Order")
 else:
-    sales_order = frappe.get_doc("Sales Order", open_orders[0].name)
+    sales_order = frappe.get_doc("Sales Order", active_orders[0].name)
 
 existing_client_order_id = (
     sales_order.get("custom_client_order_id") or ""
