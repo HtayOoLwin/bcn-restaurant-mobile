@@ -150,7 +150,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     setState(() => _pendingPrintSalesOrders.add(bill.salesOrder));
     final repository = ref.read(windowsPrintRepositoryProvider);
     try {
-      final result = await repository.requestCashierBill(bill.salesOrder);
+      final result = await repository.requestCashierBillLegacy(bill.salesOrder);
       if (!mounted || !context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Print job sent · ${result.jobId}')),
