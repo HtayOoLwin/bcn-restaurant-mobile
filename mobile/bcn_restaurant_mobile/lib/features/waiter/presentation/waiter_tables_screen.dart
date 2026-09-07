@@ -104,16 +104,19 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                     final table = response.tables[index];
                     return _TableCard(
                       table: table,
-                      onTap: () {
+                      onTap: () async {
                         ref
                             .read(cartProvider.notifier)
                             .setOrderContext(
                               customer: table.customer,
                               session: table.session,
                             );
-                        context.push(
+
+                        await context.push(
                           '/menu/${Uri.encodeComponent(table.customer)}',
                         );
+
+                        ref.invalidate(tablesProvider(serviceType));
                       },
                     );
                   },
@@ -128,14 +131,48 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
 }
 
 class _TableCard extends StatelessWidget {
-  const _TableCard({required this.table, required this.onTap});
+  const _TableCard({
+    required this.table,
+    required this.onTap,
+  });
 
   final RestaurantTableModel table;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final status = table.isOpen
+        ? (table.sessionStatus ?? 'Occupied')
+        : 'Available';
+
+    Color cardColor;
+    Color statusColor;
+    IconData statusIcon;
+
+    switch (status.toLowerCase()) {
+      case 'occupied':
+        cardColor = Colors.orange.shade50;
+        statusColor = Colors.orange.shade800;
+        statusIcon = Icons.restaurant;
+        break;
+
+      case 'billing':
+        cardColor = Colors.blue.shade50;
+        statusColor = Colors.blue.shade700;
+        statusIcon = Icons.point_of_sale;
+        break;
+
+      case 'available':
+      default:
+        cardColor = Colors.green.shade50;
+        statusColor = Colors.green.shade700;
+        statusIcon = Icons.check_circle_outline;
+        break;
+    }
+
     return Card(
+      color: cardColor,
+      elevation: 2,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -147,23 +184,39 @@ class _TableCard extends StatelessWidget {
             children: [
               Text(
                 table.customerName,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Icon(
-                    table.isOpen ? Icons.circle : Icons.circle_outlined,
-                    size: 14,
+                    statusIcon,
+                    size: 16,
+                    color: statusColor,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    table.isOpen
-                        ? (table.sessionStatus ?? 'Open')
-                        : 'Available',
+                    status,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
+              if (table.isOpen &&
+                  table.session != null &&
+                  table.session!.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  table.session!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ],
           ),
         ),
