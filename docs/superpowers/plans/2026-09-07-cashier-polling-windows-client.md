@@ -2,62 +2,64 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Extend `HtayOoLwin/local_printers_winapp` so cashier bills are claimed from OurCity through token-authenticated HTTP polling, printed through the existing SumatraPDF path, and reported as Printed/Failed without breaking legacy Socket.IO listeners.
+**Goal:** Extend `HtayOoLwin/local_printers_winapp` so cashier bills are claimed from OurCity through token-authenticated HTTP polling, printed through the existing SumatraPDF path, and reported as Printed/Failed without breaking legacy Socket.IO listeners or automatically reprinting timeout-ambiguous jobs.
 
-**Architecture:** Add a focused polling client module rather than turning `socket_app.py` into a larger mixed-responsibility file. The poller sends installed printer names to `bcn_print_jobs`, receives at most one Processing job with `pdf_base64`, prints it through a reusable single-job function, posts the terminal result to `bcn_print_job_result`, then polls again after the configured interval. Existing Socket.IO behavior remains available for unrelated legacy/kitchen events.
+**Architecture:** Add a focused polling client module rather than expanding `socket_app.py` into mixed responsibilities. The poller sends installed printer names to `bcn_print_jobs`, receives at most one Processing job with `pdf_base64`, prints it once through a reusable single-job function, and retains the terminal result in memory until `bcn_print_job_result` acknowledges it. While a result is unacknowledged, the client retries only the result POST and does not claim or print another job. If the process crashes after paper output, the server eventually marks the old Processing job Failed/unknown and never automatically redelivers it.
 
-**Tech Stack:** Python 3.10+, `requests`, `win32print`, SumatraPDF, existing Socket.IO client, `pytest`/`unittest.mock` style unit tests.
+**Tech Stack:** Python 3.10+, `requests`, `win32print`, SumatraPDF, existing Socket.IO client, `pytest` + `unittest.mock`.
 
-**Spec:** `docs/superpowers/specs/2026-09-07-cashier-draft-sales-order-billing-design.md` in orchestration repository `HtayOoLwin/bcn-restaurant-mobile`, branch `bcn-restaurant-mobile-without-kitchen-monitor`.
+**Spec:** `docs/superpowers/specs/2026-09-07-cashier-draft-sales-order-billing-design.md` in `HtayOoLwin/bcn-restaurant-mobile`, branch `bcn-restaurant-mobile-without-kitchen-monitor`.
 
 ## Global Constraints
 
 - Execution repository is `HtayOoLwin/local_printers_winapp`.
 - Do not break existing `document_print_event` or `sales_invoice_submitted` Socket.IO listeners.
-- Cashier polling uses `FRAPPE_BASE_URL`, `API_KEY`, and `API_SECRET`; it must not depend on login-cookie `AUTH_DATA`.
+- Cashier polling uses `FRAPPE_BASE_URL`, `API_KEY`, `API_SECRET`; it must not depend on login-cookie `AUTH_DATA`.
 - Authorization header is exactly `token API_KEY:API_SECRET`.
 - Claim endpoint is exactly `/api/method/bcn_print_jobs`.
 - Result endpoint is exactly `/api/method/bcn_print_job_result`.
 - Every claim sends installed local printer names.
 - One poll intentionally claims at most one job.
-- `job = null` is normal and not an error.
+- `job = null` is normal.
 - Default `POLL_INTERVAL_SECONDS` is exactly `2`.
-- The current job result must be reported before intentionally claiming another job.
-- Success reports `Printed`; failures report `Failed` with the exact client-side error text.
-- Same-terminal result POST may be retried safely after response timeout.
 - Physical printing continues through SumatraPDF.
-- Never store or log API secrets in plaintext logs beyond their existing config file presence.
+- Success reports `Printed`; print/decode failure reports `Failed` with exact client-side error text.
+- Same-terminal result POST may be retried safely after response timeout.
+- Result retry must never re-run physical printing.
+- While a terminal result is unacknowledged, do not intentionally claim another job.
+- Do not implement client-side automatic reprint/reclaim of a timed-out Processing job.
+- Server timeout error is `Print result unknown after client timeout`; the cashier decides whether to Reprint.
+- Never log API secrets or full Authorization headers.
 
 ---
 
 ## File Structure
 
-- `polling_client.py` — HTTP token auth, claim/result requests, one polling iteration, loop timing.
-- `printer_handlers.py` — expose a single-job function that raises on decode/print failure; keep existing `print_jobs()` compatibility for Socket.IO.
-- `socket_app.py` — start cashier polling alongside/around legacy Socket.IO mode without changing legacy event contracts.
-- `config copy.json` — document `FRAPPE_BASE_URL` and `POLL_INTERVAL_SECONDS`.
-- `tests/test_polling_client.py` — exact HTTP contract, sequencing, null-job handling, timeout/result behavior.
-- `tests/test_printer_handlers.py` — single-job success/failure propagation while preserving existing batch behavior.
-- `README.md` — polling configuration and operations.
+- `polling_client.py` — token auth, claim/result requests, unacknowledged-result state, loop timing.
+- `printer_handlers.py` — single-job print function that raises on failure; existing `print_jobs()` compatibility remains.
+- `socket_app.py` — starts cashier polling without changing legacy event payload contracts.
+- `config copy.json` — documents `FRAPPE_BASE_URL` and `POLL_INTERVAL_SECONDS`.
+- `tests/test_polling_client.py` — HTTP contract, sequencing, pending-result retry, null-job, timing.
+- `tests/test_printer_handlers.py` — single-job success/failure propagation and legacy compatibility.
+- `README.md` — setup and timeout/reprint operations.
 
 ---
 
-### Task 1: Make Physical Print Failures Observable to the Poller
+### Task 1: Make Physical Print Failures Observable
 
 **Files:**
 - Modify: `printer_handlers.py`
 - Create: `tests/test_printer_handlers.py`
 
 **Interfaces:**
-- Consumes: one job dict `{pdf_base64, printer_name|printer, print_format, document_name}` and config `SUMATRA_PDF_PATH`.
-- Produces: `print_single_job(job, config_data) -> str` returning printer name on success and raising an exception with the real error on failure; existing `print_jobs()` remains callable for Socket.IO.
+- Consumes: one job `{pdf_base64, printer_name|printer, document_name}` and config `SUMATRA_PDF_PATH`.
+- Produces: `print_single_job(job, config_data) -> str`; raises on decode/physical print failure. Existing `print_jobs()` remains callable.
 
-- [ ] **Step 1: Write failing unit tests**
+- [ ] **Step 1: Write failing tests**
 
 ```python
 from unittest.mock import patch
 import pytest
-
 import printer_handlers
 
 
@@ -67,9 +69,13 @@ def test_print_single_job_returns_printer_on_success(tmp_path):
         "printer_name": "Cashier Printer",
         "document_name": "SAL-ORD-2026-00005",
     }
-    with patch.object(printer_handlers, "save_pdf_from_base64", return_value=str(tmp_path / "bill.pdf")), \
-         patch.object(printer_handlers, "print_pdf_silent", return_value=None):
-        assert printer_handlers.print_single_job(job, {"SUMATRA_PDF_PATH": "SumatraPDF.exe"}) == "Cashier Printer"
+    with patch.object(
+        printer_handlers, "save_pdf_from_base64",
+        return_value=str(tmp_path / "bill.pdf"),
+    ), patch.object(printer_handlers, "print_pdf_silent", return_value=None):
+        assert printer_handlers.print_single_job(
+            job, {"SUMATRA_PDF_PATH": "SumatraPDF.exe"}
+        ) == "Cashier Printer"
 
 
 def test_print_single_job_propagates_print_failure(tmp_path):
@@ -78,10 +84,18 @@ def test_print_single_job_propagates_print_failure(tmp_path):
         "printer_name": "Cashier Printer",
         "document_name": "SAL-ORD-2026-00005",
     }
-    with patch.object(printer_handlers, "save_pdf_from_base64", return_value=str(tmp_path / "bill.pdf")), \
-         patch.object(printer_handlers, "print_pdf_silent", side_effect=RuntimeError("SumatraPDF returned exit code 1")):
+    with patch.object(
+        printer_handlers, "save_pdf_from_base64",
+        return_value=str(tmp_path / "bill.pdf"),
+    ), patch.object(
+        printer_handlers,
+        "print_pdf_silent",
+        side_effect=RuntimeError("SumatraPDF returned exit code 1"),
+    ):
         with pytest.raises(RuntimeError, match="SumatraPDF returned exit code 1"):
-            printer_handlers.print_single_job(job, {"SUMATRA_PDF_PATH": "SumatraPDF.exe"})
+            printer_handlers.print_single_job(
+                job, {"SUMATRA_PDF_PATH": "SumatraPDF.exe"}
+            )
 ```
 
 - [ ] **Step 2: Run RED**
@@ -90,21 +104,19 @@ def test_print_single_job_propagates_print_failure(tmp_path):
 python -m pytest tests/test_printer_handlers.py -q
 ```
 
-Expected: FAIL because `print_single_job` does not exist and current `print_pdf_silent` swallows failures.
+- [ ] **Step 3: Make low-level print failure raise after logging**
 
-- [ ] **Step 3: Make `print_pdf_silent` raise after logging**
-
-Keep logging/console output, but change exception handlers so they re-raise. For `subprocess.CalledProcessError`, raise:
+For `subprocess.CalledProcessError`:
 
 ```python
-raise RuntimeError(f"SumatraPDF returned exit code {exc.returncode}") from exc
+raise RuntimeError(
+    f"SumatraPDF returned exit code {exc.returncode}"
+) from exc
 ```
 
-For unexpected exceptions, re-raise the original exception after logging.
+For other unexpected exceptions, log then re-raise the original exception.
 
 - [ ] **Step 4: Add `print_single_job`**
-
-Implement exact key compatibility:
 
 ```python
 def print_single_job(job: dict, config_data: dict) -> str:
@@ -120,24 +132,23 @@ def print_single_job(job: dict, config_data: dict) -> str:
         raise ValueError("Failed to decode/save print job PDF")
 
     sumatra_pdf_path = config_data.get(
-        "SUMATRA_PDF_PATH", r"C:\Program Files\SumatraPDF\SumatraPDF.exe"
+        "SUMATRA_PDF_PATH",
+        r"C:\Program Files\SumatraPDF\SumatraPDF.exe",
     )
     print_pdf_silent(pdf_path, printer_name, sumatra_pdf_path)
     return printer_name
 ```
 
-Refactor `print_jobs()` to call `print_single_job()` inside its loop while preserving legacy list behavior and logging.
+Refactor legacy `print_jobs()` to call `print_single_job()` inside its existing loop while keeping existing event handling/logging behavior.
 
-- [ ] **Step 5: Run GREEN + basic legacy tests**
+- [ ] **Step 5: Run GREEN**
 
 ```powershell
 python -m pytest tests/test_printer_handlers.py -q
 python -m py_compile printer_handlers.py socket_app.py
 ```
 
-Expected: PASS.
-
-- [ ] **Step 6: Commit in `local_printers_winapp` feature branch**
+- [ ] **Step 6: Commit and review in Windows repo**
 
 ```powershell
 git add printer_handlers.py tests/test_printer_handlers.py
@@ -153,10 +164,10 @@ git commit -m "refactor: expose single cashier pdf print result"
 - Create: `tests/test_polling_client.py`
 
 **Interfaces:**
-- Consumes: config `FRAPPE_BASE_URL/API_KEY/API_SECRET`, local printer names.
+- Consumes: `FRAPPE_BASE_URL/API_KEY/API_SECRET`, installed printer names.
 - Produces: `claim_job(session, cfg, printers) -> dict|None`; `report_result(session, cfg, job_name, status, error_message="") -> dict`.
 
-- [ ] **Step 1: Write failing exact HTTP contract tests**
+- [ ] **Step 1: Write failing exact HTTP tests**
 
 ```python
 from unittest.mock import Mock
@@ -179,7 +190,9 @@ def test_claim_job_posts_exact_contract():
     response.json.return_value = {"message": {"job": None}}
     session.post.return_value = response
 
-    assert polling_client.claim_job(session, _cfg(), ["Cashier Printer"]) is None
+    assert polling_client.claim_job(
+        session, _cfg(), ["Cashier Printer"]
+    ) is None
     session.post.assert_called_once_with(
         "https://ourcity.s.frappe.cloud/api/method/bcn_print_jobs",
         json={"printers": ["Cashier Printer"]},
@@ -193,18 +206,18 @@ def test_report_result_posts_exact_contract():
     response = Mock()
     response.raise_for_status.return_value = None
     response.json.return_value = {
-        "message": {"job_name": "JOB-X", "status": "Printed", "duplicate": False}
+        "message": {
+            "job_name": "JOB-X",
+            "status": "Printed",
+            "duplicate": False,
+        }
     }
     session.post.return_value = response
 
-    result = polling_client.report_result(session, _cfg(), "JOB-X", "Printed")
-    assert result["status"] == "Printed"
-    session.post.assert_called_once_with(
-        "https://ourcity.s.frappe.cloud/api/method/bcn_print_job_result",
-        json={"job_name": "JOB-X", "status": "Printed"},
-        headers={"Authorization": "token key:secret"},
-        timeout=30,
+    result = polling_client.report_result(
+        session, _cfg(), "JOB-X", "Printed"
     )
+    assert result["status"] == "Printed"
 ```
 
 - [ ] **Step 2: Run RED**
@@ -213,9 +226,7 @@ def test_report_result_posts_exact_contract():
 python -m pytest tests/test_polling_client.py -q
 ```
 
-Expected: FAIL because module does not exist.
-
-- [ ] **Step 3: Implement base URL and auth helpers**
+- [ ] **Step 3: Add URL/auth helpers**
 
 ```python
 def build_api_url(cfg: dict, method: str) -> str:
@@ -233,11 +244,9 @@ def auth_headers(cfg: dict) -> dict[str, str]:
     return {"Authorization": f"token {key}:{secret}"}
 ```
 
-Never log `secret` or the complete Authorization header.
+Never log the returned header.
 
-- [ ] **Step 4: Implement Frappe message-envelope handling**
-
-Create:
+- [ ] **Step 4: Implement Frappe envelope parsing and endpoint functions**
 
 ```python
 def frappe_message(response) -> dict:
@@ -249,7 +258,7 @@ def frappe_message(response) -> dict:
     return message
 ```
 
-`claim_job` returns `message["job"]`, validating dict-or-None. `report_result` accepts only Printed/Failed and includes `error_message` only for Failed/non-empty error.
+`claim_job` POSTs `{"printers": printers}` and returns `message["job"]`, validating dict-or-None. `report_result` accepts only Printed/Failed and includes `error_message` only for Failed when non-empty.
 
 - [ ] **Step 5: Run GREEN**
 
@@ -257,9 +266,7 @@ def frappe_message(response) -> dict:
 python -m pytest tests/test_polling_client.py -q
 ```
 
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Commit and review**
 
 ```powershell
 git add polling_client.py tests/test_polling_client.py
@@ -268,43 +275,62 @@ git commit -m "feat: add cashier print queue http client"
 
 ---
 
-### Task 3: Implement One-Job Polling Iteration and Result Sequencing
+### Task 3: Print Once, Retain Unacknowledged Result, Retry Result Only
 
 **Files:**
 - Modify: `polling_client.py`
 - Modify: `tests/test_polling_client.py`
 
 **Interfaces:**
-- Consumes: `claim_job`, `report_result`, `print_single_job`, `get_local_printers` supplied as dependency/callback.
-- Produces: `poll_once(...)` that never intentionally claims a second job before reporting the current result.
+- Consumes: `claim_job`, `print_single_job`, `report_result`.
+- Produces: `PendingResult`; `process_claimed_job(...) -> PendingResult`; `flush_pending_result(...) -> bool`.
 
-- [ ] **Step 1: Add failing null-job and success sequencing tests**
+- [ ] **Step 1: Add failing data/sequence tests**
+
+Use:
 
 ```python
-def test_poll_once_does_nothing_when_no_job():
-    session = Mock()
-    with patch("polling_client.claim_job", return_value=None) as claim, \
-         patch("polling_client.print_single_job") as print_job, \
-         patch("polling_client.report_result") as report:
-        polling_client.poll_once(session, _cfg(), ["Cashier Printer"])
-        claim.assert_called_once()
-        print_job.assert_not_called()
-        report.assert_not_called()
+from dataclasses import dataclass
 
-
-def test_poll_once_prints_then_reports_printed():
-    events = []
-    job = {"name": "JOB-X", "printer_name": "Cashier Printer", "pdf_base64": "AAA="}
-    with patch("polling_client.claim_job", side_effect=lambda *a: events.append("claim") or job), \
-         patch("polling_client.print_single_job", side_effect=lambda *a: events.append("print") or "Cashier Printer"), \
-         patch("polling_client.report_result", side_effect=lambda *a, **k: events.append("report") or {"status": "Printed"}):
-        polling_client.poll_once(Mock(), _cfg(), ["Cashier Printer"])
-    assert events == ["claim", "print", "report"]
+@dataclass
+class PendingResult:
+    job_name: str
+    status: str
+    error_message: str = ""
 ```
 
-- [ ] **Step 2: Add failing failure-result test**
+Test successful physical print creates Printed result exactly once:
 
-When `print_single_job` raises `RuntimeError("SumatraPDF returned exit code 1")`, assert `report_result(..., "Failed", error_message="SumatraPDF returned exit code 1")` is called and the error text is exact.
+```python
+def test_process_claimed_job_prints_once_and_returns_result():
+    job = {
+        "name": "JOB-X",
+        "printer_name": "Cashier Printer",
+        "pdf_base64": "AAA=",
+    }
+    with patch("polling_client.print_single_job") as print_job:
+        result = polling_client.process_claimed_job(job, _cfg())
+    print_job.assert_called_once()
+    assert result == polling_client.PendingResult("JOB-X", "Printed", "")
+```
+
+Test print exception returns Failed result with exact text and does not report inside `process_claimed_job`:
+
+```python
+def test_process_claimed_job_captures_exact_failure():
+    job = {"name": "JOB-X", "printer_name": "Cashier Printer", "pdf_base64": "AAA="}
+    with patch(
+        "polling_client.print_single_job",
+        side_effect=RuntimeError("SumatraPDF returned exit code 1"),
+    ):
+        result = polling_client.process_claimed_job(job, _cfg())
+    assert result.status == "Failed"
+    assert result.error_message == "SumatraPDF returned exit code 1"
+```
+
+- [ ] **Step 2: Add failing result-retry test proving no reprint**
+
+Mock first `report_result` call to raise `requests.Timeout`, second to return `duplicate=true`. Call `flush_pending_result` twice or a bounded retry helper. Assert `print_single_job` is never called by result flushing.
 
 - [ ] **Step 3: Run RED**
 
@@ -312,259 +338,262 @@ When `print_single_job` raises `RuntimeError("SumatraPDF returned exit code 1")`
 python -m pytest tests/test_polling_client.py -q
 ```
 
-Expected: FAIL because `poll_once` does not exist.
-
-- [ ] **Step 4: Implement `poll_once`**
+- [ ] **Step 4: Implement `PendingResult` and `process_claimed_job`**
 
 ```python
-def poll_once(session, cfg: dict, printers: list[str]) -> None:
-    job = claim_job(session, cfg, printers)
-    if job is None:
-        return
+@dataclass
+class PendingResult:
+    job_name: str
+    status: str
+    error_message: str = ""
 
+
+def process_claimed_job(job: dict, cfg: dict) -> PendingResult:
     job_name = str(job.get("name") or "").strip()
     if not job_name:
         raise ValueError("Claimed print job has no name")
-
     try:
         print_single_job(job, cfg)
+        return PendingResult(job_name, "Printed", "")
     except Exception as exc:
-        report_result(session, cfg, job_name, "Failed", error_message=str(exc))
-        return
-
-    report_result(session, cfg, job_name, "Printed")
+        return PendingResult(job_name, "Failed", str(exc))
 ```
 
-Import `print_single_job` from `printer_handlers`.
+- [ ] **Step 5: Implement `flush_pending_result`**
 
-- [ ] **Step 5: Add result-response timeout retry helper**
+```python
+def flush_pending_result(session, cfg: dict, pending: PendingResult) -> bool:
+    try:
+        report_result(
+            session,
+            cfg,
+            pending.job_name,
+            pending.status,
+            error_message=pending.error_message,
+        )
+        return True
+    except requests.RequestException:
+        return False
+```
 
-Implement `report_result_with_retry(..., max_attempts=2)`. It retries only transport exceptions from `requests.RequestException`; because server same-terminal result is idempotent, a committed-but-lost response is safe. Use this helper inside `poll_once` for both Printed and Failed reports. Do not reprint when only result reporting timed out.
+Do not call `claim_job` or `print_single_job` here.
 
-- [ ] **Step 6: Add retry test**
-
-Mock first result POST to raise `requests.Timeout`, second to return `duplicate=true`; assert printer function ran once and result POST twice.
-
-- [ ] **Step 7: Run GREEN**
+- [ ] **Step 6: Run GREEN**
 
 ```powershell
 python -m pytest tests/test_polling_client.py -q
 ```
 
-Expected: PASS.
-
-- [ ] **Step 8: Commit**
+- [ ] **Step 7: Commit and review**
 
 ```powershell
 git add polling_client.py tests/test_polling_client.py
-git commit -m "feat: process cashier print queue one job at a time"
+git commit -m "feat: retain cashier print result until acknowledged"
 ```
 
 ---
 
-### Task 4: Add Poll Loop with Configured 2-Second Default
+### Task 4: Add Poll Loop That Blocks New Claims While Result Is Pending
 
 **Files:**
 - Modify: `polling_client.py`
 - Modify: `tests/test_polling_client.py`
 
 **Interfaces:**
-- Consumes: `poll_once`, local printer callback, stop event/callback for testability.
+- Consumes: installed-printer callback, claim/process/flush functions.
 - Produces: `run_polling_loop(cfg, get_printers, stop_requested)`.
 
-- [ ] **Step 1: Add failing interval test**
+- [ ] **Step 1: Add failing null-job/default-interval test**
 
-Use patched `time.sleep` and a stop callback that becomes true after one iteration. Assert default sleep argument is `2.0` when config omits `POLL_INTERVAL_SECONDS`.
+Patch `time.sleep`; stop after one iteration. When `POLL_INTERVAL_SECONDS` is absent, assert sleep receives `2.0`. `job=None` must not call physical print or result reporting.
 
-- [ ] **Step 2: Add failing config override test**
+- [ ] **Step 2: Add failing pending-result blocking test**
 
-With `POLL_INTERVAL_SECONDS=5`, assert sleep uses `5.0`. Clamp invalid/non-positive values back to `2.0`.
+Arrange one claim and successful physical print, then make result reporting fail twice across loop iterations. Assert:
 
-- [ ] **Step 3: Run RED**
+```text
+claim_job call count       = 1
+print_single_job call count = 1
+report_result call count    >= 2
+```
+
+No second claim may happen while `PendingResult` remains unacknowledged.
+
+- [ ] **Step 3: Add acknowledgement-unblocks-next-claim test**
+
+First result attempt fails; later attempt succeeds. Only after success may the loop invoke `claim_job` for the next job.
+
+- [ ] **Step 4: Run RED**
 
 ```powershell
 python -m pytest tests/test_polling_client.py -q
 ```
 
-Expected: FAIL because loop does not exist.
+- [ ] **Step 5: Implement loop state**
 
-- [ ] **Step 4: Implement loop**
+Core structure:
 
-Create one `requests.Session()` for reuse. Each iteration re-reads installed printer names via callback, calls `poll_once`, catches/logs request-level errors without leaking credentials, sleeps interval, and exits when `stop_requested()` is true.
+```python
+def run_polling_loop(cfg, get_printers, stop_requested):
+    session = requests.Session()
+    pending_result = None
+    interval = _poll_interval(cfg)
 
-- [ ] **Step 5: Run GREEN**
+    while not stop_requested():
+        if pending_result is not None:
+            if flush_pending_result(session, cfg, pending_result):
+                pending_result = None
+            time.sleep(interval)
+            continue
+
+        printers = get_printers()
+        job = claim_job(session, cfg, printers)
+        if job is not None:
+            pending_result = process_claimed_job(job, cfg)
+            if flush_pending_result(session, cfg, pending_result):
+                pending_result = None
+
+        time.sleep(interval)
+```
+
+`_poll_interval` converts config to float and returns `2.0` for missing, invalid, or non-positive values.
+
+- [ ] **Step 6: Run GREEN**
 
 ```powershell
 python -m pytest tests/test_polling_client.py -q
 ```
 
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit and review**
 
 ```powershell
 git add polling_client.py tests/test_polling_client.py
-git commit -m "feat: poll cashier print queue on configured interval"
+git commit -m "feat: poll cashier queue without duplicate printing"
 ```
 
 ---
 
-### Task 5: Integrate Poller Without Breaking Legacy Socket.IO
+### Task 5: Integrate Polling with Current Windows App Without Breaking Socket.IO
 
 **Files:**
 - Modify: `socket_app.py`
-- Modify: `tests/test_polling_client.py` or create `tests/test_socket_app_integration.py`
+- Modify: `tests/test_polling_client.py` or create `tests/test_socket_app_polling.py`
 
 **Interfaces:**
-- Consumes: current `load_config`, `get_local_printers`, legacy `run_socketio_client`; new `run_polling_loop`.
-- Produces: startup runs cashier polling in a daemon thread while existing Socket.IO client remains the foreground legacy listener.
+- Consumes: current config loader, installed-printer discovery, `run_polling_loop`.
+- Produces: cashier polling worker plus unchanged legacy Socket.IO listeners.
 
-- [ ] **Step 1: Write failing startup wiring test**
+- [ ] **Step 1: Add failing integration/source contract test**
 
-Patch `threading.Thread` (or imported `Thread`) and `run_socketio_client`. Assert startup constructs polling thread with target `run_polling_loop`, passes config and `get_local_printers`, starts it, then calls existing Socket.IO connection path.
+Assert `socket_app.py` still contains both legacy event names:
+
+```python
+assert "document_print_event" in source
+assert "sales_invoice_submitted" in source
+assert "run_polling_loop" in source
+```
 
 - [ ] **Step 2: Run RED**
 
 ```powershell
-python -m pytest tests/test_socket_app_integration.py -q
+python -m pytest tests -q
 ```
 
-Expected: FAIL before integration exists.
+- [ ] **Step 3: Start poller as a dedicated daemon thread**
 
-- [ ] **Step 3: Add a small callable entrypoint instead of testing `__main__` directly**
+After config loads and before/around Socket.IO blocking wait, start one thread that calls `run_polling_loop`. Use current `get_local_printers()`/`win32print.EnumPrinters` path as the callback. Do not change the legacy Socket.IO event payload parser or `print_jobs()` event handler.
 
-Refactor startup into:
+- [ ] **Step 4: Define clean stop behavior**
 
-```python
-def run_app(cfg: dict[str, Any]) -> None:
-    namespace = str(cfg.get("FRAPPE_SOCKET_URL") or "").strip().rstrip("/")
-    register_handlers(namespace)
-    polling_thread = Thread(
-        target=run_polling_loop,
-        args=(cfg, get_local_printers, lambda: False),
-        daemon=True,
-        name="cashier-print-poller",
-    )
-    polling_thread.start()
-    run_socketio_client(cfg, namespace)
-```
+Use one `threading.Event`. Pass `stop_event.is_set` as `stop_requested`; set event during shutdown/KeyboardInterrupt before disconnecting Socket.IO.
 
-Keep current event registrations (`document_print_event`, `sales_invoice_submitted`) unchanged.
-
-- [ ] **Step 4: Make polling optional only through explicit config if needed for rollout**
-
-Default is enabled. If adding `CASHIER_POLLING_ENABLED`, default it to true and document it; do not make polling silently off when key is absent.
-
-- [ ] **Step 5: Run GREEN + compile**
+- [ ] **Step 5: Run GREEN + syntax checks**
 
 ```powershell
-python -m pytest -q
+python -m pytest tests -q
 python -m py_compile socket_app.py polling_client.py printer_handlers.py
 ```
 
-Expected: all tests PASS.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Commit and review**
 
 ```powershell
-git add socket_app.py tests/test_socket_app_integration.py
-git commit -m "feat: run cashier polling beside legacy socket printing"
+git add socket_app.py tests
+git commit -m "feat: start cashier queue polling alongside socket printing"
 ```
 
 ---
 
-### Task 6: Update Config Template and Operations Documentation
+### Task 6: Document Config and Timeout Operations
 
 **Files:**
 - Modify: `config copy.json`
 - Modify: `README.md`
-- Modify: tests if config parsing is covered.
+- Modify: tests if config/source contracts exist.
 
 **Interfaces:**
-- Consumes: implemented polling settings.
-- Produces: deployable Windows configuration instructions.
+- Produces: deployable Windows configuration and support instructions.
 
-- [ ] **Step 1: Update sample config to include exact keys**
+- [ ] **Step 1: Update sample config**
+
+Include:
 
 ```json
 {
   "FRAPPE_BASE_URL": "https://ourcity.s.frappe.cloud",
-  "FRAPPE_SOCKET_URL": "https://your-site.com",
-  "LOGIN_URL": "https://your-site.com/api/method/login",
-  "AUTH_DATA": {
-    "usr": "legacy-socket-user",
-    "pwd": "legacy-socket-password"
-  },
   "API_KEY": "printer-api-key",
   "API_SECRET": "printer-api-secret",
   "POLL_INTERVAL_SECONDS": 2,
-  "SUMATRA_PDF_PATH": "C:\\Program Files\\SumatraPDF\\SumatraPDF.exe"
+  "SUMATRA_PDF_PATH": "C:\\Users\\<user>\\AppData\\Local\\SumatraPDF\\SumatraPDF.exe"
 }
 ```
 
-Keep legacy Socket.IO fields because unrelated event printing still exists.
+Retain legacy Socket.IO/login keys already needed by legacy mode; do not remove them solely for cashier polling.
 
-- [ ] **Step 2: Update README architecture**
+- [ ] **Step 2: Document operational semantics**
 
-Document two coexistence paths separately: legacy Socket.IO events and cashier HTTP polling. State that cashier polling uses token auth and does not require login cookies.
+README must state:
 
-- [ ] **Step 3: Run full verification**
+```text
+- Cashier HTTP polling uses API Key/API Secret, not AUTH_DATA cookies.
+- Poll interval defaults to 2 seconds.
+- A claimed job is physically printed once by the process.
+- If result POST cannot be acknowledged, the process retries only the result and does not claim another job.
+- If the app crashes after paper output, OurCity eventually marks the Processing job Failed with:
+  Print result unknown after client timeout
+- The server does not automatically redeliver that job.
+- Cashier/operator decides whether to Reprint; a manual reprint may duplicate paper if the first print actually succeeded.
+```
+
+- [ ] **Step 3: Run full Windows verification**
 
 ```powershell
-python -m pytest -q
+python -m pytest tests -q
 python -m py_compile socket_app.py polling_client.py printer_handlers.py
 ```
 
-Expected: PASS.
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Commit and review**
 
 ```powershell
-git add "config copy.json" README.md
-git commit -m "docs: configure cashier print queue polling"
+git add "config copy.json" README.md tests
+git commit -m "docs: document timeout-safe cashier polling"
 ```
 
 ---
 
-### Task 7: End-to-End Live Smoke Test Against OurCity
+## Live Integration Smoke Test
 
-**Files:** none required unless defects are found.
+After server/mobile Tasks 3-9 and Windows Tasks 1-6 are reviewed and deployed:
 
-**Interfaces:**
-- Consumes: deployed OurCity queue aliases from the server/mobile plan, configured dedicated API user, exact DMT printer name, running Windows client.
-- Produces: verified Pending -> Processing -> Printed path and failure/reprint behavior.
+1. Configure dedicated printer API user with Role `BCN Printer Client`.
+2. Set DMT exact cashier printer and Sales Order print format.
+3. Start Windows client and verify token-auth polling reaches OurCity.
+4. Table 01: create waiter order -> SO Open.
+5. Cashier Print Bill -> one Pending job and SO Billing.
+6. Windows claim -> Processing -> one physical bill -> Printed.
+7. Confirm waiter edit is blocked.
+8. Pay -> SO Closed/submitted -> SI `update_stock=1` -> PE(s) -> outstanding zero -> table Available.
+9. Retry same Print Bill HTTP request id in a controlled test -> same job returned, no second queue job.
+10. Failure test: stop/kill the Windows process after a controlled claim without result; after >60 seconds call claim API from a client and verify the old Processing job becomes Failed with exact timeout error and is not returned to Pending.
+11. Confirm no automatic paper retry occurs; only a manual Cashier Reprint creates a new Pending job.
 
-- [ ] **Step 1: Start Windows client**
-
-```powershell
-python socket_app.py
-```
-
-Expected logs show local printers and cashier polling active without printing API credentials.
-
-- [ ] **Step 2: From restaurant mobile Cashier, Print Bill for controlled Open Sales Order**
-
-Expected sequence in ERPNext:
-
-```text
-Sales Order Open -> Billing
-BCN Print Job Pending -> Processing -> Printed
-```
-
-Expected physical result: one cashier receipt prints to the configured exact Windows printer.
-
-- [ ] **Step 3: Verify waiter lock and payment independence**
-
-Attempt waiter append while Billing: rejected. Complete payment even if print job is temporarily Pending/Failed: payment is allowed and finalizes SO/SI/PE.
-
-- [ ] **Step 4: Verify failure/reprint**
-
-Temporarily make printer unavailable for a controlled test job; confirm Failed with exact error. Restore printer and use Reprint Bill; confirm a new Pending job is created and older Failed job remains unchanged.
-
-- [ ] **Step 5: Verify response-timeout safety at unit level, not by destructive network manipulation**
-
-Rely on Task 3 automated test for committed-result/lost-response retry semantics. Do not intentionally kill production networking during restaurant operations.
-
-- [ ] **Step 6: Record final evidence**
-
-Capture Sales Order, Sales Invoice, Payment Entry(s), print job names/statuses, and Windows log timestamps in the implementation review report. Do not merge any branch as part of this plan.
+Do not merge either repository into its default/main branch as part of this work.
