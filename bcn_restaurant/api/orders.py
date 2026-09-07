@@ -57,6 +57,7 @@ def create_order(
     doc.company = settings["company"]
     doc.customer = customer
     doc.transaction_date = nowdate()
+    doc.pos_profile = settings["pos_profile"]
     doc.selling_price_list = settings["selling_price_list"]
     doc.currency = settings["default_currency"]
     doc.price_list_currency = settings["default_currency"]
