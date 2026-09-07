@@ -1,145 +1,116 @@
 import 'package:bcn_restaurant_mobile/core/network/api_client.dart';
 import 'package:bcn_restaurant_mobile/core/storage/session_storage.dart';
 import 'package:bcn_restaurant_mobile/features/printing/data/windows_print_repository.dart';
-import 'package:bcn_restaurant_mobile/features/printing/domain/windows_print_status.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('WindowsPrintRepository', () {
-    test('requests a cashier bill through the exact POST contract', () async {
+    test('queues cashier bill with request id through OurCity alias', () async {
       final api = _RecordingApiClient(
         postResponse: {
-          'job_id': '10ba038e-48da-487b-96e8-8d3b99b6d18a',
+          'sales_order': 'SAL-ORD-2026-00005',
+          'request_id': 'REQ-A',
+          'print_job': 'PRINT-JOB-X',
           'status': 'Pending',
           'is_reprint': false,
+          'duplicate': false,
         },
       );
 
-      final result = await WindowsPrintRepository(
-        api,
-      ).requestCashierBill('SINV-0001');
+      final result = await WindowsPrintRepository(api).requestCashierBill(
+        salesOrder: 'SAL-ORD-2026-00005',
+        requestId: 'REQ-A',
+      );
 
       expect(api.postCalls, hasLength(1));
-      expect(
-        api.postCalls.single.method,
-        'bcn_restaurant.api.printing.request_cashier_bill',
-      );
-      expect(api.postCalls.single.data, {'invoice_name': 'SINV-0001'});
-      expect(result.jobId, '10ba038e-48da-487b-96e8-8d3b99b6d18a');
-      expect(result.status.state, PrintJobState.pending);
-      expect(result.status.rawValue, 'Pending');
-      expect(result.isReprint, isFalse);
-    });
-
-    test('gets Windows status through the exact GET contract', () async {
-      final api = _RecordingApiClient(
-        getResponse: {
-          'online': true,
-          'last_seen': '2026-09-05 10:11:12',
-          'pending': 2,
-          'failed': 3,
-        },
-      );
-
-      final status = await WindowsPrintRepository(api).getStatus();
-
-      expect(api.getCalls, hasLength(1));
-      expect(
-        api.getCalls.single.method,
-        'bcn_restaurant.api.printing.get_print_status',
-      );
-      expect(api.getCalls.single.queryParameters, isNull);
-      expect(status.online, isTrue);
-      expect(status.lastSeen, '2026-09-05 10:11:12');
-      expect(status.pending, 2);
-      expect(status.failed, 3);
-    });
-
-    test('retries one job through the exact POST contract', () async {
-      final api = _RecordingApiClient(postResponse: {'status': 'Pending'});
-
-      await WindowsPrintRepository(
-        api,
-      ).retryJob('10ba038e-48da-487b-96e8-8d3b99b6d18a');
-
-      expect(api.postCalls, hasLength(1));
-      expect(
-        api.postCalls.single.method,
-        'bcn_restaurant.api.printing.retry_print_job',
-      );
+      expect(api.postCalls.single.method, 'bcn_cashier_print_bill');
       expect(api.postCalls.single.data, {
-        'job_id': '10ba038e-48da-487b-96e8-8d3b99b6d18a',
+        'sales_order': 'SAL-ORD-2026-00005',
+        'request_id': 'REQ-A',
       });
+      expect(result.salesOrder, 'SAL-ORD-2026-00005');
+      expect(result.requestId, 'REQ-A');
+      expect(result.printJob, 'PRINT-JOB-X');
+      expect(result.status, 'Pending');
+      expect(result.isReprint, isFalse);
+      expect(result.duplicate, isFalse);
     });
 
-    test('preserves an unknown server job status safely', () {
-      final result = PrintRequestResult.fromJson({
-        'job_id': '10ba038e-48da-487b-96e8-8d3b99b6d18a',
-        'status': 'QueuedByVendor',
-        'is_reprint': 1,
-      });
-
-      expect(result.status.state, PrintJobState.unknown);
-      expect(result.status.rawValue, 'QueuedByVendor');
-      expect(result.isReprint, isTrue);
-    });
-
-    test('rejects a malformed response envelope', () async {
-      final api = _RecordingApiClient(postResponse: {'status': 'Pending'});
-
-      expect(
-        () => WindowsPrintRepository(api).requestCashierBill('SINV-0001'),
-        throwsFormatException,
+    test('reuses the caller supplied request id unchanged', () async {
+      final api = _RecordingApiClient(
+        postResponse: {
+          'sales_order': 'SAL-ORD-2026-00005',
+          'request_id': 'REQ-STABLE',
+          'print_job': 'PRINT-JOB-X',
+          'status': 'Pending',
+          'is_reprint': false,
+          'duplicate': true,
+        },
       );
+      final repository = WindowsPrintRepository(api);
+
+      await repository.requestCashierBill(
+        salesOrder: 'SAL-ORD-2026-00005',
+        requestId: 'REQ-STABLE',
+      );
+      await repository.requestCashierBill(
+        salesOrder: 'SAL-ORD-2026-00005',
+        requestId: 'REQ-STABLE',
+      );
+
+      expect(api.postCalls, hasLength(2));
+      expect(api.postCalls[0].data?['request_id'], 'REQ-STABLE');
+      expect(api.postCalls[1].data?['request_id'], 'REQ-STABLE');
     });
 
-    test(
-      'consumes the ApiClient Frappe message envelope exactly once',
-      () async {
-        final requests = <RequestOptions>[];
-        final dio = Dio(BaseOptions(baseUrl: 'https://restaurant.example.com'));
-        dio.interceptors.add(
-          InterceptorsWrapper(
-            onRequest: (options, handler) {
-              requests.add(options);
-              handler.resolve(
-                Response<dynamic>(
-                  requestOptions: options,
-                  statusCode: 200,
-                  data: {
-                    'message': {
-                      'job_id': '858f9d28-9799-49d7-8a03-7ed83bd37a5b',
-                      'status': 'Pending',
-                      'is_reprint': false,
-                    },
+    test('consumes the ApiClient Frappe message envelope exactly once', () async {
+      final requests = <RequestOptions>[];
+      final dio = Dio(BaseOptions(baseUrl: 'https://ourcity.s.frappe.cloud'));
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requests.add(options);
+            handler.resolve(
+              Response<dynamic>(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'message': {
+                    'sales_order': 'SAL-ORD-2026-00005',
+                    'request_id': 'REQ-A',
+                    'print_job': 'PRINT-JOB-X',
+                    'status': 'Pending',
+                    'is_reprint': false,
+                    'duplicate': false,
                   },
-                ),
-              );
-            },
-          ),
-        );
-        final client = ApiClient(
-          sessionStorage: _MemorySessionStorage(),
-          dio: dio,
-        );
+                },
+              ),
+            );
+          },
+        ),
+      );
+      final client = ApiClient(
+        sessionStorage: _MemorySessionStorage(),
+        dio: dio,
+      );
 
-        final result = await WindowsPrintRepository(
-          client,
-        ).requestCashierBill('SINV-0002');
+      final result = await WindowsPrintRepository(client).requestCashierBill(
+        salesOrder: 'SAL-ORD-2026-00005',
+        requestId: 'REQ-A',
+      );
 
-        expect(result.jobId, '858f9d28-9799-49d7-8a03-7ed83bd37a5b');
-        expect(result.status.state, PrintJobState.pending);
-        expect(requests, hasLength(1));
-        expect(
-          requests.single.path,
-          '/api/method/bcn_restaurant.api.printing.request_cashier_bill',
-        );
-        expect(requests.single.method, 'POST');
-        expect(requests.single.data, {'invoice_name': 'SINV-0002'});
-      },
-    );
+      expect(result.printJob, 'PRINT-JOB-X');
+      expect(result.requestId, 'REQ-A');
+      expect(requests, hasLength(1));
+      expect(requests.single.path, '/api/method/bcn_cashier_print_bill');
+      expect(requests.single.method, 'POST');
+      expect(requests.single.data, {
+        'sales_order': 'SAL-ORD-2026-00005',
+        'request_id': 'REQ-A',
+      });
+    });
   });
 }
 
@@ -151,26 +122,14 @@ class _MemorySessionStorage extends SessionStorage {
 }
 
 class _RecordingApiClient extends ApiClient {
-  _RecordingApiClient({this.getResponse, this.postResponse})
+  _RecordingApiClient({this.postResponse})
     : super(
         sessionStorage: SessionStorage(storage: const FlutterSecureStorage()),
         dio: Dio(),
       );
 
-  final dynamic getResponse;
   final dynamic postResponse;
-  final List<({String method, Map<String, dynamic>? queryParameters})>
-  getCalls = [];
   final List<({String method, Map<String, dynamic>? data})> postCalls = [];
-
-  @override
-  Future<dynamic> getMethod(
-    String method, {
-    Map<String, dynamic>? queryParameters,
-  }) async {
-    getCalls.add((method: method, queryParameters: queryParameters));
-    return getResponse;
-  }
 
   @override
   Future<dynamic> postMethod(
