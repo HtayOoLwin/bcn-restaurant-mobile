@@ -29,7 +29,8 @@ class CashierPrinterSettings {
   factory CashierPrinterSettings.fromJson(Map<String, dynamic> json) {
     return CashierPrinterSettings(
       printerIp: json['printer_ip']?.toString().trim() ?? '',
-      printerPort: _asInt(json['printer_port']) == 0 ? 9100 : _asInt(json['printer_port']),
+      printerPort:
+          _asInt(json['printer_port']) == 0 ? 9100 : _asInt(json['printer_port']),
       paperWidth: json['paper_width']?.toString() ?? '80mm',
     );
   }
@@ -51,7 +52,9 @@ class CashierInvoiceTax {
 
   factory CashierInvoiceTax.fromJson(Map<String, dynamic> json) {
     return CashierInvoiceTax(
-      description: json['description']?.toString() ?? json['account_head']?.toString() ?? 'Tax',
+      description: json['description']?.toString() ??
+          json['account_head']?.toString() ??
+          'Tax',
       rate: _asDouble(json['rate']),
       taxAmount: _asDouble(json['tax_amount']),
       chargeType: json['charge_type']?.toString() ?? '',
@@ -74,18 +77,21 @@ class CashierInvoiceItem {
     required this.salesOrder,
     required this.warehouse,
     required this.kitchenCounter,
+    this.uom = '',
   });
 
   factory CashierInvoiceItem.fromJson(Map<String, dynamic> json) {
     return CashierInvoiceItem(
       itemCode: json['item_code']?.toString() ?? '',
-      itemName: json['item_name']?.toString() ?? json['item_code']?.toString() ?? '',
+      itemName:
+          json['item_name']?.toString() ?? json['item_code']?.toString() ?? '',
       qty: _asDouble(json['qty']),
       rate: _asDouble(json['rate']),
       amount: _asDouble(json['amount']),
       salesOrder: json['sales_order']?.toString(),
       warehouse: json['warehouse']?.toString(),
       kitchenCounter: json['kitchen_counter']?.toString(),
+      uom: json['uom']?.toString() ?? '',
     );
   }
 
@@ -97,8 +103,11 @@ class CashierInvoiceItem {
   final String? salesOrder;
   final String? warehouse;
   final String? kitchenCounter;
+  final String uom;
 }
 
+// Kept for the existing direct/manual receipt builder while the cashier screen
+// migrates to Sales Order centric billing cards.
 class CashierInvoice {
   const CashierInvoice({
     required this.name,
@@ -125,7 +134,8 @@ class CashierInvoice {
     return CashierInvoice(
       name: json['name']?.toString() ?? '',
       customer: json['customer']?.toString() ?? '',
-      customerName: json['customer_name']?.toString() ?? json['customer']?.toString() ?? '',
+      customerName:
+          json['customer_name']?.toString() ?? json['customer']?.toString() ?? '',
       creation: json['creation']?.toString(),
       netTotal: _asDouble(json['net_total']),
       totalTaxesAndCharges: _asDouble(json['total_taxes_and_charges']),
@@ -138,14 +148,23 @@ class CashierInvoice {
           .map((value) => value.toString())
           .toList(),
       items: (json['items'] as List? ?? const [])
-          .map((value) => CashierInvoiceItem.fromJson(Map<String, dynamic>.from(value as Map)))
+          .map(
+            (value) => CashierInvoiceItem.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+          )
           .toList(),
       taxes: (json['taxes'] as List? ?? const [])
-          .map((value) => CashierInvoiceTax.fromJson(Map<String, dynamic>.from(value as Map)))
+          .map(
+            (value) => CashierInvoiceTax.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+          )
           .toList(),
       billPrinted: json['bill_printed'] == true || json['bill_printed'] == 1,
       billPrintedTotal: _asDouble(json['bill_printed_total']),
-      billPrintedAt: DateTime.tryParse(json['bill_printed_at']?.toString() ?? ''),
+      billPrintedAt:
+          DateTime.tryParse(json['bill_printed_at']?.toString() ?? ''),
       billPrintedBy: json['bill_printed_by']?.toString(),
     );
   }
@@ -170,9 +189,94 @@ class CashierInvoice {
   final String? billPrintedBy;
 }
 
+class CashierBill {
+  const CashierBill({
+    required this.salesOrder,
+    required this.salesInvoice,
+    required this.customer,
+    required this.customerName,
+    required this.creation,
+    required this.modified,
+    required this.billingStatus,
+    required this.paymentStatus,
+    required this.printStatus,
+    required this.canPay,
+    required this.netTotal,
+    required this.totalTaxesAndCharges,
+    required this.grandTotal,
+    required this.outstandingAmount,
+    required this.currency,
+    required this.docstatus,
+    required this.items,
+    required this.taxes,
+  });
+
+  factory CashierBill.fromJson(Map<String, dynamic> json) {
+    final billingStatus = json['billing_status']?.toString().trim();
+    final salesInvoice = json['sales_invoice']?.toString().trim();
+    return CashierBill(
+      salesOrder: json['sales_order']?.toString() ?? '',
+      salesInvoice:
+          salesInvoice == null || salesInvoice.isEmpty ? null : salesInvoice,
+      customer: json['customer']?.toString() ?? '',
+      customerName:
+          json['customer_name']?.toString() ?? json['customer']?.toString() ?? '',
+      creation: json['creation']?.toString(),
+      modified: json['modified']?.toString(),
+      billingStatus:
+          billingStatus == null || billingStatus.isEmpty ? 'Ordering' : billingStatus,
+      paymentStatus: json['payment_status']?.toString() ?? '',
+      printStatus: json['print_status']?.toString() ?? '',
+      canPay: json['can_pay'] == true || json['can_pay'] == 1,
+      netTotal: _asDouble(json['net_total']),
+      totalTaxesAndCharges: _asDouble(json['total_taxes_and_charges']),
+      grandTotal: _asDouble(json['grand_total']),
+      outstandingAmount: _asDouble(json['outstanding_amount']),
+      currency: json['currency']?.toString() ?? '',
+      docstatus: _asInt(json['docstatus']),
+      items: (json['items'] as List? ?? const [])
+          .map(
+            (value) => CashierInvoiceItem.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+          )
+          .toList(),
+      taxes: (json['taxes'] as List? ?? const [])
+          .map(
+            (value) => CashierInvoiceTax.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  final String salesOrder;
+  final String? salesInvoice;
+  final String customer;
+  final String customerName;
+  final String? creation;
+  final String? modified;
+  final String billingStatus;
+  final String paymentStatus;
+  final String printStatus;
+  final bool canPay;
+  final double netTotal;
+  final double totalTaxesAndCharges;
+  final double grandTotal;
+  final double outstandingAmount;
+  final String currency;
+  final int docstatus;
+  final List<CashierInvoiceItem> items;
+  final List<CashierInvoiceTax> taxes;
+
+  bool get isOrdering => billingStatus == 'Ordering';
+  bool get isBillRequested => billingStatus == 'Bill Requested';
+}
+
 class CashierBillingResponse {
   const CashierBillingResponse({
-    required this.invoices,
+    required this.bills,
     required this.modes,
     required this.printerSettings,
     this.paymentEntry,
@@ -182,15 +286,24 @@ class CashierBillingResponse {
 
   factory CashierBillingResponse.fromJson(Map<String, dynamic> json) {
     return CashierBillingResponse(
-      invoices: (json['invoices'] as List? ?? const [])
-          .map((value) => CashierInvoice.fromJson(Map<String, dynamic>.from(value as Map)))
+      bills: (json['bills'] as List? ?? const [])
+          .map(
+            (value) =>
+                CashierBill.fromJson(Map<String, dynamic>.from(value as Map)),
+          )
           .toList(),
       modes: (json['modes'] as List? ?? const [])
-          .map((value) => CashierPaymentMode.fromJson(Map<String, dynamic>.from(value as Map)))
+          .map(
+            (value) => CashierPaymentMode.fromJson(
+              Map<String, dynamic>.from(value as Map),
+            ),
+          )
           .where((mode) => mode.name.isNotEmpty)
           .toList(),
       printerSettings: CashierPrinterSettings.fromJson(
-        Map<String, dynamic>.from(json['printer_settings'] as Map? ?? const {}),
+        Map<String, dynamic>.from(
+          json['printer_settings'] as Map? ?? const {},
+        ),
       ),
       paymentEntry: json['payment_entry']?.toString(),
       paymentEntries: (json['payment_entries'] as List? ?? const [])
@@ -201,7 +314,7 @@ class CashierBillingResponse {
     );
   }
 
-  final List<CashierInvoice> invoices;
+  final List<CashierBill> bills;
   final List<CashierPaymentMode> modes;
   final CashierPrinterSettings printerSettings;
   final String? paymentEntry;
