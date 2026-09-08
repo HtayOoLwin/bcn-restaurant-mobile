@@ -6,11 +6,13 @@ class RestaurantTableModel {
     required this.isOpen,
     this.session,
     this.sessionStatus,
+    this.billingStatus = 'Ordering',
     this.waiter,
     this.openedAt,
   });
 
   factory RestaurantTableModel.fromJson(Map<String, dynamic> json) {
+    final rawBillingStatus = json['billing_status']?.toString().trim();
     return RestaurantTableModel(
       customer: json['customer']?.toString() ?? '',
       customerName: json['customer_name']?.toString() ?? '',
@@ -18,6 +20,9 @@ class RestaurantTableModel {
       isOpen: json['is_open'] == true,
       session: json['session']?.toString(),
       sessionStatus: json['session_status']?.toString(),
+      billingStatus: rawBillingStatus == null || rawBillingStatus.isEmpty
+          ? 'Ordering'
+          : rawBillingStatus,
       waiter: json['waiter']?.toString(),
       openedAt: json['opened_at']?.toString(),
     );
@@ -29,8 +34,11 @@ class RestaurantTableModel {
   final bool isOpen;
   final String? session;
   final String? sessionStatus;
+  final String billingStatus;
   final String? waiter;
   final String? openedAt;
+
+  bool get orderingLocked => billingStatus == 'Bill Requested' || billingStatus == 'Paid';
 }
 
 class TablesResponse {
@@ -45,7 +53,11 @@ class TablesResponse {
       serviceType: json['service_type']?.toString() ?? 'dine_in',
       customerGroup: json['customer_group']?.toString() ?? '',
       tables: (json['tables'] as List? ?? const [])
-          .map((row) => RestaurantTableModel.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) => RestaurantTableModel.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
           .toList(),
     );
   }
