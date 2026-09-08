@@ -4,7 +4,7 @@
 # Restaurant flow:
 # - one Open Draft Sales Order per table/customer
 # - later orders reuse the same Draft Sales Order
-# - Billing locks the table against new waiter orders
+# - Billing locks the table against new waiter orders, including after SO submit
 # - Sales Order Item stores kitchen note, kitchen counter snapshot, printed qty
 # - this script does not submit the Sales Order and does not print directly
 
@@ -76,35 +76,47 @@ active_orders = frappe.get_all(
     "Sales Order",
     filters={
         "customer": customer,
-        "docstatus": 0,
+        "docstatus": ["in", [0, 1]],
         "custom_restaurant_status": ["in", ["Open", "Billing"]],
     },
     fields=[
         "name",
+        "docstatus",
         "custom_client_order_id",
         "grand_total",
         "custom_restaurant_status",
     ],
     order_by="creation asc",
-    limit_page_length=2,
+    limit_page_length=5,
 )
 
-if len(active_orders) > 1:
+billing_orders = []
+open_draft_orders = []
+for active_order in active_orders:
+    if active_order.custom_restaurant_status == "Billing":
+        billing_orders.append(active_order)
+    elif (
+        active_order.docstatus == 0
+        and active_order.custom_restaurant_status == "Open"
+    ):
+        open_draft_orders.append(active_order)
+
+if billing_orders:
+    frappe.throw("Table is currently in Billing: " + customer)
+
+if len(open_draft_orders) > 1:
     frappe.throw(
         "More than one active Draft Sales Order exists for "
         + customer
         + ". Please check ERPNext."
     )
 
-if active_orders and active_orders[0].custom_restaurant_status == "Billing":
-    frappe.throw("Table is currently in Billing: " + customer)
-
-is_new_order = not bool(active_orders)
+is_new_order = not bool(open_draft_orders)
 
 if is_new_order:
     sales_order = frappe.new_doc("Sales Order")
 else:
-    sales_order = frappe.get_doc("Sales Order", active_orders[0].name)
+    sales_order = frappe.get_doc("Sales Order", open_draft_orders[0].name)
 
 existing_client_order_id = (
     sales_order.get("custom_client_order_id") or ""
