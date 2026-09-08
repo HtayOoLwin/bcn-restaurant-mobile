@@ -30,18 +30,17 @@ The required business flow is:
 
 ## State Model
 
-Use a hidden custom field on Sales Order:
+Use hidden custom fields on Sales Order:
 
-- `custom_mobile_billing_status` (Select)
+- `custom_mobile_billing_status` (Select, allow on submit)
   - `Ordering`
   - `Bill Requested`
   - `Paid`
+- `custom_bill_requested_at` (Datetime, allow on submit)
+- `custom_bill_requested_by` (Link/User, allow on submit)
+- `custom_mobile_sales_invoice` (Link/Sales Invoice, allow on submit)
 
-Optional audit fields:
-
-- `custom_bill_requested_at` (Datetime)
-- `custom_bill_requested_by` (Link/User)
-- `custom_mobile_sales_invoice` (Link/Sales Invoice)
+New Draft Sales Orders default to `Ordering`.
 
 State transitions:
 
@@ -115,6 +114,7 @@ Each bill row contains enough data for the Cashier screen without requiring a Sa
 - items/taxes required for display
 - Draft Sales Invoice name when Bill Requested
 - payment status
+- cashier print status when available
 
 Modes of Payment are returned in the same response.
 
@@ -135,19 +135,22 @@ Validation:
 - Sales Order exists;
 - belongs to configured restaurant company;
 - is Draft before first transition;
+- billing status is `Ordering` before first transition;
 - is not cancelled/paid;
 - contains items;
 - is not already linked to another active bill flow.
 
 First transition:
 
-1. Set billing lock intent so no concurrent waiter update is accepted.
+1. Mark billing lock intent in the request transaction so stale/concurrent waiter updates are rejected.
 2. Submit Sales Order.
 3. Create Sales Invoice through ERPNext standard Sales Order -> Sales Invoice mapper.
 4. Keep Sales Invoice in Draft.
-5. Store Sales Invoice link and Bill Requested audit values on Sales Order.
+5. Store Sales Invoice link, `Bill Requested` status, and audit values on Sales Order.
 6. Create a durable Cashier Print Queue row for that Sales Invoice.
 7. Return Sales Order + Draft Sales Invoice identifiers and billing status.
+
+The endpoint must not call `frappe.db.commit()` manually. Database mutations remain in the normal Frappe request transaction so an exception before a successful response rolls the request back. If the client times out after the server committed successfully, a retry must detect and return the existing Bill Requested state, Draft Sales Invoice, and deterministic print queue rather than duplicate them.
 
 ### 3. Cashier Payment
 
@@ -172,13 +175,14 @@ Validation:
 
 Transaction behavior:
 
-1. Submit Sales Invoice.
-2. Create/submit Payment Entry per tender as required.
-3. Mark Sales Order billing state `Paid`.
-4. Return payment entry names and change amount.
-5. Cashier refresh causes table to become Available.
+1. Set the Draft Sales Invoice to `update_stock = 1`.
+2. Submit Sales Invoice.
+3. Create/submit Payment Entry per tender as required.
+4. Mark Sales Order billing state `Paid`.
+5. Return payment entry names and change amount.
+6. Cashier/table refresh makes the table Available.
 
-The operation must be retry-safe and must not create duplicate Payment Entries after a client timeout/retry.
+The payment operation must be retry-safe and must not create duplicate Sales Invoice submission or duplicate Payment Entries after a client timeout/retry.
 
 ## Waiter Lock Enforcement
 
@@ -203,7 +207,7 @@ The Cashier screen is Sales-Order-centric before payment.
 - Status: `Bill Requested`.
 - Payment button enabled.
 - Displays invoice totals used for payment.
-- Auto-print state can be shown as `Queued`, `Printed`, or `Error` when available.
+- Shows auto-print state as `Queued`, `Printed`, or `Error` when available.
 
 After successful payment the card disappears from the active cashier list and the table becomes Available.
 
@@ -234,15 +238,15 @@ The Windows worker:
 4. prints through the configured Windows printer;
 5. marks the queue Printed or Error.
 
-Queue key is deterministic from Sales Invoice name so API retry cannot create duplicate physical jobs.
+Queue key is deterministic from Sales Invoice name so API retry cannot create duplicate queue rows. The worker must claim/mark the durable job before printing so normal polling does not intentionally print the same completed job twice.
 
 ## Failure Handling
 
-- If Sales Order submit fails: no Sales Invoice and no print queue are created.
-- If Sales Invoice creation fails: Request for Bill returns error; no print queue is created.
-- If queue creation fails after Sales Invoice creation: API returns an error and retry must find/reuse the same Draft Sales Invoice before re-attempting queue creation.
+- If Sales Order submit, Sales Invoice creation, or initial queue creation raises before the request completes, the request transaction is allowed to roll back; no manual commit is used.
+- If the HTTP client times out after a successful server commit, retry returns/reuses the existing Draft Sales Invoice and queue row.
 - Printer offline/error does not roll back Sales Order/Sales Invoice; the durable queue remains Error/Pending for recovery.
 - Payment cannot proceed unless the linked Draft Sales Invoice exists.
+- Payment retry after an uncertain client result checks document state and existing payment references before creating anything new.
 
 ## Testing Strategy
 
