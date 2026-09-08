@@ -18,6 +18,14 @@ class WaiterOperationsRepository {
     return WaiterReadyResponse.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
+  Future<Map<String, dynamic>> requestBill(String salesOrder) async {
+    final data = await _apiClient.postMethod(
+      'bcn_request_for_bill',
+      data: {'sales_order': salesOrder},
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   Future<void> itemAction({
     required String rowName,
     required String action,
