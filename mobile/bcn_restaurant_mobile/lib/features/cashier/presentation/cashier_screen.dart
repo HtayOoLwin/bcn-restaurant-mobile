@@ -304,11 +304,12 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       setPaymentType(selectedPaymentType);
     }
 
-    try {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (sheetContext) => StatefulBuilder(
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => _PaymentControllerOwner(
+        controllers: controllers,
+        child: StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             final visibleModes = <CashierPaymentMode>[];
             if (selectedPaymentType == 'Split') {
@@ -533,13 +534,35 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             );
           },
         ),
-      );
-    } finally {
-      for (final controller in controllers.values) {
-        controller.dispose();
-      }
-    }
+      ),
+    );
   }
+}
+
+class _PaymentControllerOwner extends StatefulWidget {
+  const _PaymentControllerOwner({
+    required this.controllers,
+    required this.child,
+  });
+
+  final Map<String, TextEditingController> controllers;
+  final Widget child;
+
+  @override
+  State<_PaymentControllerOwner> createState() => _PaymentControllerOwnerState();
+}
+
+class _PaymentControllerOwnerState extends State<_PaymentControllerOwner> {
+  @override
+  void dispose() {
+    for (final controller in widget.controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _AmountSummaryRow extends StatelessWidget {
