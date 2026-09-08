@@ -2,15 +2,18 @@
 # Deployment target: https://ourcity.s.frappe.cloud
 #
 # GET:
-# - list active Draft Sales Orders in Open/Billing state
-# - include latest cashier print queue status when BCN Print Job exists
-# - include DMT payment modes
+# - list Open Draft Sales Orders immediately
+# - list submitted Billing Sales Orders that have a Draft Sales Invoice
+# - include latest BCN Print Job status and DMT payment modes
 #
 # POST action=Pay:
-# - lock and finalize one restaurant Sales Order atomically
-# - map exactly one Sales Invoice with stock update enabled
+# - only a submitted Billing Sales Order can be paid
+# - submit its existing Draft Sales Invoice with update_stock enabled
 # - create submitted Payment Entries for tender allocations
-# - make successful response-timeout retries resolve existing final documents
+# - close the restaurant Sales Order after successful payment
+# - successful response-timeout retries resolve existing final documents
+#
+# No manual commit/rollback is used.
 
 COMPANY = "Doh Myot Daw BBQ & Restaurant"
 POS_PROFILE = "DMT"
@@ -52,7 +55,14 @@ def get_mode_details(profile, mode_name):
     account_row = frappe.db.get_value(
         "Account",
         account,
-        ["name", "company", "account_currency", "account_type", "is_group", "disabled"],
+        [
+            "name",
+            "company",
+            "account_currency",
+            "account_type",
+            "is_group",
+            "disabled",
+        ],
         as_dict=True,
     )
     if not account_row:
@@ -92,14 +102,17 @@ def parse_tenders(raw_payments, profile):
         mode_name = str(row.get("mode_of_payment") or "").strip()
         amount = float(row.get("amount") or 0)
 
+        if amount <= 0:
+            continue
         if not mode_name:
             frappe.throw("mode_of_payment is required")
-        if amount <= 0:
-            frappe.throw("Payment amount must be greater than zero")
 
         mode_details = get_mode_details(profile, mode_name)
         mode_details["amount"] = amount
         tenders.append(mode_details)
+
+    if not tenders:
+        frappe.throw("At least one positive payment is required")
 
     return tenders
 
@@ -107,7 +120,7 @@ def parse_tenders(raw_payments, profile):
 def allocate_tenders(tenders, amount_due):
     remaining = float(amount_due or 0)
     if remaining <= AMOUNT_TOLERANCE:
-        frappe.throw("Sales Order has no payable amount")
+        frappe.throw("Sales Invoice has no payable amount")
 
     allocations = []
     cash_rows = []
@@ -158,7 +171,32 @@ def allocate_tenders(tenders, amount_due):
     return allocations, change_amount
 
 
-def get_linked_sales_invoice_names(sales_order_name):
+def get_linked_draft_sales_invoice_names(sales_order_name):
+    rows = frappe.get_all(
+        "Sales Invoice Item",
+        filters={
+            "sales_order": sales_order_name,
+            "docstatus": 0,
+        },
+        fields=["parent"],
+        order_by="creation asc",
+        limit_page_length=100,
+    )
+
+    names = []
+    for row in rows:
+        if row.parent and row.parent not in names:
+            invoice_status = frappe.db.get_value(
+                "Sales Invoice",
+                row.parent,
+                "docstatus",
+            )
+            if invoice_status == 0:
+                names.append(row.parent)
+    return names
+
+
+def get_linked_submitted_sales_invoice_names(sales_order_name):
     rows = frappe.get_all(
         "Sales Invoice Item",
         filters={
@@ -166,13 +204,18 @@ def get_linked_sales_invoice_names(sales_order_name):
             "docstatus": 1,
         },
         fields=["parent"],
-        limit_page_length=500,
+        order_by="creation asc",
+        limit_page_length=100,
     )
 
     names = []
     for row in rows:
         if row.parent and row.parent not in names:
-            invoice_status = frappe.db.get_value("Sales Invoice", row.parent, "docstatus")
+            invoice_status = frappe.db.get_value(
+                "Sales Invoice",
+                row.parent,
+                "docstatus",
+            )
             if invoice_status == 1:
                 names.append(row.parent)
     return names
@@ -194,7 +237,11 @@ def get_linked_payment_entry_names(sales_invoice_name):
     names = []
     for row in rows:
         if row.parent and row.parent not in names:
-            payment_status = frappe.db.get_value("Payment Entry", row.parent, "docstatus")
+            payment_status = frappe.db.get_value(
+                "Payment Entry",
+                row.parent,
+                "docstatus",
+            )
             if payment_status == 1:
                 names.append(row.parent)
     return names
@@ -214,7 +261,12 @@ def validate_invoice_totals(sales_invoice, frozen_net, frozen_taxes, frozen_gran
 
 def make_payment_entry(sales_invoice, allocation, sequence):
     outstanding = float(
-        frappe.db.get_value("Sales Invoice", sales_invoice.name, "outstanding_amount") or 0
+        frappe.db.get_value(
+            "Sales Invoice",
+            sales_invoice.name,
+            "outstanding_amount",
+        )
+        or 0
     )
     allocated_amount = float(allocation["allocated_amount"] or 0)
 
@@ -226,12 +278,22 @@ def make_payment_entry(sales_invoice, allocation, sequence):
     receivable_row = frappe.db.get_value(
         "Account",
         sales_invoice.debit_to,
-        ["company", "account_currency", "account_type", "is_group", "disabled"],
+        [
+            "company",
+            "account_currency",
+            "account_type",
+            "is_group",
+            "disabled",
+        ],
         as_dict=True,
     )
     if not receivable_row:
         frappe.throw("Sales Invoice receivable account is missing")
-    if receivable_row.company != COMPANY or receivable_row.is_group or receivable_row.disabled:
+    if (
+        receivable_row.company != COMPANY
+        or receivable_row.is_group
+        or receivable_row.disabled
+    ):
         frappe.throw("Sales Invoice receivable account is unusable")
 
     receivable_currency = receivable_row.account_currency or CURRENCY
@@ -285,6 +347,79 @@ def make_payment_entry(sales_invoice, allocation, sequence):
     pe.flags.ignore_permissions = True
     pe.submit()
     return pe.name
+
+
+def build_bill_row(order, has_print_job_doctype):
+    sales_order = frappe.get_doc("Sales Order", order.name)
+
+    item_rows = []
+    for item in sales_order.items:
+        item_rows.append(
+            {
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "description": item.description,
+                "qty": float(item.qty or 0),
+                "uom": item.uom,
+                "rate": float(item.rate or 0),
+                "amount": float(item.amount or 0),
+                "net_amount": float(item.net_amount or 0),
+            }
+        )
+
+    tax_rows = []
+    for tax in sales_order.taxes:
+        tax_rows.append(
+            {
+                "charge_type": tax.charge_type,
+                "account_head": tax.account_head,
+                "description": tax.description,
+                "rate": float(tax.rate or 0),
+                "tax_amount": float(tax.tax_amount or 0),
+                "total": float(tax.total or 0),
+            }
+        )
+
+    draft_invoice = None
+    if order.custom_restaurant_status == "Billing" and order.docstatus == 1:
+        draft_invoices = get_linked_draft_sales_invoice_names(order.name)
+        if len(draft_invoices) == 1:
+            draft_invoice = draft_invoices[0]
+
+    last_print_status = None
+    last_print_job = None
+    if has_print_job_doctype:
+        print_rows = frappe.get_all(
+            "BCN Print Job",
+            filters={
+                "document_type": "Sales Order",
+                "document_name": order.name,
+            },
+            fields=["name", "status"],
+            order_by="creation desc",
+            limit_page_length=1,
+        )
+        if print_rows:
+            last_print_job = print_rows[0].name
+            last_print_status = print_rows[0].status
+
+    return {
+        "sales_order": order.name,
+        "sales_invoice": draft_invoice,
+        "customer": order.customer,
+        "customer_name": order.customer_name or order.customer,
+        "creation": str(order.creation),
+        "net_total": float(order.net_total or 0),
+        "total_taxes_and_charges": float(order.total_taxes_and_charges or 0),
+        "grand_total": float(order.grand_total or 0),
+        "currency": order.currency,
+        "restaurant_status": order.custom_restaurant_status,
+        "payment_enabled": bool(draft_invoice),
+        "last_print_status": last_print_status,
+        "last_print_job": last_print_job,
+        "items": item_rows,
+        "taxes": tax_rows,
+    }
 
 
 current_user = frappe.session.user
@@ -341,15 +476,20 @@ if action == "Pay":
 
     profile = frappe.get_doc("POS Profile", POS_PROFILE)
     tenders = parse_tenders(raw_payments, profile)
-
-    restaurant_status = (sales_order.get("custom_restaurant_status") or "").strip()
+    restaurant_status = (
+        sales_order.get("custom_restaurant_status") or ""
+    ).strip()
 
     if sales_order.docstatus == 1 and restaurant_status == "Closed":
-        linked_invoices = get_linked_sales_invoice_names(sales_order.name)
+        linked_invoices = get_linked_submitted_sales_invoice_names(
+            sales_order.name
+        )
         if not linked_invoices:
             frappe.throw("Closed Sales Order has no submitted linked Sales Invoice")
         if len(linked_invoices) > 1:
-            frappe.throw("Closed Sales Order has multiple submitted linked Sales Invoices")
+            frappe.throw(
+                "Closed Sales Order has multiple submitted linked Sales Invoices"
+            )
 
         sales_invoice = frappe.get_doc("Sales Invoice", linked_invoices[0])
         allocations, change_amount = allocate_tenders(
@@ -358,7 +498,12 @@ if action == "Pay":
         )
         payment_entries = get_linked_payment_entry_names(sales_invoice.name)
         final_outstanding = float(
-            frappe.db.get_value("Sales Invoice", sales_invoice.name, "outstanding_amount") or 0
+            frappe.db.get_value(
+                "Sales Invoice",
+                sales_invoice.name,
+                "outstanding_amount",
+            )
+            or 0
         )
         if abs(final_outstanding) > AMOUNT_TOLERANCE:
             frappe.throw("Existing Sales Invoice is not fully paid")
@@ -371,42 +516,25 @@ if action == "Pay":
             "duplicate": True,
         }
 
-    elif sales_order.docstatus == 0 and restaurant_status in ("Open", "Billing"):
-        active_orders = frappe.get_all(
-            "Sales Order",
-            filters={
-                "company": COMPANY,
-                "customer": sales_order.customer,
-                "docstatus": 0,
-                "custom_restaurant_status": ["in", ["Open", "Billing"]],
-            },
-            fields=["name"],
-            order_by="creation asc",
-            limit_page_length=2,
+    elif sales_order.docstatus == 1 and restaurant_status == "Billing":
+        draft_invoices = get_linked_draft_sales_invoice_names(
+            sales_order.name
         )
+        if not draft_invoices:
+            frappe.throw(
+                "Bill Requested Sales Order has no Draft Sales Invoice"
+            )
+        if len(draft_invoices) > 1:
+            frappe.throw("Sales Order has multiple Draft Sales Invoices")
 
-        if len(active_orders) != 1 or active_orders[0].name != sales_order.name:
-            frappe.throw("Restaurant table does not have one unique active Sales Order")
+        sales_invoice = frappe.get_doc("Sales Invoice", draft_invoices[0])
+        if sales_invoice.docstatus != 0:
+            frappe.throw("Linked Sales Invoice is not Draft")
 
-        sales_order.calculate_taxes_and_totals()
         frozen_net = float(sales_order.net_total or 0)
         frozen_taxes = float(sales_order.total_taxes_and_charges or 0)
         frozen_grand = float(sales_order.grand_total or 0)
-        allocations, change_amount = allocate_tenders(tenders, frozen_grand)
 
-        if restaurant_status == "Open":
-            sales_order.custom_restaurant_status = "Billing"
-
-        sales_order.custom_restaurant_status = "Closed"
-        sales_order.flags.ignore_permissions = True
-        sales_order.submit()
-
-        sales_invoice = frappe.call(
-            "erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice",
-            source_name=sales_order.name,
-            ignore_permissions=True,
-        )
-        sales_invoice.flags.ignore_permissions = True
         sales_invoice.update_stock = 1
         sales_invoice.calculate_taxes_and_totals()
         validate_invoice_totals(
@@ -416,21 +544,46 @@ if action == "Pay":
             frozen_grand,
         )
 
-        sales_invoice.insert(ignore_permissions=True)
+        allocations, change_amount = allocate_tenders(
+            tenders,
+            float(sales_invoice.grand_total or 0),
+        )
+
         sales_invoice.flags.ignore_permissions = True
         sales_invoice.submit()
 
         payment_entries = []
         sequence = 1
         for allocation in allocations:
-            payment_entries.append(make_payment_entry(sales_invoice, allocation, sequence))
+            payment_entries.append(
+                make_payment_entry(
+                    sales_invoice,
+                    allocation,
+                    sequence,
+                )
+            )
             sequence = sequence + 1
 
         final_outstanding = float(
-            frappe.db.get_value("Sales Invoice", sales_invoice.name, "outstanding_amount") or 0
+            frappe.db.get_value(
+                "Sales Invoice",
+                sales_invoice.name,
+                "outstanding_amount",
+            )
+            or 0
         )
         if abs(final_outstanding) > AMOUNT_TOLERANCE:
-            frappe.throw("Sales Invoice outstanding amount is not zero after payment")
+            frappe.throw(
+                "Sales Invoice outstanding amount is not zero after payment"
+            )
+
+        frappe.db.set_value(
+            "Sales Order",
+            sales_order.name,
+            "custom_restaurant_status",
+            "Closed",
+            update_modified=True,
+        )
 
         frappe.response["message"] = {
             "sales_order": sales_order.name,
@@ -440,6 +593,8 @@ if action == "Pay":
             "duplicate": False,
         }
 
+    elif sales_order.docstatus == 0 and restaurant_status == "Open":
+        frappe.throw("Please request the bill before taking payment")
     else:
         frappe.throw("Sales Order is not in a payable restaurant state")
 
@@ -447,12 +602,12 @@ elif action:
     frappe.throw("Unsupported cashier billing action: " + action)
 
 else:
-    orders = frappe.get_all(
+    ordering_orders = frappe.get_all(
         "Sales Order",
         filters={
             "company": COMPANY,
             "docstatus": 0,
-            "custom_restaurant_status": ["in", ["Open", "Billing"]],
+            "custom_restaurant_status": "Open",
         },
         fields=[
             "name",
@@ -463,81 +618,48 @@ else:
             "total_taxes_and_charges",
             "grand_total",
             "currency",
+            "docstatus",
             "custom_restaurant_status",
         ],
         order_by="creation asc",
         limit_page_length=500,
     )
 
-    has_print_job_doctype = bool(frappe.db.exists("DocType", "BCN Print Job"))
+    billing_orders = frappe.get_all(
+        "Sales Order",
+        filters={
+            "company": COMPANY,
+            "docstatus": 1,
+            "custom_restaurant_status": "Billing",
+        },
+        fields=[
+            "name",
+            "customer",
+            "customer_name",
+            "creation",
+            "net_total",
+            "total_taxes_and_charges",
+            "grand_total",
+            "currency",
+            "docstatus",
+            "custom_restaurant_status",
+        ],
+        order_by="creation asc",
+        limit_page_length=500,
+    )
+
+    orders = ordering_orders + billing_orders
+    orders = sorted(
+        orders,
+        key=lambda row: str(row.creation or ""),
+    )
+
+    has_print_job_doctype = bool(
+        frappe.db.exists("DocType", "BCN Print Job")
+    )
     bills = []
-
     for order in orders:
-        sales_order = frappe.get_doc("Sales Order", order.name)
-
-        item_rows = []
-        for item in sales_order.items:
-            item_rows.append(
-                {
-                    "item_code": item.item_code,
-                    "item_name": item.item_name,
-                    "description": item.description,
-                    "qty": float(item.qty or 0),
-                    "uom": item.uom,
-                    "rate": float(item.rate or 0),
-                    "amount": float(item.amount or 0),
-                    "net_amount": float(item.net_amount or 0),
-                }
-            )
-
-        tax_rows = []
-        for tax in sales_order.taxes:
-            tax_rows.append(
-                {
-                    "charge_type": tax.charge_type,
-                    "account_head": tax.account_head,
-                    "description": tax.description,
-                    "rate": float(tax.rate or 0),
-                    "tax_amount": float(tax.tax_amount or 0),
-                    "total": float(tax.total or 0),
-                }
-            )
-
-        last_print_status = None
-        last_print_job = None
-
-        if has_print_job_doctype:
-            print_rows = frappe.get_all(
-                "BCN Print Job",
-                filters={
-                    "document_type": "Sales Order",
-                    "document_name": order.name,
-                },
-                fields=["name", "status"],
-                order_by="creation desc",
-                limit_page_length=1,
-            )
-            if print_rows:
-                last_print_job = print_rows[0].name
-                last_print_status = print_rows[0].status
-
-        bills.append(
-            {
-                "sales_order": order.name,
-                "customer": order.customer,
-                "customer_name": order.customer_name or order.customer,
-                "creation": str(order.creation),
-                "net_total": float(order.net_total or 0),
-                "total_taxes_and_charges": float(order.total_taxes_and_charges or 0),
-                "grand_total": float(order.grand_total or 0),
-                "currency": order.currency,
-                "restaurant_status": order.custom_restaurant_status,
-                "last_print_status": last_print_status,
-                "last_print_job": last_print_job,
-                "items": item_rows,
-                "taxes": tax_rows,
-            }
-        )
+        bills.append(build_bill_row(order, has_print_job_doctype))
 
     profile = frappe.get_doc("POS Profile", POS_PROFILE)
     modes = []
