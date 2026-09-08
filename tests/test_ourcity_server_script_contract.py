@@ -11,7 +11,17 @@ def _read(path: Path) -> str:
 
 
 def test_ourcity_server_script_mirror_exists():
-    for name in ("bootstrap.py", "tables.py", "menu.py", "create_order.py"):
+    for name in (
+        "bootstrap.py",
+        "tables.py",
+        "menu.py",
+        "create_order.py",
+        "request_for_bill.py",
+        "cashier_billing.py",
+        "cashier_print_bill.py",
+        "print_jobs.py",
+        "print_job_result.py",
+    ):
         assert (SERVER_SCRIPTS / name).exists(), name
     assert DOC.exists()
 
@@ -24,13 +34,14 @@ def test_create_order_reuses_open_draft_sales_order_and_preserves_print_delta():
     assert 'CURRENCY = "MMK"' in source
     assert "json.loads" in source
     assert "frappe.parse_json" not in source
-    assert '"docstatus": 0' in source
+    assert '"docstatus": ["in", [0, 1]]' in source
     assert 'sales_order.custom_restaurant_status = "Open"' in source
     assert "custom_client_order_id" in source
     assert "custom_kitchen_note" in source
     assert "custom_kitchen_counter" in source
     assert "custom_printed_qty" in source
     assert ".submit(" not in source
+    assert "Table is currently in Billing" in source
     assert "Restaurant Table Session" not in source
 
 
@@ -44,14 +55,34 @@ def test_create_order_applies_and_recalculates_dmt_taxes():
     assert "sales_order.calculate_taxes_and_totals()" in source
 
 
-def test_cashier_billing_lists_open_and_billing_sales_order_bills():
-    path = SERVER_SCRIPTS / "cashier_billing.py"
-    assert path.exists()
-    source = _read(path)
+def test_request_for_bill_submits_sales_order_creates_draft_invoice_and_auto_print_job():
+    source = _read(SERVER_SCRIPTS / "request_for_bill.py")
+    assert 'sales_order.custom_restaurant_status = "Billing"' in source
+    assert "sales_order.submit()" in source
+    assert "erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice" in source
+    assert "sales_invoice.update_stock = 1" in source
+    assert "sales_invoice.insert(ignore_permissions=True)" in source
+    assert "sales_invoice.submit()" not in source
+    assert '"Sales Invoice"' in source
+    assert "frappe.get_print(" in source
+    assert 'job.status = "Pending"' in source
+    assert 'request_id = "bill-request|" + sales_order.name' in source
+    assert '"duplicate": True' in source
+    assert "frappe.db.commit" not in source
+    assert "frappe.db.rollback" not in source
+
+
+def test_cashier_billing_lists_open_and_submitted_billing_sales_orders():
+    source = _read(SERVER_SCRIPTS / "cashier_billing.py")
     assert 'COMPANY = "Doh Myot Daw BBQ & Restaurant"' in source
     assert 'POS_PROFILE = "DMT"' in source
     assert '"docstatus": 0' in source
-    assert '["Open", "Billing"]' in source
+    assert '"custom_restaurant_status": "Open"' in source
+    assert '"docstatus": 1' in source
+    assert '"custom_restaurant_status": "Billing"' in source
+    assert "get_linked_draft_sales_invoice_names" in source
+    assert '"sales_invoice": draft_invoice' in source
+    assert '"payment_enabled": bool(draft_invoice)' in source
     assert '"bills"' in source
     assert '"modes"' in source
     assert '"last_print_status"' in source
@@ -59,24 +90,22 @@ def test_cashier_billing_lists_open_and_billing_sales_order_bills():
     assert "Restaurant Table Session" not in source
 
 
-def test_cashier_print_bill_requires_request_id_and_queues_snapshot():
-    path = SERVER_SCRIPTS / "cashier_print_bill.py"
-    assert path.exists()
-    source = _read(path)
+def test_cashier_manual_print_requires_bill_request_and_reprints_draft_invoice():
+    source = _read(SERVER_SCRIPTS / "cashier_print_bill.py")
     assert 'POS_PROFILE = "DMT"' in source
     assert 'request_id = (frappe.form_dict.get("request_id") or "").strip()' in source
     assert "request_id is required" in source
     assert 'frappe.db.exists("BCN Print Job", {"request_id": request_id})' in source
+    assert "Waiter must Request for Bill before cashier printing" in source
+    assert 'sales_order.docstatus == 1 and restaurant_status == "Billing"' in source
+    assert "get_linked_draft_invoice_names" in source
+    assert '"Sales Invoice"' in source
+    assert "frappe.get_print(" in source
     assert 'job.request_id = request_id' in source
     assert 'job.status = "Pending"' in source
-    assert 'sales_order.custom_restaurant_status = "Billing"' in source
     assert "custom_cashier_printer" in source
-    assert "custom_cashier_print_format" in source
-    assert "frappe.get_print(" in source
-    assert '"Sales Order"' in source
     assert "pdf_base64" in source
     assert "publish_realtime" not in source
-    assert "Sales Invoice" not in source
 
 
 def test_cashier_print_bill_duplicate_request_returns_existing_job():
@@ -95,15 +124,13 @@ def test_cashier_print_bill_serializes_request_id_check_before_job_creation():
 
 def test_cashier_print_bill_closed_reprint_copies_existing_snapshot():
     source = _read(SERVER_SCRIPTS / "cashier_print_bill.py")
-    assert 'custom_restaurant_status == "Closed"' in source
+    assert 'restaurant_status == "Closed"' in source
     assert "No printable cashier snapshot exists" in source
     assert "previous_job.pdf_base64" in source
 
 
 def test_print_jobs_times_out_stale_processing_instead_of_requeueing():
-    path = SERVER_SCRIPTS / "print_jobs.py"
-    assert path.exists()
-    source = _read(path)
+    source = _read(SERVER_SCRIPTS / "print_jobs.py")
     assert "BCN Printer Client" in source
     assert "FOR UPDATE" in source
     assert "60" in source
@@ -117,9 +144,7 @@ def test_print_jobs_times_out_stale_processing_instead_of_requeueing():
 
 
 def test_print_job_result_is_owned_and_retry_safe():
-    path = SERVER_SCRIPTS / "print_job_result.py"
-    assert path.exists()
-    source = _read(path)
+    source = _read(SERVER_SCRIPTS / "print_job_result.py")
     assert "BCN Printer Client" in source
     assert "claimed_by" in source
     assert '["Printed", "Failed"]' in source
@@ -128,16 +153,18 @@ def test_print_job_result_is_owned_and_retry_safe():
     assert "conflict" in source.lower()
 
 
-def test_cashier_pay_finalizes_sales_order_invoice_and_payments_atomically():
+def test_cashier_pay_submits_existing_draft_invoice_then_closes_sales_order():
     source = _read(SERVER_SCRIPTS / "cashier_billing.py")
     assert 'action == "Pay"' in source
     assert "FOR UPDATE" in source
-    assert 'custom_restaurant_status = "Closed"' in source
-    assert ".submit()" in source
-    assert "update_stock = 1" in source
+    assert 'sales_order.docstatus == 1 and restaurant_status == "Billing"' in source
+    assert "get_linked_draft_sales_invoice_names" in source
+    assert "sales_invoice.update_stock = 1" in source
+    assert "sales_invoice.submit()" in source
     assert "Payment Entry" in source
-    assert "Sales Invoice Item" in source
     assert "Payment Entry Reference" in source
+    assert '"custom_restaurant_status",\n            "Closed"' in source
+    assert "Please request the bill before taking payment" in source
     assert '"duplicate"' in source
     assert "frappe.db.commit" not in source
     assert "frappe.db.rollback" not in source
@@ -150,20 +177,15 @@ def test_cashier_pay_skips_non_positive_tender_rows():
     assert "Payment amount must be greater than zero" not in source
 
 
-def test_create_order_blocks_new_waiter_orders_while_table_is_billing():
-    source = _read(SERVER_SCRIPTS / "create_order.py")
-    assert '"custom_restaurant_status": ["in", ["Open", "Billing"]]' in source
-    assert "Table is currently in Billing" in source
-
-
-def test_tables_reports_available_occupied_and_billing_from_draft_sales_orders():
+def test_tables_reports_available_occupied_and_submitted_billing_orders():
     source = _read(SERVER_SCRIPTS / "tables.py")
     assert "Sales Order" in source
     assert "custom_restaurant_status" in source
     assert 'table_status = "Available"' in source
     assert 'table_status = "Occupied"' in source
     assert 'table_status = "Billing"' in source
-    assert '"docstatus": 0' in source
+    assert '"docstatus": ["in", [0, 1]]' in source
+    assert 'row.docstatus == 1 and row.custom_restaurant_status == "Billing"' in source
     assert "Restaurant Table Session" not in source
 
 
@@ -186,7 +208,11 @@ def test_server_script_doc_describes_aliases_and_no_custom_app_requirement():
         "bcn_mobile_tables",
         "bcn_mobile_menu",
         "bcn_mobile_create_order",
+        "bcn_request_for_bill",
         "bcn_cashier_billing",
+        "bcn_cashier_print_bill",
+        "bcn_print_jobs",
+        "bcn_print_job_result",
     ):
         assert alias in source
     assert "OurCity" in source
