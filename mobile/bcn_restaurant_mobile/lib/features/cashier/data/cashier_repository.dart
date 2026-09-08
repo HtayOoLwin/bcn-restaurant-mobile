@@ -10,31 +10,22 @@ class CashierRepository {
 
   Future<CashierBillingResponse> getBilling() async {
     final data = await _apiClient.getMethod('bcn_cashier_billing');
-    return CashierBillingResponse.fromJson(Map<String, dynamic>.from(data as Map));
-  }
-
-  Future<CashierBillingResponse> recordBillPrint({
-    required String invoiceName,
-  }) async {
-    final data = await _apiClient.postMethod(
-      'bcn_cashier_billing',
-      data: {
-        'action': 'Record Print',
-        'invoice_name': invoiceName,
-      },
+    return CashierBillingResponse.fromJson(
+      Map<String, dynamic>.from(data as Map),
     );
-    return CashierBillingResponse.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
   Future<CashierBillingResponse> paySplit({
-    required String invoiceName,
+    required String salesOrder,
+    required String salesInvoice,
     required List<CashierPaymentTender> payments,
   }) async {
     final data = await _apiClient.postMethod(
       'bcn_cashier_billing',
       data: {
         'action': 'Pay',
-        'invoice_name': invoiceName,
+        'sales_order': salesOrder,
+        'sales_invoice': salesInvoice,
         'payments': jsonEncode(
           payments
               .map(
@@ -47,24 +38,8 @@ class CashierRepository {
         ),
       },
     );
-    return CashierBillingResponse.fromJson(Map<String, dynamic>.from(data as Map));
-  }
-
-  // Kept for compatibility with older callers while split payment is rolled out.
-  Future<CashierBillingResponse> pay({
-    required String invoiceName,
-    required String modeOfPayment,
-    required double receivedAmount,
-  }) async {
-    final data = await _apiClient.postMethod(
-      'bcn_cashier_billing',
-      data: {
-        'action': 'Pay',
-        'invoice_name': invoiceName,
-        'mode_of_payment': modeOfPayment,
-        'received_amount': receivedAmount,
-      },
+    return CashierBillingResponse.fromJson(
+      Map<String, dynamic>.from(data as Map),
     );
-    return CashierBillingResponse.fromJson(Map<String, dynamic>.from(data as Map));
   }
 }
