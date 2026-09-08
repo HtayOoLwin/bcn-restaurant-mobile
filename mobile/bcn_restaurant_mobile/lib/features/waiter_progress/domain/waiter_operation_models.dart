@@ -13,11 +13,13 @@ class WaiterProgressItem {
   factory WaiterProgressItem.fromJson(Map<String, dynamic> json) {
     return WaiterProgressItem(
       rowName: json['row_name']?.toString() ?? '',
-      itemName: json['item_name']?.toString() ?? json['item_code']?.toString() ?? '',
+      itemName:
+          json['item_name']?.toString() ?? json['item_code']?.toString() ?? '',
       qty: (json['qty'] as num?)?.toDouble() ?? 0,
       uom: json['uom']?.toString() ?? '',
       status: json['status']?.toString() ?? 'New',
-      canCancel: json['can_cancel'] == true || (json['status']?.toString() ?? 'New') == 'New',
+      canCancel: json['can_cancel'] == true ||
+          (json['status']?.toString() ?? 'New') == 'New',
       kitchenCounter: json['kitchen_counter']?.toString(),
       kitchenNote: json['kitchen_note']?.toString(),
     );
@@ -43,16 +45,26 @@ class WaiterProgressOrder {
     required this.preparingQty,
     required this.readyQty,
     required this.servedQty,
+    this.billingStatus = 'Ordering',
   });
 
   factory WaiterProgressOrder.fromJson(Map<String, dynamic> json) {
     double number(String key) => (json[key] as num?)?.toDouble() ?? 0;
+    final rawBillingStatus = json['billing_status']?.toString().trim();
     return WaiterProgressOrder(
       name: json['name']?.toString() ?? '',
-      customer: json['customer_name']?.toString() ?? json['customer']?.toString() ?? '',
+      customer:
+          json['customer_name']?.toString() ?? json['customer']?.toString() ?? '',
       preparationSummary: json['preparation_summary']?.toString() ?? 'New',
+      billingStatus: rawBillingStatus == null || rawBillingStatus.isEmpty
+          ? 'Ordering'
+          : rawBillingStatus,
       items: (json['items'] as List? ?? const [])
-          .map((row) => WaiterProgressItem.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) => WaiterProgressItem.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
           .toList(),
       newQty: number('new_qty'),
       preparingQty: number('preparing_qty'),
@@ -64,11 +76,15 @@ class WaiterProgressOrder {
   final String name;
   final String customer;
   final String preparationSummary;
+  final String billingStatus;
   final List<WaiterProgressItem> items;
   final double newQty;
   final double preparingQty;
   final double readyQty;
   final double servedQty;
+
+  bool get canRequestBill => billingStatus == 'Ordering';
+  bool get isBillRequested => billingStatus == 'Bill Requested';
 }
 
 class WaiterProgressResponse {
@@ -77,7 +93,11 @@ class WaiterProgressResponse {
   factory WaiterProgressResponse.fromJson(Map<String, dynamic> json) {
     return WaiterProgressResponse(
       orders: (json['orders'] as List? ?? const [])
-          .map((row) => WaiterProgressOrder.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) => WaiterProgressOrder.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
           .toList(),
     );
   }
@@ -98,7 +118,8 @@ class WaiterReadyItem {
   factory WaiterReadyItem.fromJson(Map<String, dynamic> json) {
     return WaiterReadyItem(
       rowName: json['row_name']?.toString() ?? '',
-      itemName: json['item_name']?.toString() ?? json['item_code']?.toString() ?? '',
+      itemName:
+          json['item_name']?.toString() ?? json['item_code']?.toString() ?? '',
       qty: (json['qty'] as num?)?.toDouble() ?? 0,
       uom: json['uom']?.toString() ?? '',
       kitchenCounter: json['kitchen_counter']?.toString(),
@@ -128,7 +149,11 @@ class WaiterReadyOrder {
       customer: json['customer']?.toString() ?? '',
       canServeWhole: json['can_serve_whole'] == true,
       items: (json['items'] as List? ?? const [])
-          .map((row) => WaiterReadyItem.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) => WaiterReadyItem.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
           .toList(),
     );
   }
@@ -145,7 +170,11 @@ class WaiterReadyResponse {
   factory WaiterReadyResponse.fromJson(Map<String, dynamic> json) {
     return WaiterReadyResponse(
       orders: (json['orders'] as List? ?? const [])
-          .map((row) => WaiterReadyOrder.fromJson(Map<String, dynamic>.from(row as Map)))
+          .map(
+            (row) => WaiterReadyOrder.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          )
           .toList(),
     );
   }
