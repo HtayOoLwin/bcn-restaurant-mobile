@@ -105,6 +105,18 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                     return _TableCard(
                       table: table,
                       onTap: () async {
+                        if ((table.sessionStatus ?? '').toLowerCase() ==
+                            'billing') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Bill already requested. This order is locked.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
                         ref
                             .read(cartProvider.notifier)
                             .setOrderContext(
