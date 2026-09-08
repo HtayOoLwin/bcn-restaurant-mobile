@@ -137,6 +137,16 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                     return _TableCard(
                       table: table,
                       onTap: () {
+                        if (table.orderingLocked) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Bill Requested. This order is locked and cannot be edited.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
                         ref
                             .read(cartProvider.notifier)
                             .setOrderContext(
@@ -159,7 +169,8 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   }
 
   Future<void> _openReadyToServe() async {
-    final notifications = ref.read(mobileNotificationsProvider).asData?.value;
+    final notifications =
+        ref.read(mobileNotificationsProvider).asData?.value;
     if (notifications?.isNotEmpty == true) {
       try {
         await ref.read(mobileNotificationsRepositoryProvider).markAllRead();
@@ -182,6 +193,12 @@ class _TableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final status = table.orderingLocked
+        ? 'Bill Requested'
+        : table.isOpen
+            ? (table.sessionStatus ?? 'Open')
+            : 'Available';
+
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -204,11 +221,7 @@ class _TableCard extends StatelessWidget {
                     size: 14,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    table.isOpen
-                        ? (table.sessionStatus ?? 'Open')
-                        : 'Available',
-                  ),
+                  Expanded(child: Text(status)),
                 ],
               ),
             ],
