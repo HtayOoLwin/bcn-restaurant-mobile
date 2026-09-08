@@ -30,15 +30,16 @@ customers = frappe.get_all(
     limit_page_length=200,
 )
 
-open_orders = frappe.get_all(
+active_orders = frappe.get_all(
     "Sales Order",
     filters={
-        "docstatus": 0,
+        "docstatus": ["in", [0, 1]],
         "custom_restaurant_status": ["in", ["Open", "Billing"]],
     },
     fields=[
         "name",
         "customer",
+        "docstatus",
         "custom_restaurant_status",
         "creation",
     ],
@@ -47,9 +48,24 @@ open_orders = frappe.get_all(
 )
 
 order_by_customer = {}
-for order in open_orders:
-    if order.customer not in order_by_customer:
-        order_by_customer[order.customer] = order
+for row in active_orders:
+    valid_open = (
+        row.docstatus == 0
+        and row.custom_restaurant_status == "Open"
+    )
+    valid_billing = (
+        row.docstatus == 1 and row.custom_restaurant_status == "Billing"
+    )
+    if not valid_open and not valid_billing:
+        continue
+
+    existing = order_by_customer.get(row.customer)
+    if not existing:
+        order_by_customer[row.customer] = row
+    elif row.custom_restaurant_status == "Billing":
+        # A submitted Billing order must win over any stale Draft Open row so
+        # the table cannot appear Available/Occupied for new ordering.
+        order_by_customer[row.customer] = row
 
 result = []
 for customer in customers:
