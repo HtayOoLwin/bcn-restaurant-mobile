@@ -19,6 +19,7 @@ class WaiterProgressScreen extends ConsumerStatefulWidget {
 class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
   String _searchQuery = '';
   String? _busyRow;
+  String? _busyOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +87,9 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                           itemBuilder: (context, index) => _ProgressCard(
                             order: filteredOrders[index],
                             busyRow: _busyRow,
+                            busyOrder: _busyOrder,
                             onCancel: _cancelItem,
+                            onRequestBill: _requestBill,
                           ),
                         ),
                 );
@@ -96,6 +99,69 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _requestBill(WaiterProgressOrder order) async {
+    if (_busyOrder != null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Bill Request'),
+        content: const Text(
+          'Once you request the bill, this order will be locked. '
+          'You cannot add or edit items after this. '
+          'The bill will be printed automatically.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.print),
+            label: const Text('Confirm & Print'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _busyOrder = order.name);
+    try {
+      final result = await ref
+          .read(waiterOperationsRepositoryProvider)
+          .requestBill(order.name);
+
+      ref.invalidate(waiterProgressProvider);
+      ref.invalidate(waiterReadyProvider);
+      ref.invalidate(tablesProvider('dine_in'));
+      ref.invalidate(tablesProvider('takeaway'));
+
+      if (mounted) {
+        final invoice = result['sales_invoice']?.toString() ?? '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              invoice.isEmpty
+                  ? 'Bill requested. Order is now locked.'
+                  : 'Bill requested. Draft Invoice: $invoice · Printing queued.',
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _busyOrder = null);
+    }
   }
 
   Future<void> _cancelItem(WaiterProgressItem item) async {
@@ -145,15 +211,21 @@ class _ProgressCard extends StatelessWidget {
   const _ProgressCard({
     required this.order,
     required this.busyRow,
+    required this.busyOrder,
     required this.onCancel,
+    required this.onRequestBill,
   });
 
   final WaiterProgressOrder order;
   final String? busyRow;
+  final String? busyOrder;
   final Future<void> Function(WaiterProgressItem item) onCancel;
+  final Future<void> Function(WaiterProgressOrder order) onRequestBill;
 
   @override
   Widget build(BuildContext context) {
+    final requesting = busyOrder == order.name;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -194,12 +266,29 @@ class _ProgressCard extends StatelessWidget {
                 ),
                 trailing: item.canCancel
                     ? TextButton(
-                        onPressed: busyRow == item.rowName
+                        onPressed: requesting || busyRow == item.rowName
                             ? null
                             : () => onCancel(item),
                         child: const Text('Cancel'),
                       )
                     : null,
+              ),
+            ),
+            const Divider(height: 20),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: requesting ? null : () => onRequestBill(order),
+                icon: requesting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.receipt_long),
+                label: Text(
+                  requesting ? 'Requesting…' : 'Request for Bill',
+                ),
               ),
             ),
           ],
