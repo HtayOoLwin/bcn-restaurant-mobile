@@ -10,22 +10,41 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CashierScreen request-safe draft Sales Order flow', () {
-    testWidgets('Open bill shows Print Bill and Payment', (tester) async {
-      final api = _FakeApiClient(
-        billingResponse: _billingResponse(restaurantStatus: 'Open'),
-      );
-      final printer = _FakePrintGateway();
+    testWidgets(
+      'Open bill keeps Print Bill and Payment disabled until bill request',
+      (tester) async {
+        final api = _FakeApiClient(
+          billingResponse: _billingResponse(restaurantStatus: 'Open'),
+        );
+        final printer = _FakePrintGateway();
 
-      await _pumpCashier(
-        tester,
-        api: api,
-        printer: printer,
-        requestIds: ['REQ-A'],
-      );
+        await _pumpCashier(
+          tester,
+          api: api,
+          printer: printer,
+          requestIds: ['REQ-A'],
+        );
 
-      expect(find.text('Print Bill'), findsOneWidget);
-      expect(find.text('Payment'), findsOneWidget);
-    });
+        expect(find.text('Print Bill'), findsOneWidget);
+        expect(find.text('Payment'), findsOneWidget);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Print Bill'),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Payment'),
+              )
+              .onPressed,
+          isNull,
+        );
+      },
+    );
 
     testWidgets('Billing failed bill shows Reprint, status, and Payment', (
       tester,
@@ -111,7 +130,11 @@ void main() {
       tester,
     ) async {
       final api = _FakeApiClient(
-        billingResponse: _billingResponse(restaurantStatus: 'Open'),
+        billingResponse: _billingResponse(
+          restaurantStatus: 'Billing',
+          lastPrintStatus: 'Printed',
+          lastPrintJob: 'PRINT-JOB-X',
+        ),
         paymentResponse: const {
           'sales_order': 'SAL-ORD-2026-00005',
           'sales_invoice': 'ACC-SINV-2026-00001',
