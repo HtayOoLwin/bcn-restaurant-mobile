@@ -237,6 +237,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required CashierBillingResponse billing,
     required CashierBill bill,
   }) async {
+    if (bill.restaurantStatus.trim().toLowerCase() != 'billing') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please wait for Request for Bill first.')),
+      );
+      return;
+    }
+
     final controllers = <String, TextEditingController>{};
     for (final mode in billing.modes) {
       controllers[mode.name] = TextEditingController();
@@ -657,7 +664,7 @@ class _BillCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 FilledButton.icon(
-                  onPressed: printPending ? null : onPrint,
+                  onPressed: isBilling && !printPending ? onPrint : null,
                   icon: printPending
                       ? const SizedBox(
                           width: 18,
@@ -675,7 +682,7 @@ class _BillCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 FilledButton.icon(
-                  onPressed: onPayment,
+                  onPressed: isBilling ? onPayment : null,
                   icon: const Icon(Icons.point_of_sale),
                   label: const Text('Payment'),
                 ),
