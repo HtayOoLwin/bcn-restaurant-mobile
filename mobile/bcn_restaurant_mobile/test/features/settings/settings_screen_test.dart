@@ -7,13 +7,12 @@ import 'package:bcn_restaurant_mobile/features/auth/presentation/auth_controller
 import 'package:bcn_restaurant_mobile/features/bootstrap/domain/bootstrap_model.dart';
 import 'package:bcn_restaurant_mobile/features/cashier/domain/cashier_models.dart';
 import 'package:bcn_restaurant_mobile/features/cashier/presentation/cashier_screen.dart';
-import 'package:bcn_restaurant_mobile/features/printing/data/windows_print_repository.dart';
-import 'package:bcn_restaurant_mobile/features/printing/domain/known_print_job_controller.dart';
-import 'package:bcn_restaurant_mobile/features/printing/domain/windows_print_status.dart';
-import 'package:bcn_restaurant_mobile/features/printing/presentation/printer_settings_screen.dart';
-import 'package:bcn_restaurant_mobile/features/settings/presentation/settings_screen.dart';
 import 'package:bcn_restaurant_mobile/features/notifications/domain/mobile_notification.dart';
 import 'package:bcn_restaurant_mobile/features/notifications/presentation/mobile_notification_watcher.dart';
+import 'package:bcn_restaurant_mobile/features/printing/data/windows_print_repository.dart';
+import 'package:bcn_restaurant_mobile/features/printing/domain/cashier_bill_print_result.dart';
+import 'package:bcn_restaurant_mobile/features/printing/presentation/printer_settings_screen.dart';
+import 'package:bcn_restaurant_mobile/features/settings/presentation/settings_screen.dart';
 import 'package:bcn_restaurant_mobile/features/waiter/domain/table_models.dart';
 import 'package:bcn_restaurant_mobile/features/waiter/presentation/waiter_tables_screen.dart';
 import 'package:flutter/material.dart';
@@ -72,22 +71,21 @@ void main() {
   });
 
   testWidgets(
-    'cashier retains and surfaces one accepted job while preventing double taps',
+    'cashier sends one Sales Order print request while preventing double taps',
     (tester) async {
-      final request = Completer<PrintRequestResult>();
+      final request = Completer<CashierBillPrintResult>();
       final repository = _FakeWindowsPrintGateway(request: request.future);
 
       await tester.pumpWidget(_cashierHarness(repository));
       await tester.pumpAndSettle();
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(CashierScreen)),
-      );
 
-      await tester.tap(find.text('Print Bill'));
-      await tester.tap(find.text('Print Bill'));
+      await tester.tap(find.text('Reprint Bill'));
+      await tester.tap(find.text('Reprint Bill'));
       await tester.pump();
 
-      expect(repository.requestedInvoices, ['SINV-0001']);
+      expect(repository.requestedSalesOrders, ['SO-0001']);
+      expect(repository.requestIds, hasLength(1));
+      expect(repository.requestIds.single, isNotEmpty);
       expect(
         tester
             .widget<FilledButton>(find.widgetWithText(FilledButton, 'Sending…'))
@@ -98,41 +96,32 @@ void main() {
       request.complete(_pendingResult());
       await tester.pumpAndSettle();
 
-      expect(find.text('Print job sent'), findsOneWidget);
-      expect(
-        find.text('Job ID: 10ba038e-48da-487b-96e8-8d3b99b6d18a'),
-        findsOneWidget,
-      );
-      expect(find.text('Bill printed.'), findsNothing);
-      expect(
-        container.read(lastAcceptedPrintJobProvider)?.jobId,
-        '10ba038e-48da-487b-96e8-8d3b99b6d18a',
-      );
+      expect(find.text('Print job sent · PRINT-JOB-0001'), findsOneWidget);
     },
   );
 
-  testWidgets('cashier keeps an API error visible', (tester) async {
+  testWidgets('cashier keeps a print API error visible', (tester) async {
     final repository = _FakeWindowsPrintGateway(
       requestError: const ApiException('No cashier printer configured.'),
     );
 
     await tester.pumpWidget(_cashierHarness(repository));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Print Bill'));
+    await tester.tap(find.text('Reprint Bill'));
     await tester.pumpAndSettle();
 
     expect(find.text('No cashier printer configured.'), findsOneWidget);
   });
 
-  testWidgets('cashier completion after disposal does not touch dead state', (
+  testWidgets('cashier print completion after disposal does not touch dead state', (
     tester,
   ) async {
-    final request = Completer<PrintRequestResult>();
+    final request = Completer<CashierBillPrintResult>();
     final repository = _FakeWindowsPrintGateway(request: request.future);
 
     await tester.pumpWidget(_cashierHarness(repository));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Print Bill'));
+    await tester.tap(find.text('Reprint Bill'));
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
 
     request.complete(_pendingResult());
@@ -141,260 +130,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('shows Windows status and retries only the known accepted job', (
+  testWidgets('printer screen describes the Windows polling client', (
     tester,
   ) async {
-    final repository = _FakeWindowsPrintGateway(
-      status: const WindowsPrintStatus(
-        online: true,
-        lastSeen: '2026-09-05 10:11:12',
-        pending: 2,
-        failed: 3,
-      ),
-    );
-
     await tester.pumpWidget(
       _printerHarness(
-        repository,
-        bootstrap: _bootstrap(
-          manager: true,
-          canViewPrintStatus: true,
-          canRetryPrintJobs: true,
-        ),
-        initialJobContext: _knownJob(),
+        bootstrap: _bootstrap(manager: true, canViewPrintStatus: true),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Online'), findsOneWidget);
-    expect(find.text('Last seen: 2026-09-05 10:11:12'), findsOneWidget);
-    expect(find.text('Pending'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('Failed'), findsOneWidget);
-    expect(find.text('3'), findsOneWidget);
-    expect(find.text('Bluetooth'), findsNothing);
-    expect(find.byType(SelectableText), findsOneWidget);
-    expect(find.text('10ba038e-48da-487b-96e8-8d3b99b6d18a'), findsOneWidget);
-    expect(find.byKey(const Key('failed-print-job-id')), findsNothing);
-    expect(find.text('Retry This Job'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('Retry This Job'));
-    await tester.tap(find.text('Retry This Job'));
-    await tester.pumpAndSettle();
-
-    expect(repository.retriedJobIds, ['10ba038e-48da-487b-96e8-8d3b99b6d18a']);
-    expect(repository.statusRequests, greaterThanOrEqualTo(2));
-  });
-
-  testWidgets('failed aggregate without a known job gives ERPNext guidance', (
-    tester,
-  ) async {
-    final repository = _FakeWindowsPrintGateway(
-      status: const WindowsPrintStatus(
-        online: true,
-        lastSeen: null,
-        pending: 0,
-        failed: 2,
-      ),
-    );
-
-    await tester.pumpWidget(
-      _printerHarness(
-        repository,
-        bootstrap: _bootstrap(
-          manager: true,
-          canViewPrintStatus: true,
-          canRetryPrintJobs: true,
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Retry This Job'), findsNothing);
-    expect(find.byKey(const Key('failed-print-job-id')), findsNothing);
+    expect(find.text('Windows Printer Client'), findsOneWidget);
     expect(
       find.text(
-        'Ask an administrator to open Local Print Job in ERPNext to identify and retry failed jobs.',
+        'The Windows printer client polls OurCity for queued print jobs. Mobile no longer retries or monitors printer jobs directly.',
       ),
       findsOneWidget,
     );
-  });
-
-  testWidgets('retry stays hidden when bootstrap denies retry', (tester) async {
-    final repository = _FakeWindowsPrintGateway(
-      status: const WindowsPrintStatus(
-        online: false,
-        lastSeen: null,
-        pending: 0,
-        failed: 2,
-      ),
-    );
-
-    await tester.pumpWidget(
-      _printerHarness(
-        repository,
-        bootstrap: _bootstrap(
-          cashier: true,
-          canViewPrintStatus: true,
-          canRetryPrintJobs: false,
-        ),
-        initialJobContext: _knownJob(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Offline'), findsOneWidget);
+    expect(find.text('Print and reprint bills from the Cashier screen.'), findsOneWidget);
     expect(find.text('Retry This Job'), findsNothing);
+    expect(find.text('Online'), findsNothing);
   });
 
-  testWidgets('test print stays visible when status loading fails', (
+  testWidgets('printer screen denies users without print permission', (
     tester,
   ) async {
-    final repository = _FakeWindowsPrintGateway(
-      statusError: const ApiException('Print status unavailable.'),
-    );
-
-    await tester.pumpWidget(
-      _printerHarness(
-        repository,
-        bootstrap: _bootstrap(
-          cashier: true,
-          canViewPrintStatus: true,
-          canRetryPrintJobs: true,
-        ),
-        initialJobContext: _knownJob(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Print status unavailable.'), findsOneWidget);
-    expect(find.text('Retry Status'), findsOneWidget);
-    expect(find.text('Retry This Job'), findsOneWidget);
-    expect(find.text('Test Cashier Print'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('Test Cashier Print'));
-    await tester.tap(find.text('Test Cashier Print'));
-    await tester.pumpAndSettle();
-    expect(repository.requestedInvoices, ['SINV-0001']);
-    expect(find.text('Print job sent'), findsOneWidget);
-  });
-
-  testWidgets('test print requires a named submitted invoice context', (
-    tester,
-  ) async {
-    final repository = _FakeWindowsPrintGateway();
-    final bootstrap = _bootstrap(cashier: true, canViewPrintStatus: true);
-
-    await tester.pumpWidget(_printerHarness(repository, bootstrap: bootstrap));
-    await tester.pumpAndSettle();
-    expect(find.text('Test Cashier Print'), findsNothing);
-
-    await tester.pumpWidget(
-      _printerHarness(
-        repository,
-        bootstrap: bootstrap,
-        initialJobContext: _knownJob(invoiceDocstatus: 0),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Test Cashier Print'), findsNothing);
-
-    await tester.pumpWidget(
-      _printerHarness(
-        repository,
-        bootstrap: bootstrap,
-        initialJobContext: _knownJob(invoiceName: ''),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Test Cashier Print'), findsNothing);
-  });
-
-  testWidgets(
-    'test-print completion after disposal does not touch dead state',
-    (tester) async {
-      final request = Completer<PrintRequestResult>();
-      final repository = _FakeWindowsPrintGateway(request: request.future);
-
-      await tester.pumpWidget(
-        _printerHarness(
-          repository,
-          bootstrap: _bootstrap(cashier: true, canViewPrintStatus: true),
-          initialJobContext: _knownJob(),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Test Cashier Print'));
-      await tester.tap(find.text('Test Cashier Print'));
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-
-      request.complete(_pendingResult());
-      await tester.pump();
-
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets('direct screen access is denied before status is requested', (
-    tester,
-  ) async {
-    final repository = _FakeWindowsPrintGateway();
-
-    await tester.pumpWidget(
-      _printerHarness(repository, bootstrap: _bootstrap(waiter: true)),
-    );
+    await tester.pumpWidget(_printerHarness(bootstrap: _bootstrap(waiter: true)));
     await tester.pumpAndSettle();
 
     expect(
-      find.text('You are not authorized to view print status.'),
+      find.text('You are not authorized to view printer information.'),
       findsOneWidget,
     );
-    expect(find.text('Retry This Job'), findsNothing);
-    expect(find.text('Test Cashier Print'), findsNothing);
-    expect(repository.statusRequests, 0);
+    expect(find.text('Windows Printer Client'), findsNothing);
   });
 
-  testWidgets('retry prevents duplicate taps and reports API errors', (
-    tester,
-  ) async {
-    final retry = Completer<void>();
-    final repository = _FakeWindowsPrintGateway(
-      retry: retry.future,
-      status: const WindowsPrintStatus(
-        online: true,
-        lastSeen: null,
-        pending: 0,
-        failed: 1,
-      ),
-    );
-
-    await tester.pumpWidget(
-      _printerHarness(
-        repository,
-        bootstrap: _bootstrap(
-          manager: true,
-          canViewPrintStatus: true,
-          canRetryPrintJobs: true,
-        ),
-        initialJobContext: _knownJob(),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Retry This Job'));
-    await tester.tap(find.text('Retry This Job'));
-    await tester.tap(find.text('Retry This Job'));
-    await tester.pump();
-
-    expect(repository.retriedJobIds, hasLength(1));
-
-    retry.completeError(const ApiException('Retry is not allowed.'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Retry is not allowed.'), findsOneWidget);
-    expect(repository.statusRequests, greaterThanOrEqualTo(2));
-  });
-
-  testWidgets('manager with print-status permission reaches the destination', (
+  testWidgets('manager with print permission reaches printer information', (
     tester,
   ) async {
     final repository = _FakeWindowsPrintGateway();
@@ -411,51 +182,29 @@ void main() {
 
     await tester.tap(find.text('Windows Print Service'));
     await tester.pumpAndSettle();
-    expect(find.text('Online'), findsOneWidget);
+    expect(find.text('Windows Printer Client'), findsOneWidget);
   });
 
-  testWidgets('accepted cashier job survives navigation to printer settings', (
-    tester,
-  ) async {
-    final repository = _FakeWindowsPrintGateway();
-    await tester.pumpWidget(
-      _routerHarness(
-        repository,
-        _bootstrap(cashier: true, canViewPrintStatus: true),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Print Bill'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('View status'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Last accepted print job'), findsOneWidget);
-    expect(find.text('10ba038e-48da-487b-96e8-8d3b99b6d18a'), findsOneWidget);
-    expect(find.text('Test Cashier Print'), findsOneWidget);
-  });
-
-  testWidgets('waiter without print-status permission is denied the route', (
+  testWidgets('waiter without print permission is denied the printer route', (
     tester,
   ) async {
     final repository = _FakeWindowsPrintGateway();
     await tester.pumpWidget(
       _routerHarness(repository, _bootstrap(waiter: true)),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
     final container = ProviderScope.containerOf(
       tester.element(find.byType(_RouterTestApp)),
     );
 
     container.read(routerProvider).go('/printer-settings');
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(
       container.read(routerProvider).routeInformationProvider.value.uri.path,
       '/settings',
     );
-    expect(find.text('Windows Print Service'), findsNothing);
+    expect(find.text('Windows Printer Client'), findsNothing);
   });
 }
 
@@ -474,19 +223,12 @@ Widget _cashierHarness(WindowsPrintGateway repository) {
   );
 }
 
-Widget _printerHarness(
-  WindowsPrintGateway repository, {
-  required BootstrapModel bootstrap,
-  KnownPrintJobContext? initialJobContext,
-}) {
+Widget _printerHarness({required BootstrapModel bootstrap}) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(() => _TestAuthController(bootstrap)),
-      windowsPrintRepositoryProvider.overrideWithValue(repository),
     ],
-    child: MaterialApp(
-      home: PrinterSettingsScreen(initialJobContext: initialJobContext),
-    ),
+    child: const MaterialApp(home: PrinterSettingsScreen()),
   );
 }
 
@@ -524,21 +266,13 @@ class _RouterTestApp extends ConsumerWidget {
   }
 }
 
-PrintRequestResult _pendingResult({
-  String jobId = '10ba038e-48da-487b-96e8-8d3b99b6d18a',
-}) => PrintRequestResult.fromJson({
-  'job_id': jobId,
-  'status': 'Pending',
-  'is_reprint': false,
-});
-
-KnownPrintJobContext _knownJob({
-  String invoiceName = 'SINV-0001',
-  int invoiceDocstatus = 1,
-}) => KnownPrintJobContext(
-  invoiceName: invoiceName,
-  invoiceDocstatus: invoiceDocstatus,
-  request: _pendingResult(),
+CashierBillPrintResult _pendingResult() => const CashierBillPrintResult(
+  salesOrder: 'SO-0001',
+  requestId: 'cashier-test-request',
+  printJob: 'PRINT-JOB-0001',
+  status: 'Pending',
+  isReprint: true,
+  duplicate: false,
 );
 
 BootstrapModel _bootstrap({
@@ -567,78 +301,47 @@ BootstrapModel _bootstrap({
 );
 
 CashierBillingResponse _billing() => CashierBillingResponse(
-  invoices: [_invoice()],
+  bills: [_bill()],
   modes: const [],
-  printerSettings: const CashierPrinterSettings(
-    printerIp: '',
-    printerPort: 9100,
-    paperWidth: '80mm',
-  ),
 );
 
-CashierInvoice _invoice() => CashierInvoice.fromJson({
-  'name': 'SINV-0001',
+CashierBill _bill() => CashierBill.fromJson({
+  'sales_order': 'SO-0001',
   'customer': 'Table 1',
   'customer_name': 'Table 1',
-  'creation': '2026-09-05 10:00:00',
+  'creation': '2026-09-08 10:00:00',
   'net_total': 1000,
   'total_taxes_and_charges': 0,
   'grand_total': 1000,
-  'outstanding_amount': 1000,
   'currency': 'MMK',
-  'docstatus': 1,
-  'payment_status': 'Unpaid',
-  'sales_orders': ['SO-0001'],
+  'restaurant_status': 'Billing',
+  'last_print_status': 'Printed',
+  'last_print_job': 'PRINT-JOB-OLD',
   'items': const [],
   'taxes': const [],
-  'bill_printed': false,
-  'bill_printed_total': 0,
 });
 
 class _FakeWindowsPrintGateway implements WindowsPrintGateway {
   _FakeWindowsPrintGateway({
-    Future<PrintRequestResult>? request,
+    Future<CashierBillPrintResult>? request,
     this.requestError,
-    Future<void>? retry,
-    this.statusError,
-    this.status = const WindowsPrintStatus(
-      online: true,
-      lastSeen: null,
-      pending: 0,
-      failed: 0,
-    ),
-  }) : _request = request ?? Future.value(_pendingResult()),
-       _retry = retry ?? Future<void>.value();
+  }) : _request = request ?? Future.value(_pendingResult());
 
-  final Future<PrintRequestResult> _request;
+  final Future<CashierBillPrintResult> _request;
   final Object? requestError;
-  final Future<void> _retry;
-  final Object? statusError;
-  final WindowsPrintStatus status;
-  final List<String> requestedInvoices = [];
-  final List<String> retriedJobIds = [];
-  int statusRequests = 0;
+  final List<String> requestedSalesOrders = [];
+  final List<String> requestIds = [];
 
   @override
-  Future<PrintRequestResult> requestCashierBill(String invoiceName) {
-    requestedInvoices.add(invoiceName);
+  Future<CashierBillPrintResult> requestCashierBill({
+    required String salesOrder,
+    required String requestId,
+  }) {
+    requestedSalesOrders.add(salesOrder);
+    requestIds.add(requestId);
     final error = requestError;
     if (error != null) return Future.error(error);
     return _request;
-  }
-
-  @override
-  Future<WindowsPrintStatus> getStatus() {
-    statusRequests += 1;
-    final error = statusError;
-    if (error != null) return Future.error(error);
-    return Future.value(status);
-  }
-
-  @override
-  Future<void> retryJob(String jobId) {
-    retriedJobIds.add(jobId);
-    return _retry;
   }
 }
 
