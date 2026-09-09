@@ -62,6 +62,20 @@ def test_waiter_tables_can_open_order_progress_request_bill_screen():
     assert "context.push('/waiter-progress')" in tables
 
 
+def test_waiter_order_progress_server_script_matches_open_draft_flow():
+    path = SERVER / "waiter_order_progress.py"
+    assert path.exists()
+    source = read(path)
+    assert '# Server Script API: bcn_waiter_order_progress' in source
+    assert '"docstatus": 0' in source
+    assert '"custom_restaurant_status": "Open"' in source
+    assert '"row_name"' in source
+    assert '"preparation_summary": "New"' in source
+    assert 'frappe.response["message"]' in source
+    assert "Restaurant Table Session" not in source
+    assert "custom_restaurant_session" not in source
+
+
 def test_cashier_keeps_existing_layout_but_disables_actions_until_billing():
     screen = read(MOBILE / "cashier" / "presentation" / "cashier_screen.dart")
     assert "final isBilling" in screen
