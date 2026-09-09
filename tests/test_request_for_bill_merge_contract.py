@@ -2,8 +2,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+MOBILE_APP = ROOT / "mobile" / "bcn_restaurant_mobile" / "lib"
 SERVER = ROOT / "server_scripts" / "mobile"
-MOBILE = ROOT / "mobile" / "bcn_restaurant_mobile" / "lib" / "features"
+MOBILE = MOBILE_APP / "features"
 
 
 def read(path: Path) -> str:
@@ -49,6 +50,16 @@ def test_waiter_mobile_has_confirmed_request_for_bill_action():
     assert "Confirm Bill Request" in screen
     assert "Confirm & Print" in screen
     assert "Request for Bill" in screen
+
+
+def test_waiter_tables_can_open_order_progress_request_bill_screen():
+    router = read(MOBILE_APP / "core" / "router" / "app_router.dart")
+    tables = read(MOBILE / "waiter" / "presentation" / "waiter_tables_screen.dart")
+    assert "WaiterProgressScreen" in router
+    assert "path: '/waiter-progress'" in router
+    assert "state.matchedLocation.startsWith('/waiter-progress')" in router
+    assert "tooltip: 'Order Progress'" in tables
+    assert "context.push('/waiter-progress')" in tables
 
 
 def test_cashier_keeps_existing_layout_but_disables_actions_until_billing():
