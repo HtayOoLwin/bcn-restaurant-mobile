@@ -4,7 +4,7 @@
 # Current Server-Script-only restaurant flow:
 # - waiter orders are Open Draft Sales Orders
 # - Request for Bill moves the order out of this Open list into Billing
-# - no Restaurant Table Session or custom app dependency is required
+# - this endpoint reads the same active-order state used by the table screen
 
 COMPANY = "Doh Myot Daw BBQ & Restaurant"
 
@@ -37,24 +37,13 @@ allowed_user = (
 if not allowed_user:
     frappe.throw("You are not allowed to view restaurant order progress.")
 
-order_filters = {
-    "company": COMPANY,
-    "docstatus": 0,
-    "custom_restaurant_status": "Open",
-}
-
-manager_user = (
-    current_user == "Administrator"
-    or "System Manager" in roles
-    or "Restaurant Manager" in roles
-)
-
-if not manager_user:
-    order_filters["owner"] = current_user
-
 orders = frappe.get_all(
     "Sales Order",
-    filters=order_filters,
+    filters={
+        "company": COMPANY,
+        "docstatus": 0,
+        "custom_restaurant_status": "Open",
+    },
     fields=[
         "name",
         "customer",
