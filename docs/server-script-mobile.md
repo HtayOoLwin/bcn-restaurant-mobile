@@ -12,6 +12,7 @@ The restaurant mobile app talks to Frappe **Server Script API** aliases. A custo
 | `bcn_mobile_tables` | `server_scripts/mobile/tables.py` | Dine In / Takeaway tables and Available / Occupied / Billing status |
 | `bcn_mobile_menu` | `server_scripts/mobile/menu.py` | POS Profile DMT item groups, menu items and Standard Selling prices |
 | `bcn_mobile_create_order` | `server_scripts/mobile/create_order.py` | Create/update one Open Draft Sales Order per table; reject ordering after Bill Request |
+| `bcn_waiter_order_progress` | `server_scripts/mobile/waiter_order_progress.py` | List active Open Draft Sales Orders for the waiter Order Progress / Request for Bill screen |
 | `bcn_request_for_bill` | `server_scripts/mobile/request_for_bill.py` | Waiter confirms bill request, submits Sales Order, creates Draft Sales Invoice and queues automatic cashier printing |
 | `bcn_cashier_billing` | `server_scripts/mobile/cashier_billing.py` | List Ordering/Billing cards and complete Cash/Kpay/Split payment against the existing Draft Sales Invoice |
 | `bcn_cashier_print_bill` | `server_scripts/mobile/cashier_print_bill.py` | Manual reprint after Bill Request using the linked Draft Sales Invoice snapshot |
@@ -65,6 +66,8 @@ Waiter places first order
 `bcn_mobile_create_order` keeps one Draft (`docstatus = 0`) Sales Order for each active table/customer while `custom_restaurant_status = Open`.
 
 A later waiter order for the same table reuses that Draft Sales Order. Matching rows are identified by item code, UOM, kitchen note and kitchen counter, and the incoming quantity is added to the existing quantity.
+
+`bcn_waiter_order_progress` reads those same Open Draft Sales Orders and returns the rows needed by the mobile Order Progress screen. This is the screen that exposes the Waiter `Request for Bill` action.
 
 After `bcn_request_for_bill` submits that Sales Order and changes the restaurant status to `Billing`, the waiter order API also checks submitted Billing Sales Orders. New items are rejected with a Billing lock instead of accidentally creating a new Draft Sales Order for the same table.
 
@@ -134,6 +137,7 @@ For this billing change, make sure the live site has these aliases updated befor
 ```text
 bcn_mobile_tables
 bcn_mobile_create_order
+bcn_waiter_order_progress
 bcn_request_for_bill
 bcn_cashier_billing
 bcn_cashier_print_bill
