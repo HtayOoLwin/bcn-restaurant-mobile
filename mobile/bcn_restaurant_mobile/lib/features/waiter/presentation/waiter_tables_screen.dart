@@ -40,6 +40,11 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
               : 'Waiter',
         ),
         actions: [
+          IconButton(
+            tooltip: 'Order Progress',
+            onPressed: () => context.push('/waiter-progress'),
+            icon: const Icon(Icons.receipt_long),
+          ),
           if (bootstrap?.permissions.cashier == true)
             IconButton(
               tooltip: 'Cashier',
