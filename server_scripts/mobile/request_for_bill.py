@@ -47,55 +47,41 @@ def render_sales_invoice_html(profile, sales_invoice):
         profile.get("custom_cashier_invoice_print_format") or ""
     ).strip()
 
-    if invoice_print_format:
-        print_format_row = frappe.db.get_value(
-            "Print Format",
-            invoice_print_format,
-            ["name", "doc_type", "disabled"],
-            as_dict=True,
-        )
-        if not print_format_row:
-            frappe.throw(
-                "Cashier Sales Invoice print format not found: "
-                + invoice_print_format
-            )
-        if print_format_row.disabled:
-            frappe.throw(
-                "Cashier Sales Invoice print format is disabled: "
-                + invoice_print_format
-            )
-        if print_format_row.doc_type != "Sales Invoice":
-            frappe.throw(
-                "Cashier Sales Invoice print format must be for Sales Invoice"
-            )
+    if not invoice_print_format:
+        frappe.throw("DMT custom_cashier_invoice_print_format is required")
 
-        html_content = frappe.get_print(
-            "Sales Invoice",
-            sales_invoice.name,
-            print_format=invoice_print_format,
-            as_pdf=False,
+    print_format_row = frappe.db.get_value(
+        "Print Format",
+        invoice_print_format,
+        ["name", "doc_type", "disabled"],
+        as_dict=True,
+    )
+    if not print_format_row:
+        frappe.throw(
+            "Cashier Sales Invoice print format not found: "
+            + invoice_print_format
         )
-        if not str(html_content or "").strip():
-            frappe.throw("Cashier HTML snapshot is empty")
-        return {
-            "html_content": html_content,
-            "print_format": invoice_print_format,
-        }
+    if print_format_row.disabled:
+        frappe.throw(
+            "Cashier Sales Invoice print format is disabled: "
+            + invoice_print_format
+        )
+    if print_format_row.doc_type != "Sales Invoice":
+        frappe.throw(
+            "Cashier Sales Invoice print format must be for Sales Invoice"
+        )
 
     html_content = frappe.get_print(
         "Sales Invoice",
         sales_invoice.name,
+        print_format=invoice_print_format,
         as_pdf=False,
     )
     if not str(html_content or "").strip():
         frappe.throw("Cashier HTML snapshot is empty")
-
-    metadata_format = (
-        profile.get("custom_cashier_print_format") or "Standard"
-    ).strip()
     return {
         "html_content": html_content,
-        "print_format": metadata_format or "Standard",
+        "print_format": invoice_print_format,
     }
 
 
