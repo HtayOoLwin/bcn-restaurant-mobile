@@ -1,4 +1,4 @@
-﻿import re
+import re
 from pathlib import Path
 
 
@@ -34,7 +34,14 @@ def test_request_for_bill_preserves_live_diagnostics_with_html_snapshot():
     )
 
     assert "print_format=invoice_print_format" in source
-    assert "as_pdf=False" in source
+    assert (
+        '"frappe.www.printview.get_html_and_style"'
+        in source
+    )
+    assert 'rendered.get("html")' in source
+    assert 'rendered.get("style")' in source
+    assert "frappe.get_print(" not in source
+    assert "as_pdf=False" not in source
 
     assert re.search(
         r'job\.render_mode\s*=\s*\(?\s*"HTML"\s*\)?',

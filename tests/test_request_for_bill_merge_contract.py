@@ -18,8 +18,14 @@ def test_waiter_request_for_bill_submits_so_creates_draft_si_and_queues_print():
     assert "erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice" in source
     assert "sales_invoice.insert(ignore_permissions=True)" in source
     assert "sales_invoice.submit()" not in source
-    assert 'frappe.get_print(\n            "Sales Invoice"' in source or 'frappe.get_print(\n        "Sales Invoice"' in source
-    assert "as_pdf=False" in source
+    assert (
+        '"frappe.www.printview.get_html_and_style"'
+        in source
+    )
+    assert 'rendered.get("html")' in source
+    assert 'rendered.get("style")' in source
+    assert "frappe.get_print(" not in source
+    assert "as_pdf=False" not in source
     assert "as_pdf=True" not in source
     assert 'job.render_mode = "HTML"' in source
     assert 'job.html_content = rendered["html_content"]' in source

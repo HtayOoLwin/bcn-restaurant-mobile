@@ -64,9 +64,15 @@ def test_request_for_bill_submits_sales_order_creates_draft_invoice_and_auto_pri
     assert "sales_invoice.insert(ignore_permissions=True)" in source
     assert "sales_invoice.submit()" not in source
     assert '"Sales Invoice"' in source
-    assert "frappe.get_print(" in source
+    assert (
+        '"frappe.www.printview.get_html_and_style"'
+        in source
+    )
     assert "render_sales_invoice_html" in source
-    assert "as_pdf=False" in source
+    assert 'rendered.get("html")' in source
+    assert 'rendered.get("style")' in source
+    assert "frappe.get_print(" not in source
+    assert "as_pdf=False" not in source
     assert "as_pdf=True" not in source
     assert 'job.render_mode = "HTML"' in source
     assert 'job.html_content = rendered["html_content"]' in source
@@ -107,9 +113,15 @@ def test_cashier_manual_print_requires_bill_request_and_reprints_draft_invoice()
     assert 'sales_order.docstatus == 1 and restaurant_status == "Billing"' in source
     assert "get_linked_draft_invoice_names" in source
     assert '"Sales Invoice"' in source
-    assert "frappe.get_print(" in source
+    assert (
+        '"frappe.www.printview.get_html_and_style"'
+        in source
+    )
     assert "render_invoice_html" in source
-    assert "as_pdf=False" in source
+    assert 'rendered.get("html")' in source
+    assert 'rendered.get("style")' in source
+    assert "frappe.get_print(" not in source
+    assert "as_pdf=False" not in source
     assert "as_pdf=True" not in source
     assert 'job.render_mode = "HTML"' in source
     assert 'job.html_content = rendered["html_content"]' in source

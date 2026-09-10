@@ -58,11 +58,45 @@ def render_invoice_html(profile, sales_invoice):
             "Cashier Sales Invoice print format must be for Sales Invoice"
         )
 
-    html_content = frappe.get_print(
-        "Sales Invoice",
-        sales_invoice.name,
+    rendered = frappe.call(
+        "frappe.www.printview.get_html_and_style",
+        doc="Sales Invoice",
+        name=sales_invoice.name,
         print_format=invoice_print_format,
-        as_pdf=False,
+        no_letterhead=0,
+    )
+
+    rendered_html = (
+        rendered.get("html")
+        or ""
+    )
+
+    if not str(
+        rendered_html
+        or ""
+    ).strip():
+        frappe.throw(
+            "Cashier rendered HTML body is empty"
+        )
+
+    rendered_style = (
+        rendered.get("style")
+        or ""
+    )
+
+    html_content = (
+        "<!doctype html>\n"
+        "<html>\n"
+        "<head>\n"
+        '<meta charset="utf-8">\n'
+        "<style>\n"
+        + rendered_style
+        + "\n</style>\n"
+        "</head>\n"
+        "<body>\n"
+        + rendered_html
+        + "\n</body>\n"
+        "</html>"
     )
     if not str(html_content or "").strip():
         frappe.throw("Cashier HTML snapshot is empty")
