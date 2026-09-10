@@ -65,6 +65,13 @@ def test_request_for_bill_submits_sales_order_creates_draft_invoice_and_auto_pri
     assert "sales_invoice.submit()" not in source
     assert '"Sales Invoice"' in source
     assert "frappe.get_print(" in source
+    assert "render_sales_invoice_html" in source
+    assert "as_pdf=False" in source
+    assert "as_pdf=True" not in source
+    assert 'job.render_mode = "HTML"' in source
+    assert 'job.html_content = rendered["html_content"]' in source
+    assert 'job.pdf_base64 = ""' in source
+    assert "encode_pdf_base64" not in source
     assert 'job.status = "Pending"' in source
     assert 'request_id = "bill-request|" + sales_order.name' in source
     assert '"duplicate": True' in source
@@ -101,10 +108,16 @@ def test_cashier_manual_print_requires_bill_request_and_reprints_draft_invoice()
     assert "get_linked_draft_invoice_names" in source
     assert '"Sales Invoice"' in source
     assert "frappe.get_print(" in source
+    assert "render_invoice_html" in source
+    assert "as_pdf=False" in source
+    assert "as_pdf=True" not in source
+    assert 'job.render_mode = "HTML"' in source
+    assert 'job.html_content = rendered["html_content"]' in source
     assert 'job.request_id = request_id' in source
     assert 'job.status = "Pending"' in source
     assert "custom_cashier_printer" in source
     assert "pdf_base64" in source
+    assert "encode_pdf_base64" not in source
     assert "publish_realtime" not in source
 
 
@@ -126,7 +139,11 @@ def test_cashier_print_bill_closed_reprint_copies_existing_snapshot():
     source = _read(SERVER_SCRIPTS / "cashier_print_bill.py")
     assert 'restaurant_status == "Closed"' in source
     assert "No printable cashier snapshot exists" in source
-    assert "previous_job.pdf_base64" in source
+    assert 'previous_mode = (previous_job.get("render_mode") or "PDF").strip().upper()' in source
+    assert 'if previous_mode == "HTML":' in source
+    assert 'previous_job.get("html_content")' in source
+    assert 'previous_job.get("pdf_base64")' in source
+    assert 'job.render_mode = "PDF"' in source
 
 
 def test_print_jobs_times_out_stale_processing_instead_of_requeueing():
@@ -141,6 +158,9 @@ def test_print_jobs_times_out_stale_processing_instead_of_requeueing():
     assert "claimed_by" in source
     assert "claimed_at" in source
     assert "attempt_count" in source
+    assert '"render_mode": (job.get("render_mode") or "PDF")' in source
+    assert '"html_content": job.get("html_content") or ""' in source
+    assert '"pdf_base64": job.pdf_base64' in source
 
 
 def test_print_job_result_is_owned_and_retry_safe():
@@ -218,3 +238,9 @@ def test_server_script_doc_describes_aliases_and_no_custom_app_requirement():
     assert "OurCity" in source
     assert "custom app installation" in source.lower()
     assert "not required" in source.lower()
+    assert "render_mode" in source
+    assert "html_content" in source
+    assert "pdf_base64" in source
+    assert "Microsoft Edge" in source
+    assert "wkhtmltopdf" in source
+    assert "Windows client first" in source
