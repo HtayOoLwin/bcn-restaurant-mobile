@@ -49,7 +49,7 @@ Waiter places first order
 -> confirmation dialog: Cancel / Confirm & Print
 -> Sales Order status becomes Billing and Sales Order is submitted
 -> one Draft Sales Invoice is created from the submitted Sales Order
--> Draft Sales Invoice PDF is queued automatically to BCN Print Job
+-> Draft Sales Invoice HTML snapshot is queued automatically to BCN Print Job
 -> table stays Billing and ordering is locked
 -> Cashier Payment becomes enabled
 -> Cashier confirms Cash / Kpay / Split payment
@@ -113,9 +113,17 @@ A retry after a completed payment detects the submitted linked Sales Invoice and
 
 ## Cashier printing
 
-The branch keeps the existing **BCN Print Job** / Windows printer client architecture.
+The branch keeps the existing **BCN Print Job** / Windows printer client architecture, but new cashier jobs store a browser-style HTML snapshot instead of a server wkhtmltopdf PDF.
 
-On Waiter Request for Bill, the PDF bytes stored in the initial BCN Print Job are rendered from the **Draft Sales Invoice**. The queue record continues to use the Sales Order as its document key so the existing Cashier status lookup, Windows worker and Closed reprint flow stay compatible.
+Required `BCN Print Job` fields for the dual-mode contract:
+
+```text
+render_mode   Select: PDF / HTML, default PDF
+html_content  Long Text
+pdf_base64    existing field, retained for legacy PDF jobs
+```
+
+A missing or blank `render_mode` is treated as `PDF` for backward compatibility. New Request-for-Bill and Billing reprint jobs use `render_mode = HTML` and store the rendered Draft Sales Invoice snapshot in `html_content`; `pdf_base64` remains blank for those jobs. The queue record continues to use the Sales Order as its document key so existing Cashier status lookup and reprint behavior remain compatible.
 
 Printer name comes from `DMT.custom_cashier_printer`.
 
@@ -124,7 +132,9 @@ For Draft Sales Invoice print layout:
 - if optional POS Profile field `custom_cashier_invoice_print_format` is configured, it must point to a Sales Invoice Print Format and that format is used;
 - otherwise Frappe's default Sales Invoice print rendering is used.
 
-`bcn_cashier_print_bill` is now a manual **reprint** endpoint for Billing/Closed orders. It no longer changes an Open Sales Order into Billing; the waiter Request-for-Bill API owns that transition.
+`bcn_print_jobs` sends `render_mode`, `html_content`, and legacy `pdf_base64` to the Windows client. HTML jobs are rendered locally with Microsoft Edge and then printed through the existing SumatraPDF path. This avoids the live site's wkhtmltopdf Myanmar shaping and 80mm sizing problem. If Edge rendering fails, the job is reported Failed; HTML mode does not silently fall back to wkhtmltopdf.
+
+`bcn_cashier_print_bill` remains a manual **reprint** endpoint for Billing/Closed orders. A Billing reprint renders a fresh HTML snapshot from the current Draft Sales Invoice. A Closed reprint copies the latest stored snapshot: HTML mode copies `html_content`, while legacy PDF mode copies `pdf_base64`. It no longer changes an Open Sales Order into Billing; the waiter Request-for-Bill API owns that transition.
 
 ## Deployment
 
@@ -132,7 +142,17 @@ Create or update each Frappe Server Script as **Script Type = API** and use the 
 
 These files are mirrors for source control and review. Editing a mirror file in GitHub does not automatically deploy it to OurCity; the corresponding Server Script on the site must be updated separately.
 
-For this billing change, make sure the live site has these aliases updated before end-to-end testing:
+For the HTML cashier printing change, deploy in this order:
+
+1. Add `BCN Print Job.render_mode` as Select with options `PDF` and `HTML`, default `PDF`.
+2. Add `BCN Print Job.html_content` as Long Text and keep the existing `pdf_base64` field.
+3. Deploy the **Windows client first** so it accepts both legacy PDF jobs and new HTML jobs.
+4. Deploy `bcn_print_jobs` so claims expose `render_mode`, `html_content`, and `pdf_base64`.
+5. Deploy `bcn_request_for_bill` so new automatic cashier jobs use HTML snapshots.
+6. Deploy `bcn_cashier_print_bill` so Billing and Closed reprints preserve the correct snapshot mode.
+7. Physically verify one fresh Billing print, one Closed reprint, and one legacy PDF job before considering the rollout complete.
+
+For the restaurant billing flow generally, make sure the live site has these aliases updated before end-to-end testing:
 
 ```text
 bcn_mobile_tables
@@ -144,3 +164,5 @@ bcn_cashier_print_bill
 bcn_print_jobs
 bcn_print_job_result
 ```
+
+Rollback is producer-only: switch cashier job creation back to PDF mode if required. Do not silently convert already-Pending HTML jobs into PDF jobs.
