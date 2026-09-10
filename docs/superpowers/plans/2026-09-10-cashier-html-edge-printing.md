@@ -2,80 +2,77 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make mobile cashier Sales Invoice receipts print with correct Myanmar shaping and 80mm spacing by storing a rendered HTML snapshot in `BCN Print Job` and rendering it locally with Microsoft Edge on the Windows printer client, while preserving old PDF jobs and waiter kitchen printing.
+**Goal:** Print mobile cashier Sales Invoice receipts with correct Myanmar shaping and 80mm spacing by storing HTML snapshots in `BCN Print Job` and rendering them locally with Microsoft Edge, while preserving legacy PDF jobs and waiter kitchen printing.
 
-**Architecture:** Frappe keeps owning Sales Invoice/Jinja rendering, but new cashier jobs call `frappe.get_print(..., as_pdf=False)` so the server stores the browser-style HTML instead of a wkhtmltopdf PDF. `bcn_print_jobs` sends the snapshot plus `render_mode`; the Windows client treats missing/`PDF` mode exactly as before and renders `HTML` mode through a dedicated Edge helper before sending the resulting PDF through the existing Sumatra print function. Closed-order reprints copy the stored snapshot instead of re-rendering.
+**Architecture:** New cashier jobs call `frappe.get_print(..., as_pdf=False)` so Frappe stores its browser-style rendered HTML instead of a wkhtmltopdf PDF. `bcn_print_jobs` returns `render_mode`, `html_content`, and legacy `pdf_base64`; the Windows client renders `HTML` mode through Edge and then uses the existing Sumatra print function, while missing/`PDF` mode keeps the old base64-PDF path. Closed-order reprints copy the stored snapshot instead of re-rendering.
 
-**Tech Stack:** ERPNext/Frappe v16 Server Script API, Python 3.10+, requests, Microsoft Edge headless, SumatraPDF, pytest, PowerShell.
+**Tech Stack:** ERPNext/Frappe v16 Server Script API, Python 3.10+, Microsoft Edge headless, SumatraPDF, pytest, PowerShell.
 
 **Spec:** `docs/superpowers/specs/2026-09-10-cashier-html-edge-printing-design.md`
 
 ## Global Constraints
 
-- Production target is `https://ourcity.s.frappe.cloud`.
-- Company is `Doh Myot Daw BBQ & Restaurant`; POS Profile is `DMT`; currency is `MMK`.
-- Live OurCity uses Server Scripts; GitHub mirror changes do **not** deploy automatically.
-- Do not change payment logic, order lifecycle semantics, or waiter kitchen queue behavior.
-- `queue_worker.py` must remain unchanged.
-- Keep existing `pdf_base64` support for old jobs; missing `render_mode` means `PDF`.
-- New cashier jobs use `render_mode = "HTML"` and `html_content`; do not silently fall back to wkhtmltopdf when Edge rendering fails.
-- No font files are added, bundled, or distributed. Myanmar rendering relies on Windows/Edge local fonts.
-- Frappe Server Scripts must avoid Python sequence unpacking because Safe Exec can raise `_unpack_sequence_`; use dict/index access instead.
-- Use test-first development and fresh verification before declaring success.
+- Production target: `https://ourcity.s.frappe.cloud`.
+- Company: `Doh Myot Daw BBQ & Restaurant`; POS Profile: `DMT`; Currency: `MMK`.
+- GitHub Server Script mirrors do not deploy live OurCity automatically.
+- Do not change payment logic, order lifecycle semantics, `queue_worker.py`, or waiter kitchen behavior.
+- Keep `pdf_base64`; missing `render_mode` means `PDF`.
+- New cashier jobs use `render_mode = "HTML"` plus `html_content`.
+- Do not silently fall back from HTML mode to wkhtmltopdf when Edge fails.
+- Do not add or distribute font files; use Windows/Edge local font support.
+- Frappe Server Scripts must avoid sequence unpacking because Safe Exec can raise `_unpack_sequence_`; use dict/index access.
+- Use RED-GREEN testing before each behavior change and fresh verification before completion.
 
 ---
 
-## File Structure
+## File Map
 
 ### `HtayOoLwin/local_printers_winapp` — branch `feature/kitchen-print-queue-polling`
 
-- Create `cashier_html.py` — cashier-only UTF-8 Edge HTML-to-PDF renderer. Keep this separate from `kitchen_ticket.py` so the proven waiter path is not refactored during this change.
-- Create `tests/test_cashier_html.py` — renderer timing, UTF-8/Myanmar preservation, and Edge failure tests.
-- Modify `printer_handlers.py` — dispatch `PDF` versus `HTML` jobs and route both through existing `print_pdf_silent()`.
-- Modify `tests/test_printer_handlers.py` — PDF backward compatibility, HTML path, missing HTML, invalid mode.
-- Modify `tests/test_polling_client.py` — prove an HTML job reaches `print_single_job()` unchanged and Edge/print exceptions become a `Failed` result.
-- Modify `README.md` — describe dual-mode cashier polling and `EDGE_PATH` requirement for HTML jobs.
-- Modify `tests/test_cashier_polling_docs.py` — enforce documentation/config contract.
-- Do not modify `queue_worker.py` or `kitchen_ticket.py`.
+- Create `cashier_html.py` — cashier-only UTF-8 Edge renderer.
+- Create `tests/test_cashier_html.py` — renderer behavior tests.
+- Modify `printer_handlers.py` — dual PDF/HTML dispatch.
+- Modify `tests/test_printer_handlers.py` — backward compatibility and HTML dispatch tests.
+- Modify `tests/test_polling_client.py` — HTML pass-through/failure contract.
+- Modify `README.md`, `tests/test_cashier_polling_docs.py` — deployment/config documentation.
+- Leave `queue_worker.py` and `kitchen_ticket.py` unchanged.
 
 ### `HtayOoLwin/bcn-restaurant-mobile` — branch `bcn-restaurant-mobile-without-kitchen-monitor`
 
-- Modify `server_scripts/mobile/request_for_bill.py` — create first cashier job from HTML snapshot.
-- Modify `server_scripts/mobile/cashier_print_bill.py` — Billing reprint creates fresh HTML snapshot; Closed reprint copies stored HTML/PDF mode and payload.
-- Modify `server_scripts/mobile/print_jobs.py` — include `render_mode` and `html_content` in claimed job response while preserving `pdf_base64`.
-- Modify `tests/test_ourcity_server_script_contract.py` — server-script HTML-mode and compatibility assertions.
-- Modify `tests/test_request_for_bill_merge_contract.py` — Request for Bill contract moves from PDF to HTML snapshot.
-- Modify `docs/server-script-mobile.md` — document `BCN Print Job.render_mode`, `html_content`, deployment order, and local Edge rendering.
+- Modify `server_scripts/mobile/request_for_bill.py` — first HTML snapshot job.
+- Modify `server_scripts/mobile/cashier_print_bill.py` — Billing fresh HTML reprint; Closed snapshot-copy compatibility.
+- Modify `server_scripts/mobile/print_jobs.py` — dual-mode claim payload.
+- Modify `tests/test_ourcity_server_script_contract.py` and `tests/test_request_for_bill_merge_contract.py` — source contracts.
+- Modify `docs/server-script-mobile.md` — live fields/deployment order.
 
 ---
 
-### Task 1: Add the cashier-only Edge renderer on Windows
+### Task 1: Add the cashier Edge renderer
 
 **Files:**
 - Create: `cashier_html.py`
 - Create: `tests/test_cashier_html.py`
 
 **Interfaces:**
-- Consumes: rendered HTML string and configured Edge executable path.
-- Produces: `render_html_to_pdf_edge(html: str, edge_path: str, timeout_seconds: float = 15.0) -> str`, returning a non-empty local PDF path or raising an exception.
+- Produces `render_html_to_pdf_edge(html: str, edge_path: str, timeout_seconds: float = 15.0) -> str`.
 
-- [ ] **Step 1: Write failing renderer tests**
+- [ ] **Step 1: Write the failing tests**
 
-Create `tests/test_cashier_html.py` with these behaviors:
+Create `tests/test_cashier_html.py`:
 
 ```python
-import os
 import subprocess
 import threading
 import time
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import pytest
 
 import cashier_html
 
 
-def test_edge_renderer_writes_utf8_html_and_waits_for_nonempty_pdf(tmp_path, monkeypatch):
+def test_edge_renderer_preserves_utf8_and_waits_for_pdf(tmp_path, monkeypatch):
     edge = tmp_path / "msedge.exe"
     edge.write_text("edge", encoding="utf-8")
     seen = {}
@@ -83,28 +80,23 @@ def test_edge_renderer_writes_utf8_html_and_waits_for_nonempty_pdf(tmp_path, mon
 
     def fake_run(command, check):
         html_uri = command[-1]
-        html_path = Path(html_uri.removeprefix("file:///"))
-        if os.name == "nt":
-            html_path = Path(str(html_path).replace("/", "\\"))
+        parsed = urlparse(html_uri)
+        html_path = Path(unquote(parsed.path.lstrip("/")))
         seen["html"] = html_path.read_text(encoding="utf-8")
-
         pdf_arg = next(x for x in command if x.startswith("--print-to-pdf="))
-        pdf_path = pdf_arg.split("=", 1)[1]
+        pdf_path = Path(pdf_arg.split("=", 1)[1])
 
         def delayed_write():
             time.sleep(0.08)
-            Path(pdf_path).write_bytes(b"%PDF-cashier-edge")
+            pdf_path.write_bytes(b"%PDF-cashier-edge")
 
         thread = threading.Thread(target=delayed_write)
         thread.start()
         writers.append(thread)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-
     html = "<html><meta charset='utf-8'><body>မြန်မာ စမ်းသပ်</body></html>"
-    pdf_path = cashier_html.render_html_to_pdf_edge(
-        html, str(edge), timeout_seconds=2
-    )
+    pdf_path = cashier_html.render_html_to_pdf_edge(html, str(edge), timeout_seconds=2)
 
     for thread in writers:
         thread.join()
@@ -122,29 +114,24 @@ def test_edge_renderer_raises_when_pdf_never_appears(tmp_path, monkeypatch):
     edge = tmp_path / "msedge.exe"
     edge.write_text("edge", encoding="utf-8")
     monkeypatch.setattr(subprocess, "run", lambda command, check: None)
-
     with pytest.raises(RuntimeError, match="Microsoft Edge did not create the cashier PDF"):
         cashier_html.render_html_to_pdf_edge(
-            "<html><body>bill</body></html>",
-            str(edge),
-            timeout_seconds=0.05,
+            "<html><body>bill</body></html>", str(edge), timeout_seconds=0.05
         )
 ```
 
-- [ ] **Step 2: Run only the new tests and verify RED**
-
-Run on Windows:
+- [ ] **Step 2: Verify RED**
 
 ```powershell
 cd C:\Users\htayoolwin\local_printers_winapp_code
 .\.venv\Scripts\python.exe -m pytest tests\test_cashier_html.py -q
 ```
 
-Expected: collection/import failure because `cashier_html.py` does not exist yet.
+Expected: import/collection failure because `cashier_html.py` does not exist.
 
-- [ ] **Step 3: Implement the dedicated renderer**
+- [ ] **Step 3: Implement the minimal renderer**
 
-Create `cashier_html.py` using the already-proven kitchen Edge pattern, without importing or changing `kitchen_ticket.py`:
+Create `cashier_html.py`:
 
 ```python
 from __future__ import annotations
@@ -157,14 +144,9 @@ import time
 from pathlib import Path
 
 
-def render_html_to_pdf_edge(
-    html: str,
-    edge_path: str,
-    timeout_seconds: float = 15.0,
-) -> str:
+def render_html_to_pdf_edge(html: str, edge_path: str, timeout_seconds: float = 15.0) -> str:
     if not str(html or "").strip():
         raise ValueError("Cashier HTML is empty")
-
     edge_path = str(edge_path or "").strip()
     if not edge_path:
         raise ValueError("EDGE_PATH is required for HTML cashier printing")
@@ -199,49 +181,57 @@ def render_html_to_pdf_edge(
         raise
 
     shutil.rmtree(work_dir, ignore_errors=True)
-    raise RuntimeError(
-        "Microsoft Edge did not create the cashier PDF before timeout"
-    )
+    raise RuntimeError("Microsoft Edge did not create the cashier PDF before timeout")
 ```
 
-- [ ] **Step 4: Run the renderer tests and verify GREEN**
+- [ ] **Step 4: Verify GREEN and commit**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_cashier_html.py -q
-```
-
-Expected: all tests pass.
-
-- [ ] **Step 5: Commit Task 1 in the Windows repo**
-
-```powershell
 git add cashier_html.py tests\test_cashier_html.py
 git commit -m "feat: add cashier Edge HTML renderer"
 ```
 
 ---
 
-### Task 2: Make the Windows print handler dual-mode without breaking PDF jobs
+### Task 2: Make `print_single_job()` dual-mode
 
 **Files:**
 - Modify: `printer_handlers.py`
 - Modify: `tests/test_printer_handlers.py`
 
 **Interfaces:**
-- Consumes: job dict containing `render_mode`, `html_content`, `pdf_base64`, `printer_name`; config containing `EDGE_PATH` and `SUMATRA_PDF_PATH`.
-- Produces: existing `print_single_job(job, config_data) -> str` contract; missing `render_mode` remains PDF.
+- Missing/`PDF` mode uses `pdf_base64`; `HTML` mode uses `html_content` and `EDGE_PATH`; both end at existing `print_pdf_silent()`.
 
-- [ ] **Step 1: Add failing tests for dual-mode dispatch**
+- [ ] **Step 1: Add failing tests**
 
-Append tests that require:
+Append to `tests/test_printer_handlers.py`:
 
 ```python
 def test_print_single_job_missing_render_mode_keeps_pdf_path(monkeypatch, tmp_path):
-    # Existing PDF behavior remains valid when render_mode is absent.
-    ...
+    calls = []
+    monkeypatch.setattr(
+        printer_handlers,
+        "save_pdf_from_base64",
+        lambda value: calls.append(("decode", value)) or str(tmp_path / "bill.pdf"),
+    )
+    monkeypatch.setattr(
+        printer_handlers,
+        "print_pdf_silent",
+        lambda pdf, printer, path, **kwargs: calls.append(
+            ("print", pdf, printer, path, kwargs)
+        ),
+    )
+    result = printer_handlers.print_single_job(
+        {"pdf_base64": "AAA=", "printer_name": "Kitchen Printer"},
+        {"SUMATRA_PDF_PATH": "SumatraPDF.exe"},
+    )
+    assert result == "Kitchen Printer"
+    assert calls[0] == ("decode", "AAA=")
+    assert calls[1][0] == "print"
 
 
-def test_print_single_job_html_mode_renders_edge_then_prints(monkeypatch, tmp_path):
+def test_print_single_job_html_mode_renders_then_prints(monkeypatch, tmp_path):
     rendered = tmp_path / "cashier.pdf"
     rendered.write_bytes(b"%PDF-edge")
     calls = []
@@ -257,21 +247,16 @@ def test_print_single_job_html_mode_renders_edge_then_prints(monkeypatch, tmp_pa
             ("print", pdf, printer, path, kwargs)
         ),
     )
-
     result = printer_handlers.print_single_job(
         {
             "render_mode": "HTML",
             "html_content": "<html><body>မြန်မာ</body></html>",
             "printer_name": "Kitchen Printer",
         },
-        {
-            "EDGE_PATH": r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-            "SUMATRA_PDF_PATH": "SumatraPDF.exe",
-        },
+        {"EDGE_PATH": "msedge.exe", "SUMATRA_PDF_PATH": "SumatraPDF.exe"},
     )
-
     assert result == "Kitchen Printer"
-    assert calls[0][0] == "render"
+    assert calls[0] == ("render", "<html><body>မြန်မာ</body></html>", "msedge.exe")
     assert calls[1][0] == "print"
 
 
@@ -279,37 +264,34 @@ def test_print_single_job_html_mode_requires_html_content():
     with pytest.raises(ValueError, match="HTML print job has no html_content"):
         printer_handlers.print_single_job(
             {"render_mode": "HTML", "printer_name": "Kitchen Printer"},
-            {"EDGE_PATH": "msedge.exe", "SUMATRA_PDF_PATH": "SumatraPDF.exe"},
+            {"EDGE_PATH": "msedge.exe"},
         )
 
 
 def test_print_single_job_rejects_unknown_render_mode():
     with pytest.raises(ValueError, match="Unsupported print render_mode"):
         printer_handlers.print_single_job(
-            {"render_mode": "RAW", "printer_name": "Kitchen Printer"},
-            {},
+            {"render_mode": "RAW", "printer_name": "Kitchen Printer"}, {}
         )
 ```
 
-Replace the `...` in the actual test with the same explicit `save_pdf_from_base64` and `print_pdf_silent` assertions already used by the existing success test; do not leave placeholders in committed code.
-
-- [ ] **Step 2: Run targeted tests and verify RED**
+- [ ] **Step 2: Verify RED**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_printer_handlers.py -q
 ```
 
-Expected: HTML-mode tests fail because `printer_handlers` does not yet dispatch by `render_mode`.
+Expected: HTML tests fail because current handler requires `pdf_base64`.
 
-- [ ] **Step 3: Implement minimal dual-mode dispatch**
+- [ ] **Step 3: Implement mode dispatch**
 
-At module top:
+Add:
 
 ```python
 from cashier_html import render_html_to_pdf_edge
 ```
 
-Refactor only `print_single_job()` so the mode selection is explicit:
+Replace the start of `print_single_job()` with:
 
 ```python
 render_mode = str(job.get("render_mode") or "PDF").strip().upper()
@@ -336,39 +318,28 @@ else:
     raise ValueError("Unsupported print render_mode: " + render_mode)
 ```
 
-Keep the existing common Sumatra block unchanged after `pdf_path` is resolved. Do not change `print_pdf_silent()` or its `noscale` setting in this task.
+Keep the existing common Sumatra block and `-print-settings "noscale"` unchanged.
 
-- [ ] **Step 4: Run handler tests and full Windows tests**
+- [ ] **Step 4: Verify GREEN/full Windows regression and commit**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_printer_handlers.py tests\test_cashier_html.py -q
 .\.venv\Scripts\python.exe -m pytest tests -q
-```
-
-Expected: both targeted and full suite pass.
-
-- [ ] **Step 5: Commit Task 2 in the Windows repo**
-
-```powershell
 git add printer_handlers.py tests\test_printer_handlers.py
 git commit -m "feat: print cashier HTML jobs through Edge"
 ```
 
 ---
 
-### Task 3: Prove polling passes HTML jobs unchanged and reports Edge failures
+### Task 3: Lock the polling contract and Windows docs
 
 **Files:**
 - Modify: `tests/test_polling_client.py`
-- Production file `polling_client.py`: no change expected unless the tests expose a contract bug.
+- Modify: `README.md`
+- Modify: `tests/test_cashier_polling_docs.py`
+- `polling_client.py` should remain unchanged if tests pass.
 
-**Interfaces:**
-- Consumes: claimed job dict returned by `bcn_print_jobs`.
-- Produces: `PendingResult(job_name, "Printed"|"Failed", error_message)` exactly once per physical attempt.
-
-- [ ] **Step 1: Add the HTML pass-through and failure tests**
-
-Add:
+- [ ] **Step 1: Add HTML pass-through/failure tests**
 
 ```python
 def test_process_claimed_html_job_passes_snapshot_unchanged(monkeypatch):
@@ -386,9 +357,7 @@ def test_process_claimed_html_job_passes_snapshot_unchanged(monkeypatch):
         "print_single_job",
         lambda value, cfg: seen.append(value.copy()) or "Kitchen Printer",
     )
-
     result = polling_client.process_claimed_job(job, _cfg())
-
     assert seen == [job]
     assert result == polling_client.PendingResult(
         "BCN-PRINT-JOB-HTML-00001", "Printed", ""
@@ -397,14 +366,9 @@ def test_process_claimed_html_job_passes_snapshot_unchanged(monkeypatch):
 
 def test_process_claimed_html_job_reports_edge_failure(monkeypatch):
     polling_client = _module()
-    monkeypatch.setattr(
-        polling_client,
-        "print_single_job",
-        lambda job, cfg: (_ for _ in ()).throw(
-            RuntimeError("Microsoft Edge did not create the cashier PDF before timeout")
-        ),
-    )
-
+    def fail(job, cfg):
+        raise RuntimeError("Microsoft Edge did not create the cashier PDF before timeout")
+    monkeypatch.setattr(polling_client, "print_single_job", fail)
     result = polling_client.process_claimed_job(
         {
             "name": "BCN-PRINT-JOB-HTML-00002",
@@ -414,40 +378,21 @@ def test_process_claimed_html_job_reports_edge_failure(monkeypatch):
         },
         _cfg(),
     )
-
     assert result.status == "Failed"
     assert "Microsoft Edge did not create the cashier PDF" in result.error_message
 ```
 
-- [ ] **Step 2: Run the tests**
+- [ ] **Step 2: Run polling tests**
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_polling_client.py -q
 ```
 
-Expected: they should pass without production change because `process_claimed_job()` already passes the whole job dict to `print_single_job()` and captures exceptions. If they fail, make only the smallest production change needed and rerun RED/GREEN before committing.
+Expected: pass without production change because `process_claimed_job()` already forwards the full job and captures exceptions. If not, stop and debug the exact failing contract before editing production code.
 
-- [ ] **Step 3: Commit the contract tests**
+- [ ] **Step 3: Make the documentation test RED, then update README**
 
-```powershell
-git add tests\test_polling_client.py
-git commit -m "test: cover cashier HTML polling contract"
-```
-
----
-
-### Task 4: Update Windows documentation before server begins producing HTML jobs
-
-**Files:**
-- Modify: `README.md`
-- Modify: `tests/test_cashier_polling_docs.py`
-
-**Interfaces:**
-- Documents that `EDGE_PATH` is required only for HTML cashier jobs and that PDF jobs remain supported.
-
-- [ ] **Step 1: Add failing documentation assertions**
-
-Extend `test_cashier_polling_docs.py` with exact expectations:
+Add to `tests/test_cashier_polling_docs.py`:
 
 ```python
 assert "EDGE_PATH" in cfg
@@ -457,50 +402,33 @@ assert "pdf_base64" in source
 assert "Microsoft Edge" in source
 ```
 
-- [ ] **Step 2: Run and verify RED**
+Run:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\test_cashier_polling_docs.py -q
 ```
 
-Expected: README-specific assertions fail until dual-mode flow is documented.
-
-- [ ] **Step 3: Update README**
-
-Change the Cashier section to show:
+Then update README to show both flows explicitly:
 
 ```text
-New cashier job:
-Draft Sales Invoice -> HTML snapshot -> BCN Print Job render_mode=HTML
--> socket_app.py -> Edge headless -> local PDF -> Sumatra -> printer
-
-Old job:
-pdf_base64 -> local PDF -> Sumatra -> printer
+HTML: Draft Sales Invoice -> HTML snapshot -> BCN Print Job -> Edge -> local PDF -> Sumatra -> printer
+PDF:  pdf_base64 -> local PDF -> Sumatra -> printer
 ```
 
-State explicitly that `EDGE_PATH` must point to the installed Microsoft Edge executable for HTML cashier jobs and that `queue_worker.py` remains a separate waiter-kitchen process.
+State `EDGE_PATH` is required for HTML jobs and `queue_worker.py` remains separate.
 
-- [ ] **Step 4: Run docs test and compile checks**
+- [ ] **Step 4: Verify and commit**
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\test_cashier_polling_docs.py -q
+.\.venv\Scripts\python.exe -m pytest tests -q
 .\.venv\Scripts\python.exe -m py_compile cashier_html.py polling_client.py printer_handlers.py socket_app.py
+git add tests\test_polling_client.py README.md tests\test_cashier_polling_docs.py
+git commit -m "test: cover dual-mode cashier polling"
 ```
-
-Expected: pass.
-
-- [ ] **Step 5: Commit Task 4**
-
-```powershell
-git add README.md tests\test_cashier_polling_docs.py
-git commit -m "docs: describe dual-mode cashier printing"
-```
-
-At this checkpoint the Windows app is safe to deploy first: it accepts both the old PDF contract and the future HTML contract.
 
 ---
 
-### Task 5: Change Request for Bill from server PDF snapshot to HTML snapshot
+### Task 4: Convert Request for Bill to an HTML snapshot
 
 **Files:**
 - Modify: `tests/test_ourcity_server_script_contract.py`
@@ -508,38 +436,36 @@ At this checkpoint the Windows app is safe to deploy first: it accepts both the 
 - Modify: `server_scripts/mobile/request_for_bill.py`
 
 **Interfaces:**
-- Consumes: `DMT.custom_cashier_invoice_print_format` and the created Draft Sales Invoice.
-- Produces: a Pending `BCN Print Job` with `render_mode = "HTML"`, `html_content` from `frappe.get_print(..., as_pdf=False)`, and the same deterministic `request_id = "bill-request|" + sales_order.name`.
+- New initial job keeps deterministic `bill-request|<Sales Order>` idempotency and stores `render_mode = HTML`, `html_content`, and the selected Sales Invoice Print Format.
 
-- [ ] **Step 1: Change tests first**
+- [ ] **Step 1: Make source-contract tests RED**
 
-Update the old PDF assertions so Request for Bill now requires all of these strings:
+Change Request-for-Bill assertions to:
 
 ```python
 assert "render_sales_invoice_html" in source
 assert "as_pdf=False" in source
 assert 'job.render_mode = "HTML"' in source
-assert "job.html_content = rendered[\"html_content\"]" in source
+assert 'job.html_content = rendered["html_content"]' in source
 assert 'request_id = "bill-request|" + sales_order.name' in source
 assert "encode_pdf_base64" not in source
 assert "as_pdf=True" not in source
 ```
 
-Keep the existing assertions for Sales Order submit, Draft Sales Invoice creation, `update_stock = 1`, Pending status, duplicate retry behavior, and no explicit commit/rollback.
+Keep existing SO submit, Draft SI creation, `update_stock = 1`, Pending, duplicate, and no explicit commit/rollback assertions.
 
-- [ ] **Step 2: Run targeted server contract tests and verify RED**
-
-From `C:\Users\htayoolwin\bcn-restaurant-mobile`:
+Run:
 
 ```powershell
+cd C:\Users\htayoolwin\bcn-restaurant-mobile
 python -m pytest tests\test_ourcity_server_script_contract.py tests\test_request_for_bill_merge_contract.py -q
 ```
 
-Expected: Request-for-Bill HTML assertions fail against the current PDF implementation.
+Expected: RED against current PDF implementation.
 
-- [ ] **Step 3: Replace the PDF helper with a Safe-Exec-friendly HTML helper**
+- [ ] **Step 2: Implement Safe-Exec-friendly HTML rendering**
 
-Use this shape in `request_for_bill.py`:
+Replace the PDF encoder/helper with:
 
 ```python
 def render_sales_invoice_html(profile, sales_invoice):
@@ -556,15 +482,9 @@ def render_sales_invoice_html(profile, sales_invoice):
         as_dict=True,
     )
     if not print_format_row:
-        frappe.throw(
-            "Cashier Sales Invoice print format not found: "
-            + invoice_print_format
-        )
+        frappe.throw("Cashier Sales Invoice print format not found: " + invoice_print_format)
     if print_format_row.disabled:
-        frappe.throw(
-            "Cashier Sales Invoice print format is disabled: "
-            + invoice_print_format
-        )
+        frappe.throw("Cashier Sales Invoice print format is disabled: " + invoice_print_format)
     if print_format_row.doc_type != "Sales Invoice":
         frappe.throw("Cashier Sales Invoice print format must be for Sales Invoice")
 
@@ -576,16 +496,10 @@ def render_sales_invoice_html(profile, sales_invoice):
     )
     if not html_content:
         frappe.throw("Cashier HTML snapshot could not be rendered")
-
-    return {
-        "html_content": html_content,
-        "print_format": invoice_print_format,
-    }
+    return {"html_content": html_content, "print_format": invoice_print_format}
 ```
 
-`frappe.get_print(..., as_pdf=False)` uses Frappe's printview HTML path, avoiding wkhtmltopdf while retaining the Jinja Print Format. Do not use `pdf, print_format = ...` or any other sequence unpacking.
-
-In `ensure_print_job()`:
+Inside `ensure_print_job()` use dict access only:
 
 ```python
 rendered = render_sales_invoice_html(profile, sales_invoice)
@@ -604,74 +518,48 @@ job.requested_at = frappe.utils.now()
 job.insert(ignore_permissions=True)
 ```
 
-Remove the PDF encoder and all new-job `pdf_base64` generation from this script. Existing deterministic duplicate lookup remains unchanged.
+Remove PDF base64 generation from new Request-for-Bill jobs.
 
-- [ ] **Step 4: Run targeted tests and verify GREEN**
+- [ ] **Step 3: Verify GREEN and commit**
 
 ```powershell
 python -m pytest tests\test_ourcity_server_script_contract.py tests\test_request_for_bill_merge_contract.py -q
-```
-
-Expected: pass.
-
-- [ ] **Step 5: Commit Task 5 in the mobile repo**
-
-```powershell
 git add server_scripts\mobile\request_for_bill.py tests\test_ourcity_server_script_contract.py tests\test_request_for_bill_merge_contract.py
 git commit -m "feat: queue cashier bill HTML snapshots"
 ```
 
 ---
 
-### Task 6: Make cashier reprint preserve HTML or legacy PDF snapshots
+### Task 5: Make cashier reprint snapshot-compatible
 
 **Files:**
 - Modify: `tests/test_ourcity_server_script_contract.py`
 - Modify: `server_scripts/mobile/cashier_print_bill.py`
 
-**Interfaces:**
-- Billing order: render a fresh current Draft Sales Invoice HTML snapshot.
-- Closed order: copy latest stored mode and corresponding payload; do not re-render.
-
-- [ ] **Step 1: Add failing reprint contract assertions**
-
-Require the source to contain:
+- [ ] **Step 1: Add RED assertions**
 
 ```python
 assert "render_invoice_html" in source
 assert "as_pdf=False" in source
 assert 'job.render_mode = "HTML"' in source
 assert "job.html_content" in source
-assert 'previous_mode = (previous_job.get("render_mode") or "PDF").strip().upper()' in source
+assert 'previous_job.get("render_mode") or "PDF"' in source
 assert 'if previous_mode == "HTML":' in source
-assert "previous_job.html_content" in source
-assert "previous_job.pdf_base64" in source
+assert "previous_job.get(\"html_content\")" in source
+assert "previous_job.get(\"pdf_base64\")" in source
 assert 'job.render_mode = "PDF"' in source
 ```
 
-Also retain existing request-id serialization/idempotency and `Open` rejection assertions.
+Run `python -m pytest tests\test_ourcity_server_script_contract.py -q` and confirm failure.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Implement Billing fresh HTML render**
 
-```powershell
-python -m pytest tests\test_ourcity_server_script_contract.py -q
-```
+Use the same Print Format validation as Task 4, named `render_invoice_html()`, returning a dict and calling `frappe.get_print(..., as_pdf=False)`. Billing reprint sets `render_mode = "HTML"` and `html_content`.
 
-Expected: reprint HTML compatibility assertions fail.
-
-- [ ] **Step 3: Implement Billing fresh HTML mode**
-
-Use the same validation/rendering logic as Task 5, named `render_invoice_html()`, returning a dict instead of a tuple. Billing job creation sets `render_mode = "HTML"`, `html_content`, and no new PDF payload.
-
-- [ ] **Step 4: Implement Closed snapshot-copy branch**
-
-After loading `previous_job`:
+- [ ] **Step 3: Implement Closed snapshot copy exactly**
 
 ```python
-previous_mode = (
-    previous_job.get("render_mode") or "PDF"
-).strip().upper()
-
+previous_mode = (previous_job.get("render_mode") or "PDF").strip().upper()
 job = frappe.new_doc("BCN Print Job")
 job.request_id = request_id
 job.document_type = "Sales Order"
@@ -695,9 +583,9 @@ else:
     frappe.throw("Stored cashier snapshot has unsupported render mode")
 ```
 
-Then keep the existing Pending/requested fields and insert. This is the only allowed legacy fallback: a job explicitly stored as PDF remains PDF. Never convert an HTML job to wkhtmltopdf.
+Keep the existing request-id lock/idempotency and Pending fields unchanged.
 
-- [ ] **Step 5: Run tests and commit**
+- [ ] **Step 4: Verify and commit**
 
 ```powershell
 python -m pytest tests\test_ourcity_server_script_contract.py -q
@@ -707,19 +595,15 @@ git commit -m "feat: preserve cashier reprint snapshot mode"
 
 ---
 
-### Task 7: Extend `bcn_print_jobs` claim response for dual-mode payloads
+### Task 6: Extend the print-job claim response
 
 **Files:**
 - Modify: `tests/test_ourcity_server_script_contract.py`
 - Modify: `server_scripts/mobile/print_jobs.py`
 
-**Interfaces:**
-- Produces claimed `job` JSON with normalized `render_mode`, `html_content`, and legacy `pdf_base64`.
-
-- [ ] **Step 1: Add failing claim-response assertions**
+- [ ] **Step 1: Add RED assertions**
 
 ```python
-source = _read(SERVER_SCRIPTS / "print_jobs.py")
 assert '"render_mode"' in source
 assert '"html_content"' in source
 assert 'job.get("render_mode") or "PDF"' in source
@@ -727,29 +611,21 @@ assert 'job.get("html_content") or ""' in source
 assert 'job.get("pdf_base64") or ""' in source
 ```
 
-Keep stale Processing timeout, ownership, lock, and attempt-count assertions unchanged.
+Run `python -m pytest tests\test_ourcity_server_script_contract.py -q` and confirm failure.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Add payload fields without changing claim semantics**
 
-```powershell
-python -m pytest tests\test_ourcity_server_script_contract.py -q
-```
-
-- [ ] **Step 3: Extend the response only; do not change claim semantics**
-
-Inside the claimed job response, use:
+Inside the claimed job response add:
 
 ```python
-"render_mode": (
-    job.get("render_mode") or "PDF"
-).strip().upper(),
+"render_mode": (job.get("render_mode") or "PDF").strip().upper(),
 "html_content": job.get("html_content") or "",
 "pdf_base64": job.get("pdf_base64") or "",
 ```
 
-Do not alter Pending selection, `FOR UPDATE`, stale timeout, printer matching, or Processing transition.
+Do not change Pending selection, printer matching, `FOR UPDATE`, stale timeout, Processing transition, or attempt counting.
 
-- [ ] **Step 4: Run tests and commit**
+- [ ] **Step 3: Verify and commit**
 
 ```powershell
 python -m pytest tests\test_ourcity_server_script_contract.py -q
@@ -759,205 +635,101 @@ git commit -m "feat: expose cashier HTML print payloads"
 
 ---
 
-### Task 8: Update source-control documentation for the live data fields and deployment order
+### Task 7: Document and create the live fields, then deploy in safe order
 
 **Files:**
 - Modify: `docs/server-script-mobile.md`
 - Modify: `tests/test_ourcity_server_script_contract.py`
+- Live OurCity metadata and Server Scripts.
 
-**Interfaces:**
-- Documents live configuration required before HTML-producing server scripts are enabled.
+- [ ] **Step 1: Make documentation contract RED**
 
-- [ ] **Step 1: Add failing documentation assertions**
+Require `docs/server-script-mobile.md` to contain `render_mode`, `html_content`, `Long Text`, `PDF`, `HTML`, and `EDGE_PATH`; run the contract test and confirm RED.
 
-Require the doc to contain:
-
-```python
-assert "render_mode" in source
-assert "html_content" in source
-assert "Long Text" in source
-assert "PDF" in source
-assert "HTML" in source
-assert "EDGE_PATH" in source
-```
-
-- [ ] **Step 2: Run and verify RED**
-
-```powershell
-python -m pytest tests\test_ourcity_server_script_contract.py -q
-```
-
-- [ ] **Step 3: Document the exact live custom fields**
-
-Add:
+- [ ] **Step 2: Document exact live metadata**
 
 ```text
 BCN Print Job
-- render_mode: Select; options PDF / HTML; default PDF
-- html_content: Long Text
-- pdf_base64: existing field, retained for legacy jobs
+- render_mode: Select; options PDF / HTML; default PDF; not required
+- html_content: Long Text; not required
+- pdf_base64: existing field retained for legacy jobs
 ```
 
-Document the safe deployment order: fields -> Windows dual-mode client -> `bcn_print_jobs` -> HTML producers -> physical test. State that source mirrors do not deploy live automatically.
+Document deployment order: fields -> Windows dual-mode client -> `bcn_print_jobs` -> `bcn_request_for_bill` -> `bcn_cashier_print_bill` -> physical tests.
 
-- [ ] **Step 4: Run full mobile-repo fast tests**
+- [ ] **Step 3: Verify mobile-repo tests and commit docs**
 
 ```powershell
 python -m pytest tests -q
-```
-
-Expected: all fast tests pass.
-
-- [ ] **Step 5: Commit Task 8**
-
-```powershell
 git add docs\server-script-mobile.md tests\test_ourcity_server_script_contract.py
 git commit -m "docs: describe cashier HTML print deployment"
 ```
 
----
+- [ ] **Step 4: Create the live fields without touching existing data**
 
-### Task 9: Preflight and deploy live `BCN Print Job` fields safely
+Use Customize Form or authenticated Custom Field REST creation. Create only missing fields with the exact definitions above. Do not delete/rename `pdf_base64`; do not rewrite existing queue rows.
 
-**Files:**
-- Live OurCity metadata only; no repository file mutation in this task.
-
-**Interfaces:**
-- Produces live fields required by the server scripts; existing records remain valid as PDF jobs.
-
-- [ ] **Step 1: Inspect current field metadata before mutation**
-
-Using the Windows `config.json` token, query `DocType/BCN Print Job` and verify whether `render_mode`, `html_content`, and `pdf_base64` exist and whether `pdf_base64` is required. Do not print or log API secrets.
-
-- [ ] **Step 2: Create missing fields only**
-
-In Customize Form or via authenticated `Custom Field` REST calls, create:
-
-```text
-DT: BCN Print Job
-fieldname: render_mode
-label: Render Mode
-fieldtype: Select
-options: PDF\nHTML
-default: PDF
-reqd: 0
-
-DT: BCN Print Job
-fieldname: html_content
-label: HTML Content
-fieldtype: Long Text
-reqd: 0
-```
-
-Do not delete or rename `pdf_base64` and do not modify existing queue rows.
-
-- [ ] **Step 3: Re-read metadata and verify exact field definitions**
-
-Expected: both fields exist; `render_mode` allows `PDF` and `HTML`; old jobs with blank `render_mode` remain interpretable as PDF by code.
-
----
-
-### Task 10: Deploy the Windows client before enabling HTML-producing server scripts
-
-**Files:**
-- Local checkout: `C:\Users\htayoolwin\local_printers_winapp_code`
-
-- [ ] **Step 1: Pull the approved Windows branch and verify config**
+- [ ] **Step 5: Deploy Windows first and verify it**
 
 ```powershell
 cd C:\Users\htayoolwin\local_printers_winapp_code
 git status
 git pull
-```
-
-Preserve existing `.venv`, local config backups, and unrelated untracked files. Verify `config.json` contains valid `EDGE_PATH` and `SUMATRA_PDF_PATH` without displaying credentials.
-
-- [ ] **Step 2: Run fresh verification**
-
-```powershell
 .\.venv\Scripts\python.exe -m pytest tests -q
 .\.venv\Scripts\python.exe -m py_compile cashier_html.py polling_client.py printer_handlers.py socket_app.py
 ```
 
-Do not claim success unless these commands actually pass in the local environment.
+Preserve `.venv`, local config backups, and unrelated untracked files. Restart `socket_app.py`; keep `queue_worker.py` running separately.
 
-- [ ] **Step 3: Restart only cashier polling**
+- [ ] **Step 6: Deploy live Server Scripts in this order**
 
-Stop the existing `socket_app.py` process and start:
+1. Replace live `bcn_print_jobs` with the full reviewed mirror; smoke-test one legacy PDF job.
+2. Replace live `bcn_request_for_bill` with the full reviewed mirror.
+3. Replace live `bcn_cashier_print_bill` with the full reviewed mirror.
 
-```powershell
-.\.venv\Scripts\python.exe socket_app.py
-```
-
-Keep `queue_worker.py` running separately; do not change its files or behavior.
+Never paste partial snippets into live Server Scripts.
 
 ---
 
-### Task 11: Deploy the three live Server Scripts in safe order
+### Task 8: Physical E2E verification and rollback gate
 
-**Files:**
-- Live API Server Scripts corresponding to repository mirrors.
+**Files:** none unless a reproducible defect is found; any defect requires a new failing test before source edits.
 
-- [ ] **Step 1: Deploy `bcn_print_jobs` first**
+- [ ] **Step 1: Fresh automatic bill**
 
-Copy the reviewed `server_scripts/mobile/print_jobs.py` mirror into the enabled live API Server Script for `bcn_print_jobs`. At this point old PDF producers still work because the Windows client defaults missing/old modes to PDF.
-
-- [ ] **Step 2: Smoke-test one existing PDF-mode job**
-
-Confirm the updated claim endpoint still returns/prints an old PDF job and can reach `Printed` through the existing Sumatra path. Do not proceed if legacy PDF printing regresses.
-
-- [ ] **Step 3: Deploy `bcn_request_for_bill`**
-
-Copy the full reviewed `server_scripts/mobile/request_for_bill.py` into the live API Server Script. Do not paste partial snippets.
-
-- [ ] **Step 4: Deploy `bcn_cashier_print_bill`**
-
-Copy the full reviewed `server_scripts/mobile/cashier_print_bill.py` into the live API Server Script. Do not paste partial snippets.
-
----
-
-### Task 12: End-to-end physical verification and rollback gate
-
-**Files:**
-- No new code unless a reproducible defect is found; any defect starts a new RED test before source changes.
-
-- [ ] **Step 1: Fresh Billing-order automatic print**
-
-Create a brand-new waiter order containing at least one Myanmar item name, then Request for Bill. Verify exactly one new `BCN Print Job` has:
+Create a brand-new waiter order containing at least one Myanmar item name, Request for Bill, and verify exactly one new job with:
 
 ```text
 render_mode = HTML
 html_content = non-empty
-status transitions Pending -> Processing -> Printed
+Pending -> Processing -> Printed
 ```
 
-Verify physical paper has correct Myanmar shaping and acceptable 80mm top/left/right spacing.
+Verify physical Myanmar shaping and 80mm top/left/right spacing.
 
 - [ ] **Step 2: Billing reprint**
 
-While the order remains Billing, press Reprint once. Verify exactly one new request/job, fresh HTML snapshot, and exactly one additional physical bill.
+Press Reprint once while Billing. Verify one new request/job and exactly one additional physical bill.
 
-- [ ] **Step 3: Complete payment, then Closed reprint**
+- [ ] **Step 3: Closed reprint**
 
-Pay the existing Draft Sales Invoice, then Reprint the Closed order. Verify the new job copies the previous snapshot mode/content and the paper matches the stored receipt rather than a newly rendered changed document.
+Complete payment, then Reprint the Closed order. Verify the new job copies the stored snapshot mode/content rather than re-rendering changed invoice state.
 
-- [ ] **Step 4: Legacy PDF compatibility**
+- [ ] **Step 4: Legacy PDF regression**
 
-Use a known pre-change PDF-mode job or controlled PDF test job. Verify missing/`PDF` `render_mode` still decodes `pdf_base64` and prints through Sumatra.
+Verify an old/missing-`render_mode` PDF job still decodes `pdf_base64` and prints through Sumatra.
 
-- [ ] **Step 5: Waiter kitchen regression check**
+- [ ] **Step 5: Waiter kitchen regression**
 
-Submit a new waiter order that routes to a kitchen counter. Verify the existing `queue_worker.py` still creates/prints the kitchen ticket exactly as before; no cashier change should be required for this path.
+Submit a new waiter order routed to a kitchen counter and verify the existing `queue_worker.py` ticket flow still prints unchanged.
 
-- [ ] **Step 6: Rollback rule if HTML physical print fails**
+- [ ] **Step 6: Rollback rule**
 
-If local Edge HTML printing fails after deployment, leave the dual-mode Windows client in place and restore only the live producer Server Scripts (`bcn_request_for_bill` and `bcn_cashier_print_bill`) to the prior reviewed PDF versions. Do not convert existing Pending HTML jobs into PDF; resolve/cancel them explicitly according to operational status.
+If HTML physical printing fails, keep the dual-mode Windows client and restore only the live producer scripts `bcn_request_for_bill` and `bcn_cashier_print_bill` to their prior reviewed PDF versions. Do not silently convert Pending HTML jobs to PDF; resolve them explicitly.
 
----
+## Final Verification
 
-## Final Verification Commands
-
-Windows printer repo:
+Windows repo:
 
 ```powershell
 cd C:\Users\htayoolwin\local_printers_winapp_code
@@ -973,4 +745,4 @@ python -m pytest tests -q
 git status
 ```
 
-Success is not complete until fresh automated output passes **and** the physical mobile cashier receipt is confirmed with Myanmar text, 80mm spacing, Billing reprint, Closed snapshot reprint, legacy PDF compatibility, and waiter kitchen regression coverage.
+Completion requires fresh automated pass output plus physical confirmation of Myanmar text, 80mm spacing, Billing reprint, Closed snapshot reprint, legacy PDF compatibility, and waiter kitchen regression.
