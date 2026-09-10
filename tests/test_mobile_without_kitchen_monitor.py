@@ -17,13 +17,12 @@ def test_mobile_server_is_fixed_to_ourcity():
     assert "bcndemo-restaurant.nvi.frappe.cloud" not in config
 
 
-def test_mobile_router_has_no_kitchen_monitor_or_waiter_status_destination():
+def test_mobile_router_has_no_kitchen_monitor_or_old_waiter_status_destination():
     router = _read("lib/core/router/app_router.dart")
     assert "features/kitchen" not in router
     assert "KitchenOrdersScreen" not in router
     assert "permissions.kitchen" not in router
     assert "'/kitchen'" not in router
-    assert "waiter_progress" not in router
     assert "'/waiter/ready'" not in router
     assert "'/waiter/progress'" not in router
 
@@ -41,7 +40,6 @@ def test_waiter_and_cashier_navigation_have_no_kitchen_monitor_controls():
 
     waiter = _read("lib/features/waiter/presentation/waiter_tables_screen.dart")
     assert "Ready to Serve" not in waiter
-    assert "Order Progress" not in waiter
     assert "mobileNotificationsProvider" not in waiter
     assert "'/waiter/ready'" not in waiter
     assert "'/waiter/progress'" not in waiter
