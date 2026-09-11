@@ -107,3 +107,27 @@ def test_old_mobile_kitchen_and_direct_print_files_are_deleted():
     )
     for relative in removed_paths:
         assert not (MOBILE / relative).exists(), relative
+
+
+
+def test_waiter_and_cashier_role_navigation_keeps_settings_available():
+    router = _read("lib/core/router/app_router.dart")
+    waiter = _read(
+        "lib/features/waiter/presentation/waiter_tables_screen.dart"
+    )
+    cashier = _read(
+        "lib/features/cashier/presentation/cashier_screen.dart"
+    )
+
+    assert "final canWaiter" in router
+    assert "final canCashier" in router
+    assert "startsWith('/cashier') && !canCashier" in router
+    assert "!canWaiter" in router
+    assert "path: '/settings'" in router
+
+    assert "tooltip: 'Order Progress'" in waiter
+    assert "if (bootstrap?.permissions.cashier == true)" in waiter
+    assert "tooltip: 'Settings'" in waiter
+
+    assert "if (bootstrap?.permissions.waiter == true)" in cashier
+    assert "tooltip: 'Settings'" in cashier

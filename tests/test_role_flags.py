@@ -49,3 +49,26 @@ def test_bootstrap_does_not_expose_a_mobile_kitchen_destination():
         Path(__file__).resolve().parents[1] / "bcn_restaurant" / "api" / "bootstrap.py"
     ).read_text()
     assert '"kitchen_counters"' not in bootstrap
+
+
+
+def test_custom_admin_role_gets_all_mobile_capabilities():
+    flags = build_role_flags(["Admin"])
+    assert flags == {
+        "waiter": True,
+        "cashier": True,
+        "manager": True,
+        "can_request_cashier_print": True,
+        "can_view_print_status": True,
+        "can_retry_print_jobs": True,
+    }
+
+
+def test_custom_admin_role_is_privileged_in_common_role_gate():
+    common = (
+        Path(__file__).resolve().parents[1]
+        / "bcn_restaurant"
+        / "api"
+        / "common.py"
+    ).read_text(encoding="utf-8")
+    assert '"Admin" in user_roles' in common

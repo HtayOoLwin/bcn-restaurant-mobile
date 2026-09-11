@@ -256,3 +256,30 @@ def test_server_script_doc_describes_aliases_and_no_custom_app_requirement():
     assert "Microsoft Edge" in source
     assert "wkhtmltopdf" in source
     assert "Windows client first" in source
+
+
+
+def test_custom_admin_role_is_allowed_across_mobile_server_scripts():
+    bootstrap = _read(SERVER_SCRIPTS / "bootstrap.py")
+    assert 'or "Admin" in roles' in bootstrap
+
+    for name in (
+        "create_order.py",
+        "waiter_order_progress.py",
+        "request_for_bill.py",
+        "cashier_billing.py",
+        "cashier_print_bill.py",
+    ):
+        source = _read(SERVER_SCRIPTS / name)
+        assert 'or "Admin" in roles' in source, name
+
+
+
+def test_waiter_read_endpoints_are_role_protected():
+    for name in ("tables.py", "menu.py"):
+        source = _read(SERVER_SCRIPTS / name)
+
+        assert '"Waiter" in roles' in source, name
+        assert 'or "Admin" in roles' in source, name
+        assert 'or "Cashier" in roles' not in source, name
+        assert "allowed_user" in source, name

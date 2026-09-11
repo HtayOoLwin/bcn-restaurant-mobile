@@ -422,6 +422,7 @@ for role_row in role_rows:
 
 allowed_user = (
     current_user == "Administrator"
+    or "Admin" in roles
     or "System Manager" in roles
     or "Waiter" in roles
     or "Restaurant Manager" in roles

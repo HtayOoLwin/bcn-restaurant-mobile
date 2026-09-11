@@ -11,6 +11,34 @@ current_user = frappe.session.user
 if not current_user or current_user == "Guest":
     frappe.throw("Authentication is required.")
 
+role_rows = frappe.get_all(
+    "Has Role",
+    filters={
+        "parent": current_user,
+        "parenttype": "User",
+    },
+    fields=["role"],
+    limit_page_length=200,
+)
+
+roles = []
+for role_row in role_rows:
+    if role_row.role and role_row.role not in roles:
+        roles.append(role_row.role)
+
+allowed_user = (
+    current_user == "Administrator"
+    or "Admin" in roles
+    or "System Manager" in roles
+    or "Waiter" in roles
+    or "Restaurant Manager" in roles
+)
+
+if not allowed_user:
+    frappe.throw(
+        "You are not allowed to use waiter restaurant views."
+    )
+
 profile = frappe.get_doc("POS Profile", POS_PROFILE)
 
 item_groups = []

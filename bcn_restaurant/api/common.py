@@ -33,7 +33,11 @@ def current_roles() -> list[str]:
 
 def require_any_role(*roles: str) -> None:
     user_roles = set(current_roles())
-    if "Administrator" in user_roles or "System Manager" in user_roles:
+    if (
+        "Administrator" in user_roles
+        or "Admin" in user_roles
+        or "System Manager" in user_roles
+    ):
         return
     if not user_roles.intersection(roles):
         frappe.throw("You are not permitted to use this restaurant action", frappe.PermissionError)

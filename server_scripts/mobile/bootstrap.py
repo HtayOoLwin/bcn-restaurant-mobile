@@ -25,7 +25,7 @@ for role_row in role_rows:
     if role_row.role and role_row.role not in roles:
         roles.append(role_row.role)
 
-is_administrator = current_user == "Administrator"
+is_administrator = current_user == "Administrator" or "Admin" in roles
 is_manager = (
     is_administrator
     or "System Manager" in roles

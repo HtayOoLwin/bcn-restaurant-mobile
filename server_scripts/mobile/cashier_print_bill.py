@@ -115,7 +115,13 @@ roles = []
 for role_row in role_rows:
     if role_row.role and role_row.role not in roles:
         roles.append(role_row.role)
-allowed_user = current_user == "Administrator" or "System Manager" in roles or "Restaurant Manager" in roles or "Cashier" in roles
+allowed_user = (
+    current_user == "Administrator"
+    or "Admin" in roles
+    or "System Manager" in roles
+    or "Restaurant Manager" in roles
+    or "Cashier" in roles
+)
 if not allowed_user:
     frappe.throw("You are not allowed to print cashier bills.")
 
