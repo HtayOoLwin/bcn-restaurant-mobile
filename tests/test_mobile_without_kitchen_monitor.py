@@ -165,3 +165,19 @@ def test_operational_screens_auto_refresh_every_five_seconds():
         "lib/features/cashier/presentation/cashier_screen.dart"
     )
     assert "_pendingPrintSalesOrders.isNotEmpty" in cashier
+
+
+
+def test_login_password_can_toggle_visibility():
+    login = _read(
+        "lib/features/auth/presentation/login_screen.dart"
+    )
+
+    assert "bool _obscurePassword = true;" in login
+    assert "obscureText: _obscurePassword" in login
+    assert "suffixIcon: IconButton(" in login
+    assert "Icons.visibility" in login
+    assert "Icons.visibility_off" in login
+    assert "_obscurePassword = !_obscurePassword" in login
+    assert "'Show password'" in login
+    assert "'Hide password'" in login
