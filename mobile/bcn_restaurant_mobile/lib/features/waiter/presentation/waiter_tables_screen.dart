@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,6 +28,30 @@ class WaiterTablesScreen extends ConsumerStatefulWidget {
 
 class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   String serviceType = 'dine_in';
+  Timer? _autoRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+
+        final current = ref.read(tablesProvider(serviceType));
+        if (current.isLoading) return;
+
+        ref.invalidate(tablesProvider(serviceType));
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -45,6 +46,31 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   final Set<String> _pendingPrintSalesOrders = {};
   final Map<String, String> _retryPrintRequestIds = {};
   CashierPaymentResult? _lastPaymentResult;
+  Timer? _autoRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+        if (_pendingPrintSalesOrders.isNotEmpty) return;
+
+        final current = ref.read(cashierBillingProvider);
+        if (current.isLoading) return;
+
+        ref.invalidate(cashierBillingProvider);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

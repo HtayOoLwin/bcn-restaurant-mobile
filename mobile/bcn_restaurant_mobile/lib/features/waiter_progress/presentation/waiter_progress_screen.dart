@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,6 +22,31 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
   String _searchQuery = '';
   String? _busyRow;
   String? _busyOrder;
+  Timer? _autoRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+        if (_busyRow != null || _busyOrder != null) return;
+
+        final current = ref.read(waiterProgressProvider);
+        if (current.isLoading) return;
+
+        ref.invalidate(waiterProgressProvider);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -131,3 +131,37 @@ def test_waiter_and_cashier_role_navigation_keeps_settings_available():
 
     assert "if (bootstrap?.permissions.waiter == true)" in cashier
     assert "tooltip: 'Settings'" in cashier
+
+
+
+def test_operational_screens_auto_refresh_every_five_seconds():
+    screens = {
+        "lib/features/waiter/presentation/waiter_tables_screen.dart":
+            "tablesProvider(serviceType)",
+        "lib/features/waiter_progress/presentation/waiter_progress_screen.dart":
+            "waiterProgressProvider",
+        "lib/features/cashier/presentation/cashier_screen.dart":
+            "cashierBillingProvider",
+    }
+
+    for relative, provider in screens.items():
+        source = _read(relative)
+
+        assert "import 'dart:async';" in source, relative
+        assert "Timer? _autoRefreshTimer;" in source, relative
+        assert "Timer.periodic(" in source, relative
+        assert "const Duration(seconds: 5)" in source, relative
+        assert "ModalRoute.of(context)?.isCurrent != true" in source, relative
+        assert "if (current.isLoading) return;" in source, relative
+        assert f"ref.invalidate({provider})" in source, relative
+        assert "_autoRefreshTimer?.cancel();" in source, relative
+
+    progress = _read(
+        "lib/features/waiter_progress/presentation/waiter_progress_screen.dart"
+    )
+    assert "_busyRow != null || _busyOrder != null" in progress
+
+    cashier = _read(
+        "lib/features/cashier/presentation/cashier_screen.dart"
+    )
+    assert "_pendingPrintSalesOrders.isNotEmpty" in cashier
