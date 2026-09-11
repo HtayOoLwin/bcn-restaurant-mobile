@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../auth/presentation/auth_controller.dart';
+import '../../../core/search/order_search.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../cart/domain/cart_controller.dart';
 import '../data/tables_repository.dart';
@@ -28,28 +29,28 @@ class WaiterTablesScreen extends ConsumerStatefulWidget {
 
 class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   String serviceType = 'dine_in';
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
   Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
 
-    _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) {
-        if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
 
-        final current = ref.read(tablesProvider(serviceType));
-        if (current.isLoading) return;
+      final current = ref.read(tablesProvider(serviceType));
+      if (current.isLoading) return;
 
-        ref.invalidate(tablesProvider(serviceType));
-      },
-    );
+      ref.invalidate(tablesProvider(serviceType));
+    });
   }
 
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -112,6 +113,30 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
               },
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search table, customer, or order',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      ),
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                setState(() => _searchQuery = value);
+              },
+            ),
+          ),
           OperationalRefreshIndicator(
             onRefresh: () => ref.invalidate(tablesProvider(serviceType)),
           ),
@@ -119,52 +144,67 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
             child: tables.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(child: Text(error.toString())),
-              data: (response) => RefreshIndicator(
-                onRefresh: () =>
-                    ref.refresh(tablesProvider(serviceType).future),
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 220,
-                    childAspectRatio: 1.5,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: response.tables.length,
-                  itemBuilder: (context, index) {
-                    final table = response.tables[index];
-                    return _TableCard(
-                      table: table,
-                      onTap: () async {
-                        if ((table.sessionStatus ?? '').toLowerCase() ==
-                            'billing') {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Bill already requested. This order is locked.',
+              data: (response) {
+                final filteredTables = response.tables.where((table) {
+                  return matchesOrderSearch(
+                    queryText: _searchQuery,
+                    tableName: table.customerName,
+                    orderNumbers: [
+                      if (table.session != null && table.session!.isNotEmpty)
+                        table.session!,
+                    ],
+                    searchTerms: [table.customer],
+                  );
+                }).toList();
+
+                return RefreshIndicator(
+                  onRefresh: () =>
+                      ref.refresh(tablesProvider(serviceType).future),
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 220,
+                          childAspectRatio: 1.5,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                    itemCount: filteredTables.length,
+                    itemBuilder: (context, index) {
+                      final table = filteredTables[index];
+                      return _TableCard(
+                        table: table,
+                        onTap: () async {
+                          if ((table.sessionStatus ?? '').toLowerCase() ==
+                              'billing') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Bill already requested. This order is locked.',
+                                ),
                               ),
-                            ),
-                          );
-                          return;
-                        }
-
-                        ref
-                            .read(cartProvider.notifier)
-                            .setOrderContext(
-                              customer: table.customer,
-                              session: table.session,
                             );
+                            return;
+                          }
 
-                        await context.push(
-                          '/menu/${Uri.encodeComponent(table.customer)}',
-                        );
+                          ref
+                              .read(cartProvider.notifier)
+                              .setOrderContext(
+                                customer: table.customer,
+                                session: table.session,
+                              );
 
-                        ref.invalidate(tablesProvider(serviceType));
-                      },
-                    );
-                  },
-                ),
-              ),
+                          await context.push(
+                            '/menu/${Uri.encodeComponent(table.customer)}',
+                          );
+
+                          ref.invalidate(tablesProvider(serviceType));
+                        },
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -174,10 +214,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
 }
 
 class _TableCard extends StatelessWidget {
-  const _TableCard({
-    required this.table,
-    required this.onTap,
-  });
+  const _TableCard({required this.table, required this.onTap});
 
   final RestaurantTableModel table;
   final VoidCallback onTap;
@@ -227,18 +264,14 @@ class _TableCard extends StatelessWidget {
             children: [
               Text(
                 table.customerName,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(
-                    statusIcon,
-                    size: 16,
-                    color: statusColor,
-                  ),
+                  Icon(statusIcon, size: 16, color: statusColor),
                   const SizedBox(width: 6),
                   Text(
                     status,

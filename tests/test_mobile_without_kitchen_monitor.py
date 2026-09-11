@@ -181,3 +181,25 @@ def test_login_password_can_toggle_visibility():
     assert "_obscurePassword = !_obscurePassword" in login
     assert "'Show password'" in login
     assert "'Hide password'" in login
+
+
+
+def test_waiter_tables_supports_search():
+    source = _read(
+        "lib/features/waiter/presentation/waiter_tables_screen.dart"
+    )
+
+    assert "core/search/order_search.dart" in source
+    assert "String _searchQuery = '';" in source
+    assert "hintText: 'Search table, customer, or order'" in source
+    assert "onChanged: (value)" in source
+    assert "matchesOrderSearch(" in source
+    assert "queryText: _searchQuery" in source
+    assert "tableName: table.customerName" in source
+    assert "table.customer" in source
+    assert "table.session" in source
+    assert "itemCount: filteredTables.length" in source
+    assert "final _searchController = TextEditingController();" in source
+    assert "controller: _searchController" in source
+    assert "_searchController.clear();" in source
+    assert "_searchController.dispose();" in source
