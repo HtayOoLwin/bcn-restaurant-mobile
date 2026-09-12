@@ -107,6 +107,7 @@ void main() {
 
     await tester.pumpWidget(_cashierHarness(repository));
     await tester.pumpAndSettle();
+    await _expandCashierBill(tester);
     await tester.tap(find.text('Reprint Bill'));
     await tester.pumpAndSettle();
 
@@ -121,6 +122,7 @@ void main() {
 
     await tester.pumpWidget(_cashierHarness(repository));
     await tester.pumpAndSettle();
+    await _expandCashierBill(tester);
     await tester.tap(find.text('Reprint Bill'));
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
 
@@ -206,6 +208,12 @@ void main() {
     );
     expect(find.text('Windows Printer Client'), findsNothing);
   });
+}
+
+
+Future<void> _expandCashierBill(WidgetTester tester) async {
+  await tester.tap(find.text('Table 1'));
+  await tester.pumpAndSettle();
 }
 
 Widget _cashierHarness(WindowsPrintGateway repository) {
