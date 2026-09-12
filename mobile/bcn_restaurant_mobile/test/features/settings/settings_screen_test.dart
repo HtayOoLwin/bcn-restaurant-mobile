@@ -78,6 +78,7 @@ void main() {
 
       await tester.pumpWidget(_cashierHarness(repository));
       await tester.pumpAndSettle();
+      await _expandCashierBill(tester);
 
       await tester.tap(find.text('Reprint Bill'));
       await tester.tap(find.text('Reprint Bill'));
