@@ -16,8 +16,8 @@ final tablesRepositoryProvider = Provider<TablesRepository>(
 );
 
 final tablesProvider = FutureProvider.family<TablesResponse, String>(
-  (ref, serviceType) =>
-      ref.watch(tablesRepositoryProvider).getTables(serviceType),
+  (ref, customerGroup) =>
+      ref.watch(tablesRepositoryProvider).getTables(customerGroup),
 );
 
 int waiterTableColumnCount(double width) {
@@ -35,7 +35,7 @@ class WaiterTablesScreen extends ConsumerStatefulWidget {
 }
 
 class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
-  String serviceType = 'dine_in';
+  String customerGroup = '';
   String _searchQuery = '';
   final _searchController = TextEditingController();
   Timer? _autoRefreshTimer;
@@ -47,10 +47,10 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
 
-      final current = ref.read(tablesProvider(serviceType));
+      final current = ref.read(tablesProvider(customerGroup));
       if (current.isLoading) return;
 
-      ref.invalidate(tablesProvider(serviceType));
+      ref.invalidate(tablesProvider(customerGroup));
     });
   }
 
@@ -64,7 +64,12 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   @override
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
-    final tables = ref.watch(tablesProvider(serviceType));
+    final tables = ref.watch(tablesProvider(customerGroup));
+    final response = tables.asData?.value;
+    final customerGroups = response?.customerGroups ?? const <String>[];
+    final effectiveCustomerGroup = customerGroup.isNotEmpty
+        ? customerGroup
+        : (response?.customerGroup ?? '');
 
     return Scaffold(
       appBar: AppBar(
@@ -87,7 +92,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
             ),
           IconButton(
             tooltip: 'Refresh',
-            onPressed: () => ref.invalidate(tablesProvider(serviceType)),
+            onPressed: () => ref.invalidate(tablesProvider(customerGroup)),
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
@@ -99,37 +104,32 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ChoiceChip(
-                    selected: serviceType == 'dine_in',
-                    avatar: const Icon(Icons.groups_2_outlined, size: 18),
-                    label: const Text('Dine In'),
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-                    onSelected: (_) {
-                      if (serviceType == 'dine_in') return;
-                      setState(() => serviceType = 'dine_in');
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    selected: serviceType == 'takeaway',
-                    avatar: const Icon(Icons.takeout_dining, size: 18),
-                    label: const Text('Takeaway'),
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-                    onSelected: (_) {
-                      if (serviceType == 'takeaway') return;
-                      setState(() => serviceType = 'takeaway');
-                    },
-                  ),
-                ],
+          if (customerGroups.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final group in response.customerGroups) ...[
+                      ChoiceChip(
+                        selected: effectiveCustomerGroup == group,
+                        avatar: const Icon(Icons.groups_2_outlined, size: 18),
+                        label: Text(group),
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        onSelected: (_) {
+                          if (effectiveCustomerGroup == group) return;
+                          setState(() => customerGroup = group);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: TextField(
@@ -156,7 +156,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
             ),
           ),
           OperationalRefreshIndicator(
-            onRefresh: () => ref.invalidate(tablesProvider(serviceType)),
+            onRefresh: () => ref.invalidate(tablesProvider(customerGroup)),
           ),
           Expanded(
             child: tables.when(
@@ -177,7 +177,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
 
                 return RefreshIndicator(
                   onRefresh: () =>
-                      ref.refresh(tablesProvider(serviceType).future),
+                      ref.refresh(tablesProvider(customerGroup).future),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final columns = waiterTableColumnCount(
@@ -221,7 +221,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                                 '/menu/${Uri.encodeComponent(table.customer)}',
                               );
 
-                              ref.invalidate(tablesProvider(serviceType));
+                              ref.invalidate(tablesProvider(customerGroup));
                             },
                           );
                         },
