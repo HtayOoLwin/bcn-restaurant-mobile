@@ -37,26 +37,66 @@ if not allowed_user:
         "You are not allowed to use waiter restaurant views."
     )
 
-service_type = (frappe.form_dict.get("service_type") or "dine_in").strip().lower()
+requested_customer_group = (
+    frappe.form_dict.get("customer_group") or ""
+).strip()
+legacy_service_type = (
+    frappe.form_dict.get("service_type") or ""
+).strip().lower()
 
-if service_type in ("dine_in", "dinein"):
-    service_type = "dine_in"
-    customer_group = "Dine In"
-elif service_type == "takeaway":
-    customer_group = "Takeaway"
-else:
-    frappe.throw("service_type must be dine_in or takeaway")
-
-customers = frappe.get_all(
-    "Customer",
-    filters={
-        "customer_group": customer_group,
-        "disabled": 0,
-    },
-    fields=["name", "customer_name", "customer_group"],
-    order_by="customer_name asc, name asc",
-    limit_page_length=200,
+leaf_group_rows = frappe.get_all(
+    "Customer Group",
+    filters={"is_group": 0},
+    fields=["name"],
+    order_by="name asc",
+    limit_page_length=500,
 )
+
+enabled_customer_rows = frappe.get_all(
+    "Customer",
+    filters={"disabled": 0},
+    fields=["customer_group"],
+    limit_page_length=5000,
+)
+
+groups_with_customers = []
+for customer_row in enabled_customer_rows:
+    group_name = customer_row.customer_group
+    if group_name and group_name not in groups_with_customers:
+        groups_with_customers.append(group_name)
+
+customer_groups = []
+for group_row in leaf_group_rows:
+    if group_row.name in groups_with_customers:
+        customer_groups.append(group_row.name)
+
+if not requested_customer_group:
+    if legacy_service_type in ("dine_in", "dinein") and "Dine In" in customer_groups:
+        requested_customer_group = "Dine In"
+    elif legacy_service_type == "takeaway" and "Takeaway" in customer_groups:
+        requested_customer_group = "Takeaway"
+    elif "Dine In" in customer_groups:
+        requested_customer_group = "Dine In"
+    elif customer_groups:
+        requested_customer_group = customer_groups[0]
+
+if requested_customer_group and requested_customer_group not in customer_groups:
+    frappe.throw("Selected Customer Group is not available for restaurant tables.")
+
+customer_group = requested_customer_group
+
+customers = []
+if customer_group:
+    customers = frappe.get_all(
+        "Customer",
+        filters={
+            "customer_group": customer_group,
+            "disabled": 0,
+        },
+        fields=["name", "customer_name", "customer_group"],
+        order_by="customer_name asc, name asc",
+        limit_page_length=200,
+    )
 
 active_orders = frappe.get_all(
     "Sales Order",
@@ -126,8 +166,15 @@ for customer in customers:
         }
     )
 
+service_type = "customer_group"
+if customer_group == "Dine In":
+    service_type = "dine_in"
+elif customer_group == "Takeaway":
+    service_type = "takeaway"
+
 frappe.response["message"] = {
     "service_type": service_type,
     "customer_group": customer_group,
+    "customer_groups": customer_groups,
     "tables": result,
 }
