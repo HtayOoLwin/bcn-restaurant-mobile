@@ -37,13 +37,18 @@ class TablesResponse {
   const TablesResponse({
     required this.serviceType,
     required this.customerGroup,
+    required this.customerGroups,
     required this.tables,
   });
 
   factory TablesResponse.fromJson(Map<String, dynamic> json) {
     return TablesResponse(
-      serviceType: json['service_type']?.toString() ?? 'dine_in',
+      serviceType: json['service_type']?.toString() ?? 'customer_group',
       customerGroup: json['customer_group']?.toString() ?? '',
+      customerGroups: (json['customer_groups'] as List? ?? const [])
+          .map((e) => e.toString())
+          .where((name) => name.isNotEmpty)
+          .toList(),
       tables: (json['tables'] as List? ?? const [])
           .map(
             (row) => RestaurantTableModel.fromJson(
@@ -56,5 +61,6 @@ class TablesResponse {
 
   final String serviceType;
   final String customerGroup;
+  final List<String> customerGroups;
   final List<RestaurantTableModel> tables;
 }
