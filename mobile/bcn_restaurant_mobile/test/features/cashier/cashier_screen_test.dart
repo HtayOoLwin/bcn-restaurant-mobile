@@ -17,33 +17,36 @@ const _disabledForeground = Color(0xFF94A3B8);
 
 void main() {
   group('CashierScreen request-safe draft Sales Order flow', () {
-    testWidgets('bill card starts collapsed and table header expands details', (
-      tester,
-    ) async {
-      final api = _FakeApiClient(
-        billingResponse: _billingResponse(restaurantStatus: 'Billing'),
-      );
-      final printer = _FakePrintGateway();
+    testWidgets(
+      'Billing bill starts collapsed with actions visible and header expands details',
+      (tester) async {
+        final api = _FakeApiClient(
+          billingResponse: _billingResponse(restaurantStatus: 'Billing'),
+        );
+        final printer = _FakePrintGateway();
 
-      await _pumpCashier(
-        tester,
-        api: api,
-        printer: printer,
-        requestIds: ['REQ-A'],
-      );
+        await _pumpCashier(
+          tester,
+          api: api,
+          printer: printer,
+          requestIds: ['REQ-A'],
+        );
 
-      expect(find.text('Table 01'), findsOneWidget);
-      expect(find.text('SAL-ORD-2026-00005'), findsOneWidget);
-      expect(find.byIcon(Icons.expand_more), findsOneWidget);
-      expect(find.text('Grand Total'), findsNothing);
-      expect(find.text('Payment'), findsNothing);
+        expect(find.text('Table 01'), findsOneWidget);
+        expect(find.text('SAL-ORD-2026-00005'), findsOneWidget);
+        expect(find.byIcon(Icons.expand_more), findsOneWidget);
+        expect(find.text('Grand Total'), findsNothing);
+        expect(find.text('Reprint Bill'), findsOneWidget);
+        expect(find.text('Payment'), findsOneWidget);
 
-      await _expandBill(tester);
+        await _expandBill(tester);
 
-      expect(find.byIcon(Icons.expand_less), findsOneWidget);
-      expect(find.text('Grand Total'), findsOneWidget);
-      expect(find.text('Payment'), findsOneWidget);
-    });
+        expect(find.byIcon(Icons.expand_less), findsOneWidget);
+        expect(find.text('Grand Total'), findsOneWidget);
+        expect(find.text('Reprint Bill'), findsOneWidget);
+        expect(find.text('Payment'), findsOneWidget);
+      },
+    );
 
     testWidgets('Billing bill uses green card and colored action buttons', (
       tester,
@@ -68,8 +71,6 @@ void main() {
         find.ancestor(of: find.text('Table 01'), matching: find.byType(Card)).first,
       );
       expect(card.color, _billingCardColor);
-
-      await _expandBill(tester);
 
       final reprint = _filledButton(tester, 'Reprint Bill');
       final payment = _filledButton(tester, 'Payment');
@@ -98,6 +99,8 @@ void main() {
         find.ancestor(of: find.text('Table 01'), matching: find.byType(Card)).first,
       );
       expect(card.color, _openCardColor);
+      expect(find.text('Reprint Bill'), findsNothing);
+      expect(find.text('Payment'), findsNothing);
 
       await _expandBill(tester);
 
