@@ -275,10 +275,30 @@ class _ProgressCardState extends State<_ProgressCard> {
                     borderRadius: BorderRadius.circular(8),
                     onTap: () => setState(() => _expanded = !_expanded),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Text(
-                        widget.order.customer,
-                        style: Theme.of(context).textTheme.titleLarge,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  widget.order.customer,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ),
+                              Icon(
+                                _expanded ? Icons.expand_less : Icons.expand_more,
+                                size: 24,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            widget.order.name,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
                     ),
                   ),
