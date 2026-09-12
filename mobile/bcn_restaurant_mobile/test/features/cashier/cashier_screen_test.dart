@@ -8,43 +8,120 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const _billingCardColor = Color(0xFFE9F8EF);
+const _openCardColor = Colors.white;
+const _reprintBlue = Color(0xFF0D47A1);
+const _paymentGreen = Color(0xFF0B6B3A);
+const _disabledBackground = Color(0xFFE2E8F0);
+const _disabledForeground = Color(0xFF94A3B8);
+
 void main() {
   group('CashierScreen request-safe draft Sales Order flow', () {
-    testWidgets(
-      'Open bill keeps Print Bill and Payment disabled until bill request',
-      (tester) async {
-        final api = _FakeApiClient(
-          billingResponse: _billingResponse(restaurantStatus: 'Open'),
-        );
-        final printer = _FakePrintGateway();
+    testWidgets('bill card starts collapsed and table header expands details', (
+      tester,
+    ) async {
+      final api = _FakeApiClient(
+        billingResponse: _billingResponse(restaurantStatus: 'Billing'),
+      );
+      final printer = _FakePrintGateway();
 
-        await _pumpCashier(
-          tester,
-          api: api,
-          printer: printer,
-          requestIds: ['REQ-A'],
-        );
+      await _pumpCashier(
+        tester,
+        api: api,
+        printer: printer,
+        requestIds: ['REQ-A'],
+      );
 
-        expect(find.text('Print Bill'), findsOneWidget);
-        expect(find.text('Payment'), findsOneWidget);
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.widgetWithText(FilledButton, 'Print Bill'),
-              )
-              .onPressed,
-          isNull,
-        );
-        expect(
-          tester
-              .widget<FilledButton>(
-                find.widgetWithText(FilledButton, 'Payment'),
-              )
-              .onPressed,
-          isNull,
-        );
-      },
-    );
+      expect(find.text('Table 01'), findsOneWidget);
+      expect(find.text('SAL-ORD-2026-00005'), findsOneWidget);
+      expect(find.byIcon(Icons.expand_more), findsOneWidget);
+      expect(find.text('Grand Total'), findsNothing);
+      expect(find.text('Payment'), findsNothing);
+
+      await _expandBill(tester);
+
+      expect(find.byIcon(Icons.expand_less), findsOneWidget);
+      expect(find.text('Grand Total'), findsOneWidget);
+      expect(find.text('Payment'), findsOneWidget);
+    });
+
+    testWidgets('Billing bill uses green card and colored action buttons', (
+      tester,
+    ) async {
+      final api = _FakeApiClient(
+        billingResponse: _billingResponse(
+          restaurantStatus: 'Billing',
+          lastPrintStatus: 'Printed',
+          lastPrintJob: 'PRINT-JOB-X',
+        ),
+      );
+      final printer = _FakePrintGateway();
+
+      await _pumpCashier(
+        tester,
+        api: api,
+        printer: printer,
+        requestIds: ['REQ-A'],
+      );
+
+      final card = tester.widget<Card>(
+        find.ancestor(of: find.text('Table 01'), matching: find.byType(Card)).first,
+      );
+      expect(card.color, _billingCardColor);
+
+      await _expandBill(tester);
+
+      final reprint = _filledButton(tester, 'Reprint Bill');
+      final payment = _filledButton(tester, 'Payment');
+      expect(reprint.onPressed, isNotNull);
+      expect(payment.onPressed, isNotNull);
+      expect(reprint.style?.backgroundColor?.resolve({}), _reprintBlue);
+      expect(payment.style?.backgroundColor?.resolve({}), _paymentGreen);
+    });
+
+    testWidgets('Open bill stays white with faded disabled action buttons', (
+      tester,
+    ) async {
+      final api = _FakeApiClient(
+        billingResponse: _billingResponse(restaurantStatus: 'Open'),
+      );
+      final printer = _FakePrintGateway();
+
+      await _pumpCashier(
+        tester,
+        api: api,
+        printer: printer,
+        requestIds: ['REQ-A'],
+      );
+
+      final card = tester.widget<Card>(
+        find.ancestor(of: find.text('Table 01'), matching: find.byType(Card)).first,
+      );
+      expect(card.color, _openCardColor);
+
+      await _expandBill(tester);
+
+      final reprint = _filledButton(tester, 'Reprint Bill');
+      final payment = _filledButton(tester, 'Payment');
+      expect(reprint.onPressed, isNull);
+      expect(payment.onPressed, isNull);
+      expect(
+        reprint.style?.backgroundColor?.resolve({WidgetState.disabled}),
+        _disabledBackground,
+      );
+      expect(
+        reprint.style?.foregroundColor?.resolve({WidgetState.disabled}),
+        _disabledForeground,
+      );
+      expect(
+        payment.style?.backgroundColor?.resolve({WidgetState.disabled}),
+        _disabledBackground,
+      );
+      expect(
+        payment.style?.foregroundColor?.resolve({WidgetState.disabled}),
+        _disabledForeground,
+      );
+    });
 
     testWidgets('Billing failed bill shows Reprint, status, and Payment', (
       tester,
@@ -64,6 +141,7 @@ void main() {
         printer: printer,
         requestIds: ['REQ-A'],
       );
+      await _expandBill(tester);
 
       expect(find.text('Reprint Bill'), findsOneWidget);
       expect(find.text('Last Print: Failed'), findsOneWidget);
@@ -108,6 +186,7 @@ void main() {
           printer: printer,
           requestIds: ['REQ-A', 'REQ-B'],
         );
+        await _expandBill(tester);
 
         await tester.tap(find.text('Reprint Bill'));
         await tester.pumpAndSettle();
@@ -152,6 +231,7 @@ void main() {
         printer: printer,
         requestIds: ['REQ-POST-PAY'],
       );
+      await _expandBill(tester);
 
       await tester.tap(find.text('Payment'));
       await tester.pumpAndSettle();
@@ -171,6 +251,17 @@ void main() {
       expect(printer.calls.single.requestId, 'REQ-POST-PAY');
     });
   });
+}
+
+FilledButton _filledButton(WidgetTester tester, String label) {
+  return tester.widget<FilledButton>(
+    find.widgetWithText(FilledButton, label),
+  );
+}
+
+Future<void> _expandBill(WidgetTester tester) async {
+  await tester.tap(find.text('Table 01'));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _pumpCashier(
