@@ -41,7 +41,7 @@ def test_mobile_waiter_uses_dynamic_customer_group_chips():
     )
 
     assert "String customerGroup = '';" in screen
-    assert "for (final group in response.customerGroups)" in screen
+    assert "for (final group in customerGroups)" in screen
     assert "label: Text(group)" in screen
     assert "serviceType == 'dine_in'" not in screen
     assert "serviceType == 'takeaway'" not in screen
@@ -50,6 +50,6 @@ def test_mobile_waiter_uses_dynamic_customer_group_chips():
     assert "'customer_group': customerGroup" in repository
     assert "'service_type': serviceType" not in repository
 
-    assert "required this.customerGroups" in models
+    assert "this.customerGroups = const []" in models
     assert "json['customer_groups']" in models
     assert "final List<String> customerGroups;" in models
