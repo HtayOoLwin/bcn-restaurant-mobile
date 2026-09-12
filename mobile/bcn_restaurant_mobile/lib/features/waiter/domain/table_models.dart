@@ -37,7 +37,7 @@ class TablesResponse {
   const TablesResponse({
     required this.serviceType,
     required this.customerGroup,
-    required this.customerGroups,
+    this.customerGroups = const [],
     required this.tables,
   });
 
