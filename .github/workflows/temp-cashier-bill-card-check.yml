@@ -27,3 +27,7 @@ jobs:
       - name: Run cashier screen tests
         working-directory: mobile/bcn_restaurant_mobile
         run: flutter test test/features/cashier/cashier_screen_test.dart
+
+      - name: Run full Flutter test suite
+        working-directory: mobile/bcn_restaurant_mobile
+        run: flutter test
