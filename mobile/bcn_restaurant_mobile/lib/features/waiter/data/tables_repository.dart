@@ -6,10 +6,10 @@ class TablesRepository {
 
   final ApiClient _apiClient;
 
-  Future<TablesResponse> getTables(String serviceType) async {
+  Future<TablesResponse> getTables(String customerGroup) async {
     final data = await _apiClient.getMethod(
       'bcn_mobile_tables',
-      queryParameters: {'service_type': serviceType},
+      queryParameters: {'customer_group': customerGroup},
     );
     return TablesResponse.fromJson(Map<String, dynamic>.from(data as Map));
   }
