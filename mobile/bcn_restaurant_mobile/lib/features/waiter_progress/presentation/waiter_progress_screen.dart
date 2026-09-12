@@ -261,26 +261,38 @@ class _ProgressCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
-                    order.customer,
-                    style: Theme.of(context).textTheme.titleLarge,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.customer,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        order.name,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
                 ),
-                Text(order.preparationSummary),
-              ],
-            ),
-            Text(order.name, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                Chip(label: Text('New ${order.newQty.g}')),
-                Chip(label: Text('Preparing ${order.preparingQty.g}')),
-                Chip(label: Text('Ready ${order.readyQty.g}')),
-                Chip(label: Text('Served ${order.servedQty.g}')),
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: requesting ? null : () => onRequestBill(order),
+                  icon: requesting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.receipt_long),
+                  label: Text(
+                    requesting ? 'Requesting…' : 'Request for Bill',
+                  ),
+                ),
               ],
             ),
             const Divider(height: 24),
@@ -289,7 +301,7 @@ class _ProgressCard extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 title: Text(item.itemName),
                 subtitle: Text(
-                  '${item.qty.g} ${item.uom} · ${item.status}${item.kitchenCounter?.isNotEmpty == true ? ' · ${item.kitchenCounter}' : ''}${item.kitchenNote?.isNotEmpty == true ? '\n${item.kitchenNote}' : ''}',
+                  '${item.qty.g} ${item.uom}${item.kitchenCounter?.isNotEmpty == true ? ' · ${item.kitchenCounter}' : ''}${item.kitchenNote?.isNotEmpty == true ? '\n${item.kitchenNote}' : ''}',
                 ),
                 trailing: item.canCancel
                     ? TextButton(
@@ -299,23 +311,6 @@ class _ProgressCard extends StatelessWidget {
                         child: const Text('Cancel'),
                       )
                     : null,
-              ),
-            ),
-            const Divider(height: 20),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: requesting ? null : () => onRequestBill(order),
-                icon: requesting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.receipt_long),
-                label: Text(
-                  requesting ? 'Requesting…' : 'Request for Bill',
-                ),
               ),
             ),
           ],
