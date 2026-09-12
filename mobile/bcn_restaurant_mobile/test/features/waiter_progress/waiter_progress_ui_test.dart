@@ -20,23 +20,29 @@ void main() {
     expect(source, isNot(contains("'Served \${order.servedQty.g}'")));
   });
 
-  test('progress card starts collapsed and table name toggles item details', () {
+  test('progress card starts collapsed and table header toggles item details', () {
     expect(source, contains('class _ProgressCard extends StatefulWidget'));
     expect(source, contains('bool _expanded = false;'));
     expect(source, contains('setState(() => _expanded = !_expanded)'));
     expect(source, contains('if (_expanded) ...['));
   });
 
-  test('collapsed header contains table name and bill action only', () {
+  test('collapsed header shows table name sales order and bill action', () {
     final cardStart = source.indexOf('class _ProgressCard');
     final headerStart = source.indexOf('Row(', cardStart);
     final expandedStart = source.indexOf('if (_expanded) ...[', headerStart);
     final header = source.substring(headerStart, expandedStart);
 
     expect(header, contains('widget.order.customer'));
+    expect(header, contains('widget.order.name'));
     expect(header, contains('Request for Bill'));
-    expect(header, isNot(contains('widget.order.name')));
     expect(header, isNot(contains('widget.order.items')));
+  });
+
+  test('table header shows expand and collapse arrow cues', () {
+    expect(source, contains('Icons.expand_more'));
+    expect(source, contains('Icons.expand_less'));
+    expect(source, contains('_expanded ? Icons.expand_less : Icons.expand_more'));
   });
 
   test('item rows appear only inside expanded content', () {
