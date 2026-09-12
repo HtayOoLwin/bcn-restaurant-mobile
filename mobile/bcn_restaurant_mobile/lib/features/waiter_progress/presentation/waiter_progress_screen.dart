@@ -234,7 +234,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
   }
 }
 
-class _ProgressCard extends StatelessWidget {
+class _ProgressCard extends StatefulWidget {
   const _ProgressCard({
     required this.order,
     required this.busyRow,
@@ -250,8 +250,15 @@ class _ProgressCard extends StatelessWidget {
   final Future<void> Function(WaiterProgressOrder order) onRequestBill;
 
   @override
+  State<_ProgressCard> createState() => _ProgressCardState();
+}
+
+class _ProgressCardState extends State<_ProgressCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final requesting = busyOrder == order.name;
+    final requesting = widget.busyOrder == widget.order.name;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -261,27 +268,26 @@ class _ProgressCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        order.customer,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        widget.order.customer,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        order.name,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 FilledButton.icon(
-                  onPressed: requesting ? null : () => onRequestBill(order),
+                  onPressed: requesting
+                      ? null
+                      : () => widget.onRequestBill(widget.order),
                   icon: requesting
                       ? const SizedBox(
                           width: 18,
@@ -295,24 +301,27 @@ class _ProgressCard extends StatelessWidget {
                 ),
               ],
             ),
-            const Divider(height: 24),
-            ...order.items.map(
-              (item) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(item.itemName),
-                subtitle: Text(
-                  '${item.qty.g} ${item.uom}${item.kitchenCounter?.isNotEmpty == true ? ' · ${item.kitchenCounter}' : ''}${item.kitchenNote?.isNotEmpty == true ? '\n${item.kitchenNote}' : ''}',
+            if (_expanded) ...[
+              const Divider(height: 20),
+              ...widget.order.items.map(
+                (item) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(item.itemName),
+                  subtitle: Text(
+                    '${item.qty.g} ${item.uom}${item.kitchenCounter?.isNotEmpty == true ? ' · ${item.kitchenCounter}' : ''}${item.kitchenNote?.isNotEmpty == true ? '\n${item.kitchenNote}' : ''}',
+                  ),
+                  trailing: item.canCancel
+                      ? TextButton(
+                          onPressed:
+                              requesting || widget.busyRow == item.rowName
+                              ? null
+                              : () => widget.onCancel(item),
+                          child: const Text('Cancel'),
+                        )
+                      : null,
                 ),
-                trailing: item.canCancel
-                    ? TextButton(
-                        onPressed: requesting || busyRow == item.rowName
-                            ? null
-                            : () => onCancel(item),
-                        child: const Text('Cancel'),
-                      )
-                    : null,
               ),
-            ),
+            ],
           ],
         ),
       ),
