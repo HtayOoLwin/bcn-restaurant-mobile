@@ -28,6 +28,14 @@ class MenuScreen extends ConsumerStatefulWidget {
 
 class _MenuScreenState extends ConsumerState<MenuScreen> {
   String _selectedCategory = 'All';
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,16 +49,48 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         error: (error, _) => Center(child: Text(error.toString())),
         data: (response) {
           final categories = <String>['All', ...response.groups];
-          final visibleItems = _selectedCategory == 'All'
-              ? response.items
-              : response.items
-                    .where((item) => item.itemGroup == _selectedCategory)
-                    .toList();
+          final normalizedQuery = _searchQuery.trim().toLowerCase();
+          final visibleItems = response.items.where((item) {
+            final matchesCategory =
+                _selectedCategory == 'All' ||
+                item.itemGroup == _selectedCategory;
+            final matchesSearch =
+                normalizedQuery.isEmpty ||
+                item.itemName.toLowerCase().contains(normalizedQuery) ||
+                item.itemCode.toLowerCase().contains(normalizedQuery);
+            return matchesCategory && matchesSearch;
+          }).toList();
 
           return Column(
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                child: TextField(
+                  controller: _searchController,
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Search menu items',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          ),
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -70,8 +110,16 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
               ),
               Expanded(
                 child: visibleItems.isEmpty
-                    ? const Center(child: Text('No items in this category.'))
+                    ? Center(
+                        child: Text(
+                          normalizedQuery.isEmpty
+                              ? 'No items in this category.'
+                              : 'No matching items.',
+                        ),
+                      )
                     : ListView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
                         padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
                         children: [
                           ...visibleItems.map((item) => _MenuTile(item: item)),
