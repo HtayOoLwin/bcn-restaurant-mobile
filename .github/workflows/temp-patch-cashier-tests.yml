@@ -24,39 +24,10 @@ jobs:
 
           path = Path('mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart')
           text = path.read_text()
-
-          wrapped_old = """      await tester.pumpWidget(_cashierHarness(repository));
-          await tester.pumpAndSettle();
-
-          await tester.tap(find.text('Reprint Bill'));"""
-          wrapped_new = """      await tester.pumpWidget(_cashierHarness(repository));
-          await tester.pumpAndSettle();
-          await _expandCashierBill(tester);
-
-          await tester.tap(find.text('Reprint Bill'));"""
-          if wrapped_old in text:
-              text = text.replace(wrapped_old, wrapped_new, 1)
-
-          plain_old = """    await tester.pumpWidget(_cashierHarness(repository));
-              await tester.pumpAndSettle();
-              await tester.tap(find.text('Reprint Bill'));"""
-          plain_new = """    await tester.pumpWidget(_cashierHarness(repository));
-              await tester.pumpAndSettle();
-              await _expandCashierBill(tester);
-              await tester.tap(find.text('Reprint Bill'));"""
-          text = text.replace(plain_old, plain_new, 2)
-
-          helper = """
-          Future<void> _expandCashierBill(WidgetTester tester) async {
-            await tester.tap(find.text('Table 1'));
-            await tester.pumpAndSettle();
-          }
-
-          """
-          marker = 'Widget _cashierHarness(WindowsPrintGateway repository) {'
-          if '_expandCashierBill(WidgetTester tester)' not in text:
-              text = text.replace(marker, helper + marker, 1)
-
+          old = "      await tester.pumpAndSettle();\n\n      await tester.tap(find.text('Reprint Bill'));"
+          new = "      await tester.pumpAndSettle();\n      await _expandCashierBill(tester);\n\n      await tester.tap(find.text('Reprint Bill'));"
+          if old in text:
+              text = text.replace(old, new, 1)
           path.write_text(text)
           PY
 
@@ -69,5 +40,5 @@ jobs:
           git config user.name "HtayOoLwin"
           git config user.email "htayoo.lwin@bcncl.com"
           git add mobile/bcn_restaurant_mobile/test/features/settings/settings_screen_test.dart
-          git commit -m "test: expand cashier card before print actions"
+          git commit -m "test: expand first cashier card before print action"
           git push origin HEAD:bcn-restaurant-mobile-without-kitchen-monitor
