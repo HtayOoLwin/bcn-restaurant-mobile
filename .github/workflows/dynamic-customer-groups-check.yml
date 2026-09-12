@@ -18,6 +18,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install Python test dependency
+        run: python -m pip install pytest
+
       - name: Run contract test
         run: python -m pytest tests/test_dynamic_customer_groups_contract.py
 
