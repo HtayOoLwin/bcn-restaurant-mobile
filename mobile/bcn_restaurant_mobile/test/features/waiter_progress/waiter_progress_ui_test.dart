@@ -20,16 +20,31 @@ void main() {
     expect(source, isNot(contains("'Served \${order.servedQty.g}'")));
   });
 
-  test('request for bill action is rendered in the table header before items', () {
-    final cardStart = source.indexOf('class _ProgressCard');
-    final tableName = source.indexOf('order.customer', cardStart);
-    final requestButton = source.indexOf('FilledButton.icon(', tableName);
-    final itemList = source.indexOf('...order.items.map(', tableName);
+  test('progress card starts collapsed and table name toggles item details', () {
+    expect(source, contains('class _ProgressCard extends StatefulWidget'));
+    expect(source, contains('bool _expanded = false;'));
+    expect(source, contains('setState(() => _expanded = !_expanded)'));
+    expect(source, contains('if (_expanded) ...['));
+  });
 
-    expect(cardStart, greaterThanOrEqualTo(0));
-    expect(tableName, greaterThan(cardStart));
-    expect(requestButton, greaterThan(tableName));
-    expect(itemList, greaterThan(requestButton));
+  test('collapsed header contains table name and bill action only', () {
+    final cardStart = source.indexOf('class _ProgressCard');
+    final headerStart = source.indexOf('Row(', cardStart);
+    final expandedStart = source.indexOf('if (_expanded) ...[', headerStart);
+    final header = source.substring(headerStart, expandedStart);
+
+    expect(header, contains('widget.order.customer'));
+    expect(header, contains('Request for Bill'));
+    expect(header, isNot(contains('widget.order.name')));
+    expect(header, isNot(contains('widget.order.items')));
+  });
+
+  test('item rows appear only inside expanded content', () {
+    final expandedStart = source.indexOf('if (_expanded) ...[');
+    final itemList = source.indexOf('...widget.order.items.map(', expandedStart);
+
+    expect(expandedStart, greaterThanOrEqualTo(0));
+    expect(itemList, greaterThan(expandedStart));
   });
 
   test('item rows show quantity and counter without item preparation status', () {
