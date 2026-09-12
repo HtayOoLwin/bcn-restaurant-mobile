@@ -20,6 +20,13 @@ final tablesProvider = FutureProvider.family<TablesResponse, String>(
       ref.watch(tablesRepositoryProvider).getTables(serviceType),
 );
 
+int waiterTableColumnCount(double width) {
+  if (width < 340) return 2;
+  if (width < 700) return 3;
+  if (width < 1000) return 4;
+  return 5;
+}
+
 class WaiterTablesScreen extends ConsumerStatefulWidget {
   const WaiterTablesScreen({super.key});
 
@@ -93,28 +100,38 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(
-                  value: 'dine_in',
-                  label: Text('Dine In'),
-                  icon: Icon(Icons.table_restaurant),
-                ),
-                ButtonSegment(
-                  value: 'takeaway',
-                  label: Text('Takeaway'),
-                  icon: Icon(Icons.takeout_dining),
-                ),
-              ],
-              selected: {serviceType},
-              onSelectionChanged: (selection) {
-                setState(() => serviceType = selection.first);
-              },
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    selected: serviceType == 'dine_in',
+                    avatar: const Icon(Icons.groups_2_outlined, size: 18),
+                    label: const Text('Dine In'),
+                    labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+                    onSelected: (_) {
+                      if (serviceType == 'dine_in') return;
+                      setState(() => serviceType = 'dine_in');
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    selected: serviceType == 'takeaway',
+                    avatar: const Icon(Icons.takeout_dining, size: 18),
+                    label: const Text('Takeaway'),
+                    labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+                    onSelected: (_) {
+                      if (serviceType == 'takeaway') return;
+                      setState(() => serviceType = 'takeaway');
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -131,6 +148,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                         },
                       ),
                 border: const OutlineInputBorder(),
+                isDense: true,
               ),
               onChanged: (value) {
                 setState(() => _searchQuery = value);
@@ -146,12 +164,12 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
               error: (error, _) => Center(child: Text(error.toString())),
               data: (response) {
                 final filteredTables = response.tables.where((table) {
+                  final session = table.session;
                   return matchesOrderSearch(
                     queryText: _searchQuery,
                     tableName: table.customerName,
                     orderNumbers: [
-                      if (table.session != null && table.session!.isNotEmpty)
-                        table.session!,
+                      if (session != null && session.isNotEmpty) session,
                     ],
                     searchTerms: [table.customer],
                   );
@@ -160,45 +178,52 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                 return RefreshIndicator(
                   onRefresh: () =>
                       ref.refresh(tablesProvider(serviceType).future),
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 220,
-                          childAspectRatio: 1.5,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                        ),
-                    itemCount: filteredTables.length,
-                    itemBuilder: (context, index) {
-                      final table = filteredTables[index];
-                      return _TableCard(
-                        table: table,
-                        onTap: () async {
-                          if ((table.sessionStatus ?? '').toLowerCase() ==
-                              'billing') {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Bill already requested. This order is locked.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns = waiterTableColumnCount(
+                        constraints.maxWidth,
+                      );
 
-                          ref
-                              .read(cartProvider.notifier)
-                              .setOrderContext(
-                                customer: table.customer,
-                                session: table.session,
+                      return GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          childAspectRatio: columns <= 2 ? 1.75 : 1.55,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemCount: filteredTables.length,
+                        itemBuilder: (context, index) {
+                          final table = filteredTables[index];
+                          return _TableCard(
+                            table: table,
+                            onTap: () async {
+                              if ((table.sessionStatus ?? '').toLowerCase() ==
+                                  'billing') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Bill already requested. This order is locked.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              ref
+                                  .read(cartProvider.notifier)
+                                  .setOrderContext(
+                                    customer: table.customer,
+                                    session: table.session,
+                                  );
+
+                              await context.push(
+                                '/menu/${Uri.encodeComponent(table.customer)}',
                               );
 
-                          await context.push(
-                            '/menu/${Uri.encodeComponent(table.customer)}',
+                              ref.invalidate(tablesProvider(serviceType));
+                            },
                           );
-
-                          ref.invalidate(tablesProvider(serviceType));
                         },
                       );
                     },
@@ -251,48 +276,53 @@ class _TableCard extends StatelessWidget {
     }
 
     return Card(
+      margin: EdgeInsets.zero,
       color: cardColor,
-      elevation: 2,
+      elevation: 1.5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                table.customerName,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      table.customerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.chevron_right, size: 18, color: statusColor),
+                ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Icon(statusIcon, size: 16, color: statusColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    status,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
-              if (table.isOpen &&
-                  table.session != null &&
-                  table.session!.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  table.session!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
             ],
           ),
         ),
