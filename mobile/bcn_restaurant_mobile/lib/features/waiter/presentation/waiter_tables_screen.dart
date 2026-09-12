@@ -111,7 +111,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    for (final group in response.customerGroups) ...[
+                    for (final group in customerGroups) ...[
                       ChoiceChip(
                         selected: effectiveCustomerGroup == group,
                         avatar: const Icon(Icons.groups_2_outlined, size: 18),
