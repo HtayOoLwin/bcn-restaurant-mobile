@@ -620,7 +620,18 @@ class _AmountSummaryRow extends StatelessWidget {
   }
 }
 
-class _BillCard extends StatelessWidget {
+const _billingCardColor = Color(0xFFE9F8EF);
+const _openCardColor = Colors.white;
+const _billingStatusBackground = Color(0xFFDDF5E7);
+const _billingStatusForeground = Color(0xFF0B6B3A);
+const _openStatusBackground = Color(0xFFF1F5F9);
+const _openStatusForeground = Color(0xFF475569);
+const _reprintBlue = Color(0xFF0D47A1);
+const _paymentGreen = Color(0xFF0B6B3A);
+const _disabledBackground = Color(0xFFE2E8F0);
+const _disabledForeground = Color(0xFF94A3B8);
+
+class _BillCard extends StatefulWidget {
   const _BillCard({
     required this.bill,
     required this.printPending,
@@ -634,109 +645,175 @@ class _BillCard extends StatelessWidget {
   final VoidCallback onPayment;
 
   @override
+  State<_BillCard> createState() => _BillCardState();
+}
+
+class _BillCardState extends State<_BillCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final hasPrinted = bill.lastPrintJob?.isNotEmpty == true;
+    final bill = widget.bill;
     final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'billing';
+    final cardColor = isBilling ? _billingCardColor : _openCardColor;
+    final statusBackground =
+        isBilling ? _billingStatusBackground : _openStatusBackground;
+    final statusForeground =
+        isBilling ? _billingStatusForeground : _openStatusForeground;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: cardColor,
+      surfaceTintColor: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        bill.customerName,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        bill.salesOrder,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                Chip(label: Text(bill.restaurantStatus)),
-              ],
-            ),
-            if (bill.lastPrintStatus?.isNotEmpty == true) ...[
-              const SizedBox(height: 6),
-              Text('Last Print: ${bill.lastPrintStatus}'),
-            ],
-            const Divider(height: 24),
-            ...bill.items.map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${formatQuantity(item.qty)} × ${item.itemName}',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  bill.customerName,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(
+                                _expanded ? Icons.expand_less : Icons.expand_more,
+                                color: statusForeground,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            bill.salesOrder,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Text(formatMoney(item.amount, bill.currency)),
-                  ],
-                ),
-              ),
-            ),
-            const Divider(height: 24),
-            _AmountSummaryRow(
-              label: 'Subtotal',
-              value: formatMoney(bill.netTotal, bill.currency),
-            ),
-            ...bill.taxes.map(
-              (tax) => _AmountSummaryRow(
-                label: tax.rate == 0
-                    ? tax.description
-                    : '${tax.description} ${formatQuantity(tax.rate)}%',
-                value: formatMoney(tax.taxAmount, bill.currency),
-              ),
-            ),
-            const SizedBox(height: 4),
-            _AmountSummaryRow(
-              label: 'Grand Total',
-              value: formatMoney(bill.grandTotal, bill.currency),
-              emphasize: true,
-            ),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                FilledButton.icon(
-                  onPressed: isBilling && !printPending ? onPrint : null,
-                  icon: printPending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.print),
-                  label: Text(
-                    printPending
-                        ? 'Sending…'
-                        : isBilling || hasPrinted
-                        ? 'Reprint Bill'
-                        : 'Print Bill',
                   ),
                 ),
                 const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: isBilling ? onPayment : null,
-                  icon: const Icon(Icons.point_of_sale),
-                  label: const Text('Payment'),
+                Chip(
+                  avatar: Icon(
+                    isBilling ? Icons.receipt_long : Icons.schedule,
+                    size: 18,
+                    color: statusForeground,
+                  ),
+                  label: Text(
+                    bill.restaurantStatus,
+                    style: TextStyle(
+                      color: statusForeground,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  backgroundColor: statusBackground,
+                  side: BorderSide(color: statusForeground.withValues(alpha: 0.35)),
                 ),
               ],
             ),
+            if (_expanded) ...[
+              if (bill.lastPrintStatus?.isNotEmpty == true) ...[
+                const SizedBox(height: 6),
+                Text('Last Print: ${bill.lastPrintStatus}'),
+              ],
+              const Divider(height: 24),
+              ...bill.items.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${formatQuantity(item.qty)} × ${item.itemName}',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(formatMoney(item.amount, bill.currency)),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(height: 24),
+              _AmountSummaryRow(
+                label: 'Subtotal',
+                value: formatMoney(bill.netTotal, bill.currency),
+              ),
+              ...bill.taxes.map(
+                (tax) => _AmountSummaryRow(
+                  label: tax.rate == 0
+                      ? tax.description
+                      : '${tax.description} ${formatQuantity(tax.rate)}%',
+                  value: formatMoney(tax.taxAmount, bill.currency),
+                ),
+              ),
+              const SizedBox(height: 4),
+              _AmountSummaryRow(
+                label: 'Grand Total',
+                value: formatMoney(bill.grandTotal, bill.currency),
+                emphasize: true,
+              ),
+              const Divider(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _reprintBlue,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: _disabledBackground,
+                        disabledForegroundColor: _disabledForeground,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: isBilling && !widget.printPending
+                          ? widget.onPrint
+                          : null,
+                      icon: widget.printPending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.print),
+                      label: Text(
+                        widget.printPending ? 'Sending…' : 'Reprint Bill',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _paymentGreen,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: _disabledBackground,
+                        disabledForegroundColor: _disabledForeground,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: isBilling ? widget.onPayment : null,
+                      icon: const Icon(Icons.point_of_sale),
+                      label: const Text('Payment'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
