@@ -727,6 +727,10 @@ class _BillCardState extends State<_BillCard> {
                 ),
               ],
             ),
+            if (isBilling && !_expanded) ...[
+              const SizedBox(height: 12),
+              _actionButtons(isBilling),
+            ],
             if (_expanded) ...[
               if (bill.lastPrintStatus?.isNotEmpty == true) ...[
                 const SizedBox(height: 6),
@@ -770,53 +774,57 @@ class _BillCardState extends State<_BillCard> {
                 emphasize: true,
               ),
               const Divider(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _reprintBlue,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: _disabledBackground,
-                        disabledForegroundColor: _disabledForeground,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: isBilling && !widget.printPending
-                          ? widget.onPrint
-                          : null,
-                      icon: widget.printPending
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.print),
-                      label: Text(
-                        widget.printPending ? 'Sending…' : 'Reprint Bill',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _paymentGreen,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: _disabledBackground,
-                        disabledForegroundColor: _disabledForeground,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: isBilling ? widget.onPayment : null,
-                      icon: const Icon(Icons.point_of_sale),
-                      label: const Text('Payment'),
-                    ),
-                  ),
-                ],
-              ),
+              _actionButtons(isBilling),
             ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _actionButtons(bool isBilling) {
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _reprintBlue,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _disabledBackground,
+              disabledForegroundColor: _disabledForeground,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: isBilling && !widget.printPending
+                ? widget.onPrint
+                : null,
+            icon: widget.printPending
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.print),
+            label: Text(
+              widget.printPending ? 'Sending…' : 'Reprint Bill',
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _paymentGreen,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _disabledBackground,
+              disabledForegroundColor: _disabledForeground,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: isBilling ? widget.onPayment : null,
+            icon: const Icon(Icons.point_of_sale),
+            label: const Text('Payment'),
+          ),
+        ),
+      ],
     );
   }
 }
