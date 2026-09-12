@@ -1,0 +1,37 @@
+name: Dynamic Customer Group Checks
+
+on:
+  push:
+    branches:
+      - bcn-restaurant-mobile-without-kitchen-monitor
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run contract test
+        run: python -m pytest tests/test_dynamic_customer_groups_contract.py
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: mobile/bcn_restaurant_mobile
+        run: flutter pub get
+
+      - name: Run Flutter tests
+        working-directory: mobile/bcn_restaurant_mobile
+        run: flutter test
