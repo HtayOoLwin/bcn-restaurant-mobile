@@ -3,7 +3,7 @@
     <application
         android:label="BCN Restaurant"
         android:name="${applicationName}"
-        android:icon="@drawable/bcn_app_icon">
+        android:icon="@drawable/bcn_launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"
