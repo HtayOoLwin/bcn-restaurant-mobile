@@ -70,43 +70,55 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
     final effectiveCustomerGroup = customerGroup.isNotEmpty
         ? customerGroup
         : (response?.customerGroup ?? '');
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          bootstrap?.fullName.isNotEmpty == true
-              ? bootstrap!.fullName
-              : 'Waiter',
+        toolbarHeight: 72,
+        titleSpacing: 16,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'BCN Restaurant',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              bootstrap?.fullName.isNotEmpty == true
+                  ? '${bootstrap!.fullName} • Waiter'
+                  : 'Waiter',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.82),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Order Progress',
-            onPressed: () => context.push('/waiter-progress'),
-            icon: const Icon(Icons.receipt_long),
-          ),
           if (bootstrap?.permissions.cashier == true)
             IconButton(
               tooltip: 'Cashier',
               onPressed: () => context.go('/cashier'),
-              icon: const Icon(Icons.point_of_sale),
+              icon: const Icon(Icons.point_of_sale_outlined),
             ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: () => ref.invalidate(tablesProvider(customerGroup)),
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
           ),
-          IconButton(
-            tooltip: 'Settings',
-            onPressed: () => context.push('/settings'),
-            icon: const Icon(Icons.settings),
-          ),
+          const SizedBox(width: 6),
         ],
       ),
       body: Column(
         children: [
           if (customerGroups.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            Container(
+              width: double.infinity,
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -114,10 +126,19 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                     for (final group in customerGroups) ...[
                       ChoiceChip(
                         selected: effectiveCustomerGroup == group,
-                        avatar: const Icon(Icons.groups_2_outlined, size: 18),
                         label: Text(group),
-                        labelStyle: const TextStyle(
-                          fontWeight: FontWeight.w600,
+                        showCheckmark: false,
+                        selectedColor: colorScheme.primary,
+                        backgroundColor: const Color(0xFFEAF1F8),
+                        side: BorderSide.none,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        labelStyle: TextStyle(
+                          color: effectiveCustomerGroup == group
+                              ? Colors.white
+                              : const Color(0xFF173A5E),
+                          fontWeight: FontWeight.w700,
                         ),
                         onSelected: (_) {
                           if (effectiveCustomerGroup == group) return;
@@ -130,29 +151,27 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                 ),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search table, customer, or order',
-                prefixIcon: const Icon(Icons.search),
+                hintText: 'Search table, customer, or order...',
+                prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _searchQuery.isEmpty
                     ? null
                     : IconButton(
                         tooltip: 'Clear search',
-                        icon: const Icon(Icons.clear),
+                        icon: const Icon(Icons.clear_rounded),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
                         },
                       ),
-                border: const OutlineInputBorder(),
                 isDense: true,
               ),
-              onChanged: (value) {
-                setState(() => _searchQuery = value);
-              },
+              onChanged: (value) => setState(() => _searchQuery = value),
             ),
           ),
           OperationalRefreshIndicator(
@@ -161,7 +180,12 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
           Expanded(
             child: tables.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text(error.toString())),
+              error: (error, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(error.toString(), textAlign: TextAlign.center),
+                ),
+              ),
               data: (response) {
                 final filteredTables = response.tables.where((table) {
                   final session = table.session;
@@ -175,62 +199,128 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                   );
                 }).toList();
 
-                return RefreshIndicator(
-                  onRefresh: () =>
-                      ref.refresh(tablesProvider(customerGroup).future),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final columns = waiterTableColumnCount(
-                        constraints.maxWidth,
-                      );
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.table_restaurant_outlined,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Tables',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${filteredTables.length} ${filteredTables.length == 1 ? 'Table' : 'Tables'}',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: const Color(0xFF66829D)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: () =>
+                            ref.refresh(tablesProvider(customerGroup).future),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final columns = waiterTableColumnCount(
+                              constraints.maxWidth,
+                            );
 
-                      return GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          childAspectRatio: columns <= 2 ? 1.75 : 1.55,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                        itemCount: filteredTables.length,
-                        itemBuilder: (context, index) {
-                          final table = filteredTables[index];
-                          return _TableCard(
-                            table: table,
-                            onTap: () async {
-                              if ((table.sessionStatus ?? '').toLowerCase() ==
-                                  'billing') {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Bill already requested. This order is locked.',
-                                    ),
+                            return GridView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: columns,
+                                    childAspectRatio: columns <= 2 ? 1.22 : 1.08,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
                                   ),
+                              itemCount: filteredTables.length,
+                              itemBuilder: (context, index) {
+                                final table = filteredTables[index];
+                                return _TableCard(
+                                  table: table,
+                                  onTap: () async {
+                                    if ((table.sessionStatus ?? '')
+                                            .toLowerCase() ==
+                                        'billing') {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Bill already requested. This order is locked.',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    ref
+                                        .read(cartProvider.notifier)
+                                        .setOrderContext(
+                                          customer: table.customer,
+                                          session: table.session,
+                                        );
+
+                                    await context.push(
+                                      '/menu/${Uri.encodeComponent(table.customer)}',
+                                    );
+
+                                    ref.invalidate(
+                                      tablesProvider(customerGroup),
+                                    );
+                                  },
                                 );
-                                return;
-                              }
-
-                              ref
-                                  .read(cartProvider.notifier)
-                                  .setOrderContext(
-                                    customer: table.customer,
-                                    session: table.session,
-                                  );
-
-                              await context.push(
-                                '/menu/${Uri.encodeComponent(table.customer)}',
-                              );
-
-                              ref.invalidate(tablesProvider(customerGroup));
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        height: 66,
+        selectedIndex: 0,
+        backgroundColor: Colors.white,
+        indicatorColor: colorScheme.primary.withValues(alpha: 0.12),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        onDestinationSelected: (index) {
+          if (index == 1) {
+            context.push('/waiter-progress');
+          } else if (index == 2) {
+            context.push('/settings');
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Tables',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long_rounded),
+            label: 'Orders',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings_rounded),
+            label: 'Settings',
           ),
         ],
       ),
@@ -250,78 +340,85 @@ class _TableCard extends StatelessWidget {
         ? (table.sessionStatus ?? 'Occupied')
         : 'Available';
 
-    Color cardColor;
     Color statusColor;
+    Color statusBackground;
     IconData statusIcon;
 
     switch (status.toLowerCase()) {
       case 'occupied':
-        cardColor = Colors.red.shade50;
-        statusColor = Colors.red.shade800;
-        statusIcon = Icons.restaurant;
+        statusColor = const Color(0xFFB94A55);
+        statusBackground = const Color(0xFFFBEAEC);
+        statusIcon = Icons.person_outline_rounded;
         break;
-
       case 'billing':
-        cardColor = Colors.blue.shade50;
-        statusColor = Colors.blue.shade700;
-        statusIcon = Icons.point_of_sale;
+        statusColor = const Color(0xFF2E67A0);
+        statusBackground = const Color(0xFFE8F1FA);
+        statusIcon = Icons.point_of_sale_outlined;
         break;
-
       case 'available':
       default:
-        cardColor = Colors.green.shade50;
-        statusColor = Colors.green.shade700;
-        statusIcon = Icons.check_circle_outline;
+        statusColor = const Color(0xFF2E7D5B);
+        statusBackground = const Color(0xFFE6F5EE);
+        statusIcon = Icons.check_circle_outline_rounded;
         break;
     }
 
-    return Card(
-      margin: EdgeInsets.zero,
-      color: cardColor,
-      elevation: 1.5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      clipBehavior: Clip.antiAlias,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFDCE7F1)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      table.customerName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Icon(Icons.chevron_right, size: 18, color: statusColor),
-                ],
+              Icon(
+                Icons.table_restaurant_outlined,
+                size: 30,
+                color: const Color(0xFF315F8E),
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Icon(statusIcon, size: 16, color: statusColor),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                      status,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: statusColor,
-                        fontWeight: FontWeight.w600,
+              const SizedBox(height: 7),
+              Text(
+                table.customerName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: const Color(0xFF102F4F),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBackground,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(statusIcon, size: 14, color: statusColor),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        status,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
