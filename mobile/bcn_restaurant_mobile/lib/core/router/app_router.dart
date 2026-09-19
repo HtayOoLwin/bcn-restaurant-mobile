@@ -119,51 +119,40 @@ class BcnLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+    return const Scaffold(
+      backgroundColor: Color(0xFFF4F7FB),
       body: SafeArea(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(30),
-                  child: Image.asset(
-                    'assets/images/bcn_loading_logo.jpg',
-                    width: 180,
-                    height: 180,
-                    fit: BoxFit.cover,
+                SizedBox(
+                  width: 156,
+                  height: 156,
+                  child: Image(
+                    image: AssetImage('assets/images/bcn_loading_logo.jpg'),
+                    fit: BoxFit.contain,
                   ),
                 ),
-                const SizedBox(height: 22),
-                const Text(
+                SizedBox(height: 20),
+                Text(
                   'BCN Restaurant',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color(0xFF173A5E),
-                    fontSize: 24,
+                    fontSize: 23,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.2,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Preparing your workspace...',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF66829D),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const SizedBox(
-                  width: 26,
-                  height: 26,
+                SizedBox(height: 24),
+                SizedBox(
+                  width: 24,
+                  height: 24,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2.6,
+                    strokeWidth: 2.4,
                     color: Color(0xFF1E5E96),
                   ),
                 ),
