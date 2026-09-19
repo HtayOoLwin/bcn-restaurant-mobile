@@ -9,17 +9,22 @@ void main() {
     final manifest = File(
       'android/app/src/main/AndroidManifest.xml',
     ).readAsStringSync();
+    final launcher = File(
+      'android/app/src/main/res/drawable/bcn_launcher_icon.xml',
+    ).readAsStringSync();
     final splash = File(
       'android/app/src/main/res/drawable/launch_background.xml',
     ).readAsStringSync();
 
-    expect(pubspec, contains('assets/images/bcn_loading_logo.png'));
-    expect(router, contains("Image.asset('assets/images/bcn_loading_logo.png'"));
+    expect(pubspec, contains('assets/images/bcn_loading_logo.jpg'));
+    expect(router, contains("Image.asset('assets/images/bcn_loading_logo.jpg'"));
     expect(router, contains('fit: BoxFit.contain'));
     expect(router, isNot(contains('ClipRRect(')));
     expect(router, contains("'BCN Restaurant'"));
-    expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
+    expect(manifest, contains('android:icon="@drawable/bcn_launcher_icon"'));
     expect(manifest, contains('android:label="BCN Restaurant"'));
-    expect(splash, contains('@drawable/launch_image'));
+    expect(launcher, contains('@drawable/bcn_app_icon'));
+    expect(launcher, contains('android:left="8dp"'));
+    expect(splash, contains('@drawable/bcn_app_icon'));
   });
 }
