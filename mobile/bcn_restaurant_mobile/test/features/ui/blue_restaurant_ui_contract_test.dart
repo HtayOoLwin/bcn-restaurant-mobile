@@ -13,6 +13,13 @@ void main() {
     expect(source, isNot(contains('Colors.deepOrange')));
   });
 
+  test('global filled button theme keeps a finite minimum width', () {
+    final source = _read('lib/app.dart');
+
+    expect(source, contains('minimumSize: const Size(0, 52)'));
+    expect(source, isNot(contains('Size.fromHeight(52)')));
+  });
+
   test('waiter tables use blue navigation and soft table cards', () {
     final source = _read(
       'lib/features/waiter/presentation/waiter_tables_screen.dart',
