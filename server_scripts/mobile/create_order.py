@@ -70,9 +70,6 @@ if not customer_row:
 if customer_row.disabled:
     frappe.throw("Customer / Table is disabled: " + customer)
 
-if customer_row.customer_group not in ("Dine In", "Takeaway"):
-    frappe.throw("Customer must belong to Dine In or Takeaway Customer Group.")
-
 active_orders = frappe.get_all(
     "Sales Order",
     filters={
