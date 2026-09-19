@@ -12,6 +12,11 @@ void main() {
     source = File(screenPath).readAsStringSync();
   });
 
+  test('progress screen refreshes orders when opened', () {
+    expect(source, contains('WidgetsBinding.instance.addPostFrameCallback'));
+    expect(source, contains('ref.invalidate(waiterProgressProvider);'));
+  });
+
   test('progress card hides kitchen status summary labels', () {
     expect(source, isNot(contains('Text(order.preparationSummary)')));
     expect(source, isNot(contains("'New \${order.newQty.g}'")));
