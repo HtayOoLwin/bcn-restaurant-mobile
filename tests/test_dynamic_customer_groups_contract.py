@@ -29,6 +29,17 @@ def test_packaged_tables_api_exposes_dynamic_customer_groups():
     assert '"customer_groups": customer_groups' in source
 
 
+def test_waiter_create_order_accepts_any_enabled_customer_group():
+    packaged = _read("bcn_restaurant/api/orders.py")
+    server_script = _read("server_scripts/mobile/create_order.py")
+
+    assert "customer_row.customer_group not in allowed_groups" not in packaged
+    assert "Customer is not a configured restaurant table/takeaway customer" not in packaged
+
+    assert 'customer_row.customer_group not in ("Dine In", "Takeaway")' not in server_script
+    assert "Customer must belong to Dine In or Takeaway Customer Group." not in server_script
+
+
 def test_mobile_waiter_uses_dynamic_customer_group_chips():
     screen = _read(
         "mobile/bcn_restaurant_mobile/lib/features/waiter/presentation/waiter_tables_screen.dart"
