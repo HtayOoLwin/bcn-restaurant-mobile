@@ -70,8 +70,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/loading',
-        builder: (context, state) =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        builder: (context, state) => const BcnLoadingScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
@@ -114,6 +113,68 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class BcnLoadingScreen extends StatelessWidget {
+  const BcnLoadingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F7FB),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: Image.asset(
+                    'assets/images/bcn_loading_logo.jpg',
+                    width: 180,
+                    height: 180,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const Text(
+                  'BCN Restaurant',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF173A5E),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Preparing your workspace...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF66829D),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.6,
+                    color: Color(0xFF1E5E96),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class UnsupportedRoleScreen extends StatelessWidget {
   const UnsupportedRoleScreen({super.key, required this.onLogout});
