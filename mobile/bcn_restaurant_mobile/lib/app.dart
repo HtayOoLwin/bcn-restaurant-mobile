@@ -18,7 +18,6 @@ class BcnRestaurantApp extends ConsumerWidget {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: _primaryBlue,
       brightness: Brightness.light,
-      surface: Colors.white,
     );
 
     return MaterialApp.router(
