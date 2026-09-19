@@ -54,7 +54,7 @@ class BcnRestaurantApp extends ConsumerWidget {
           style: FilledButton.styleFrom(
             backgroundColor: _primaryBlue,
             foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(52),
+            minimumSize: const Size(0, 52),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
