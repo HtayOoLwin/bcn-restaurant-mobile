@@ -119,25 +119,25 @@ class BcnLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFFF4F7FB),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F7FB),
       body: SafeArea(
         child: Center(
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
                   width: 156,
                   height: 156,
-                  child: Image(
-                    image: AssetImage('assets/images/bcn_loading_logo.jpg'),
+                  child: Image.asset(
+                    'assets/images/bcn_loading_logo.jpg',
                     fit: BoxFit.contain,
                   ),
                 ),
-                SizedBox(height: 20),
-                Text(
+                const SizedBox(height: 20),
+                const Text(
                   'BCN Restaurant',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -147,8 +147,8 @@ class BcnLoadingScreen extends StatelessWidget {
                     letterSpacing: 0.2,
                   ),
                 ),
-                SizedBox(height: 24),
-                SizedBox(
+                const SizedBox(height: 24),
+                const SizedBox(
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(
