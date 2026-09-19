@@ -42,10 +42,6 @@ def create_order(
     if not customer_row or customer_row.disabled:
         frappe.throw("Customer / table is invalid or disabled")
 
-    allowed_groups = {settings["dine_in_customer_group"], settings["takeaway_customer_group"]}
-    if customer_row.customer_group not in allowed_groups:
-        frappe.throw("Customer is not a configured restaurant table/takeaway customer")
-
     session_name = _get_or_create_session(
         customer=customer,
         customer_group=customer_row.customer_group,
