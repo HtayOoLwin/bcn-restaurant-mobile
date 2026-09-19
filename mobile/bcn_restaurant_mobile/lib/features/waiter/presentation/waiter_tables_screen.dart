@@ -241,7 +241,11 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                               gridDelegate:
                                   SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: columns,
-                                    childAspectRatio: columns <= 2 ? 1.22 : 1.08,
+                                    childAspectRatio: columns == 3
+                                        ? 0.88
+                                        : columns <= 2
+                                        ? 1.15
+                                        : 1.02,
                                     crossAxisSpacing: 10,
                                     mainAxisSpacing: 10,
                                   ),
@@ -340,31 +344,39 @@ class _TableCard extends StatelessWidget {
         ? (table.sessionStatus ?? 'Occupied')
         : 'Available';
 
+    Color cardBackground;
+    Color borderColor;
     Color statusColor;
     Color statusBackground;
     IconData statusIcon;
 
     switch (status.toLowerCase()) {
       case 'occupied':
+        cardBackground = const Color(0xFFFFEFF1);
+        borderColor = const Color(0xFFF1CDD2);
         statusColor = const Color(0xFFB94A55);
-        statusBackground = const Color(0xFFFBEAEC);
+        statusBackground = const Color(0xFFFFE1E5);
         statusIcon = Icons.person_outline_rounded;
         break;
       case 'billing':
+        cardBackground = const Color(0xFFEAF2FA);
+        borderColor = const Color(0xFFC9DCEF);
         statusColor = const Color(0xFF2E67A0);
-        statusBackground = const Color(0xFFE8F1FA);
+        statusBackground = const Color(0xFFDCEAF7);
         statusIcon = Icons.point_of_sale_outlined;
         break;
       case 'available':
       default:
+        cardBackground = const Color(0xFFE8F6EF);
+        borderColor = const Color(0xFFCBE8DA);
         statusColor = const Color(0xFF2E7D5B);
-        statusBackground = const Color(0xFFE6F5EE);
+        statusBackground = const Color(0xFFD9F0E4);
         statusIcon = Icons.check_circle_outline_rounded;
         break;
     }
 
     return Material(
-      color: Colors.white,
+      color: cardBackground,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -372,9 +384,9 @@ class _TableCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFDCE7F1)),
+            border: Border.all(color: borderColor),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -383,7 +395,7 @@ class _TableCard extends StatelessWidget {
                 size: 30,
                 color: const Color(0xFF315F8E),
               ),
-              const SizedBox(height: 7),
+              const SizedBox(height: 6),
               Text(
                 table.customerName,
                 maxLines: 1,
@@ -394,9 +406,9 @@ class _TableCard extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: statusBackground,
                   borderRadius: BorderRadius.circular(999),
@@ -404,14 +416,14 @@ class _TableCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(statusIcon, size: 14, color: statusColor),
+                    Icon(statusIcon, size: 13, color: statusColor),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
                         status,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: statusColor,
                           fontWeight: FontWeight.w700,
                         ),
