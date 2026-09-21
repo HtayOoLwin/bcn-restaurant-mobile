@@ -56,9 +56,9 @@ void main() {
 
     expect(gradle, contains('generateDmdBrandingResources'));
     expect(gradle, contains('Base64.getDecoder().decode(encoded)'));
-    expect(gradle, contains('dmd_logo.png'));
-    expect(gradle, contains('ic_launcher.png'));
-    expect(gradle, contains('ic_launcher_round.png'));
+    expect(gradle, contains('dmd_logo.jpg'));
+    expect(gradle, contains('ic_launcher.jpg'));
+    expect(gradle, contains('ic_launcher_round.jpg'));
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:roundIcon="@mipmap/ic_launcher_round"'));
     expect(adaptiveIcon, contains('@color/dmd_brand_dark'));
