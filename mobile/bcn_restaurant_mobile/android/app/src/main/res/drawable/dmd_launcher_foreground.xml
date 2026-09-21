@@ -6,7 +6,7 @@
         android:right="18dp"
         android:bottom="18dp">
         <bitmap
-            android:src="@drawable/dmd_logo"
+            android:src="@drawable/dmd_logo_vector"
             android:gravity="fill" />
     </item>
 </layer-list>
