@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Doh Myot Daw logo uses the real PNG asset on Flutter screens', () {
+  test('Doh Myot Daw logo uses embedded high-resolution artwork on Flutter screens', () {
     final logoSource = File(
       'lib/core/branding/doh_myot_daw_logo.dart',
     ).readAsStringSync();
@@ -15,22 +15,17 @@ void main() {
     ).readAsStringSync();
     final pubspec = File('pubspec.yaml').readAsStringSync();
 
-    expect(
-      logoSource,
-      contains("'assets/images/doh_myot_daw_logo.png'"),
-    );
-    expect(logoSource, contains('Image.asset('));
+    expect(logoSource, contains('base64Decode(_dohMyotDawLogoBase64Chunks.join())'));
+    expect(logoSource, contains('Image.memory('));
     expect(logoSource, contains('FilterQuality.high'));
     expect(logoSource, isNot(contains('rootBundle.loadString')));
-    expect(logoSource, isNot(contains('base64Decode')));
     expect(logoSource, isNot(contains('FutureBuilder')));
-    expect(pubspec, contains('assets/images/doh_myot_daw_logo.png'));
     expect(pubspec, isNot(contains('assets/images/doh_myot_daw_logo.b64')));
     expect(loginSource, contains('DohMyotDawLogo('));
     expect(routerSource, contains('DohMyotDawLogo('));
   });
 
-  test('Android launcher uses adaptive icon with the real logo artwork', () {
+  test('Android launcher uses a high-detail adaptive Doh Myot Daw icon', () {
     final manifest = File('android/app/src/main/AndroidManifest.xml')
         .readAsStringSync();
     final adaptiveIcon = File(
@@ -39,26 +34,21 @@ void main() {
     final adaptiveRoundIcon = File(
       'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
     ).readAsStringSync();
+    final vector = File(
+      'android/app/src/main/res/drawable/dmd_logo_vector.xml',
+    ).readAsStringSync();
 
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:roundIcon="@mipmap/ic_launcher_round"'));
     expect(adaptiveIcon, contains('@color/dmd_brand_dark'));
-    expect(adaptiveIcon, contains('@drawable/dmd_launcher_foreground'));
+    expect(adaptiveIcon, contains('@drawable/dmd_logo_vector'));
     expect(adaptiveRoundIcon, contains('@color/dmd_brand_dark'));
-    expect(adaptiveRoundIcon, contains('@drawable/dmd_launcher_foreground'));
-    expect(
-      File(
-        'android/app/src/main/res/drawable-nodpi/dmd_launcher_foreground.png',
-      ).existsSync(),
-      isTrue,
-    );
-    expect(
-      File('android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png').existsSync(),
-      isTrue,
-    );
+    expect(adaptiveRoundIcon, contains('@drawable/dmd_logo_vector'));
+    expect(vector, contains('android:viewportWidth="192"'));
+    expect(vector, contains('android:viewportHeight="192"'));
   });
 
-  test('native splash uses the real logo bitmap on a dark brand background', () {
+  test('native splash uses the same high-detail artwork on the dark brand background', () {
     final launchBackground = File(
       'android/app/src/main/res/drawable/launch_background.xml',
     ).readAsStringSync();
@@ -72,14 +62,10 @@ void main() {
       'android/app/src/main/res/values/colors.xml',
     ).readAsStringSync();
 
-    expect(launchBackground, contains('@drawable/dmd_splash_logo'));
-    expect(launchBackgroundV21, contains('@drawable/dmd_splash_logo'));
-    expect(stylesV31, contains('@drawable/dmd_splash_logo'));
+    expect(launchBackground, contains('@drawable/dmd_logo_vector'));
+    expect(launchBackgroundV21, contains('@drawable/dmd_logo_vector'));
+    expect(stylesV31, contains('@drawable/dmd_logo_vector'));
     expect(stylesV31, contains('@color/dmd_brand_dark'));
     expect(colors, contains('<color name="dmd_brand_dark">#171614</color>'));
-    expect(
-      File('android/app/src/main/res/drawable-nodpi/dmd_splash_logo.png').existsSync(),
-      isTrue,
-    );
   });
 }
