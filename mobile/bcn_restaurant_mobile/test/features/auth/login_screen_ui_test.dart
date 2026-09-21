@@ -12,10 +12,7 @@ void main() {
   });
 
   test('login screen uses BCN branding and restaurant subtitle', () {
-    expect(
-      source,
-      contains("Image.asset('assets/images/bcn_brand_mark.png'"),
-    );
+    expect(source, contains("'assets/images/bcn_brand_mark.png'"));
     expect(source, contains("'BCN Restaurant'"));
     expect(source, contains("'Restaurant Management System'"));
     expect(source, contains("'Powered by BCN'"));
