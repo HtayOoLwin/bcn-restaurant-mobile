@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Doh Myot Daw logo is preloaded before Flutter UI starts', () {
+  test('Flutter branding uses a static real logo asset without blocking startup', () {
     final logoSource = File(
       'lib/core/branding/doh_myot_daw_logo.dart',
     ).readAsStringSync();
@@ -16,31 +16,22 @@ void main() {
     ).readAsStringSync();
     final pubspec = File('pubspec.yaml').readAsStringSync();
 
-    expect(logoSource, contains('Future<void> preloadDohMyotDawLogo()'));
     expect(
       logoSource,
-      contains("rootBundle.loadString('assets/images/doh_myot_daw_logo_1.b64')"),
+      contains("Image.asset('assets/images/doh_myot_daw_logo.png'"),
     );
-    expect(
-      logoSource,
-      contains("rootBundle.loadString('assets/images/doh_myot_daw_logo_2.b64')"),
-    );
-    expect(
-      logoSource,
-      contains("rootBundle.loadString('assets/images/doh_myot_daw_logo_3.b64')"),
-    );
-    expect(logoSource, contains('Image.memory('));
     expect(logoSource, contains('FilterQuality.high'));
+    expect(logoSource, isNot(contains('rootBundle.loadString')));
+    expect(logoSource, isNot(contains('base64Decode')));
     expect(logoSource, isNot(contains('FutureBuilder')));
-    expect(mainSource, contains('await preloadDohMyotDawLogo();'));
-    expect(pubspec, contains('assets/images/doh_myot_daw_logo_1.b64'));
-    expect(pubspec, contains('assets/images/doh_myot_daw_logo_2.b64'));
-    expect(pubspec, contains('assets/images/doh_myot_daw_logo_3.b64'));
+    expect(mainSource, isNot(contains('preloadDohMyotDawLogo')));
+    expect(pubspec, contains('assets/images/doh_myot_daw_logo.png'));
+    expect(pubspec, isNot(contains('doh_myot_daw_logo_1.b64')));
     expect(loginSource, contains('DohMyotDawLogo('));
     expect(routerSource, contains('DohMyotDawLogo('));
   });
 
-  test('Android build generates launcher bitmaps from the same real logo data', () {
+  test('Android launcher uses checked-in real logo resources', () {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     final manifest = File('android/app/src/main/AndroidManifest.xml')
         .readAsStringSync();
@@ -54,11 +45,8 @@ void main() {
       'android/app/src/main/res/drawable/dmd_launcher_foreground.xml',
     ).readAsStringSync();
 
-    expect(gradle, contains('generateDmdBrandingResources'));
-    expect(gradle, contains('Base64.getDecoder().decode(encoded)'));
-    expect(gradle, contains('dmd_logo.jpg'));
-    expect(gradle, contains('ic_launcher.jpg'));
-    expect(gradle, contains('ic_launcher_round.jpg'));
+    expect(gradle, isNot(contains('generateDmdBrandingResources')));
+    expect(gradle, isNot(contains('generatedBrandingResDir')));
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:roundIcon="@mipmap/ic_launcher_round"'));
     expect(adaptiveIcon, contains('@color/dmd_brand_dark'));
@@ -66,9 +54,27 @@ void main() {
     expect(adaptiveRoundIcon, contains('@color/dmd_brand_dark'));
     expect(adaptiveRoundIcon, contains('@drawable/dmd_launcher_foreground'));
     expect(adaptiveForeground, contains('@drawable/dmd_logo'));
+
+    for (final density in ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
+      expect(
+        File('android/app/src/main/res/mipmap-$density/ic_launcher.png')
+            .existsSync(),
+        isTrue,
+      );
+      expect(
+        File('android/app/src/main/res/mipmap-$density/ic_launcher_round.png')
+            .existsSync(),
+        isTrue,
+      );
+    }
+
+    expect(
+      File('android/app/src/main/res/drawable-nodpi/dmd_logo.png').existsSync(),
+      isTrue,
+    );
   });
 
-  test('native splash uses the generated real logo bitmap on the dark brand background', () {
+  test('native splash uses the same checked-in real logo bitmap', () {
     final launchBackground = File(
       'android/app/src/main/res/drawable/launch_background.xml',
     ).readAsStringSync();
