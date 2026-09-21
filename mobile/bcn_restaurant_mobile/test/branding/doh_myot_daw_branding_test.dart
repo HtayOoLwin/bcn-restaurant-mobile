@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Flutter branding loads after runApp and never blocks application startup', () {
+  test('Flutter branding uses the supplied Doh Myot Daw artwork without blocking startup', () {
     final logoSource = File(
       'lib/core/branding/doh_myot_daw_logo.dart',
     ).readAsStringSync();
@@ -14,25 +14,35 @@ void main() {
     final routerSource = File(
       'lib/core/router/app_router.dart',
     ).readAsStringSync();
-    final pubspec = File('pubspec.yaml').readAsStringSync();
 
     expect(mainSource, isNot(contains('await preloadDohMyotDawLogo')));
-    expect(mainSource, isNot(contains('preloadDohMyotDawLogo')));
     expect(logoSource, contains('FutureBuilder<Uint8List>'));
     expect(logoSource, contains('rootBundle.loadString'));
     expect(logoSource, contains('Image.memory('));
     expect(logoSource, contains('FilterQuality.high'));
-    expect(pubspec, contains('assets/images/doh_myot_daw_logo_1.b64'));
-    expect(pubspec, contains('assets/images/doh_myot_daw_logo_2.b64'));
-    expect(pubspec, contains('assets/images/doh_myot_daw_logo_3.b64'));
     expect(loginSource, contains('DohMyotDawLogo('));
     expect(routerSource, contains('DohMyotDawLogo('));
   });
 
-  test('Android launcher and splash do not depend on generated resources', () {
+  test('Android launcher decodes the same supplied artwork into normal resource folders', () {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     final manifest = File('android/app/src/main/AndroidManifest.xml')
         .readAsStringSync();
+    final adaptiveForeground = File(
+      'android/app/src/main/res/drawable/dmd_launcher_foreground.xml',
+    ).readAsStringSync();
+
+    expect(gradle, contains('prepareDmdBrandingResources'));
+    expect(gradle, contains('Base64.getDecoder().decode(encoded)'));
+    expect(gradle, contains('src/main/res/drawable-nodpi'));
+    expect(gradle, contains('src/main/res/mipmap-nodpi'));
+    expect(gradle, isNot(contains('sourceSets.getByName')));
+    expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
+    expect(manifest, contains('android:roundIcon="@mipmap/ic_launcher_round"'));
+    expect(adaptiveForeground, contains('@drawable/dmd_logo'));
+  });
+
+  test('native splash uses the same decoded real logo artwork', () {
     final launchBackground = File(
       'android/app/src/main/res/drawable/launch_background.xml',
     ).readAsStringSync();
@@ -43,13 +53,8 @@ void main() {
       'android/app/src/main/res/values-v31/styles.xml',
     ).readAsStringSync();
 
-    expect(gradle, isNot(contains('generateDmdBrandingResources')));
-    expect(gradle, isNot(contains('generatedBrandingResDir')));
-    expect(manifest, contains('android:icon="@drawable/dmd_logo_vector"'));
-    expect(manifest, contains('android:roundIcon="@drawable/dmd_logo_vector"'));
-    expect(launchBackground, contains('@drawable/dmd_logo_vector'));
-    expect(launchBackgroundV21, contains('@drawable/dmd_logo_vector'));
-    expect(stylesV31, contains('@drawable/dmd_logo_vector'));
-    expect(stylesV31, contains('@color/dmd_brand_dark'));
+    expect(launchBackground, contains('@drawable/dmd_logo'));
+    expect(launchBackgroundV21, contains('@drawable/dmd_logo'));
+    expect(stylesV31, contains('@drawable/dmd_logo'));
   });
 }
