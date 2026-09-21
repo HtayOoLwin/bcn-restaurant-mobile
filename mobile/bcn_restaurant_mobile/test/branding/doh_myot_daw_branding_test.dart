@@ -3,10 +3,11 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Doh Myot Daw logo uses embedded high-resolution artwork on Flutter screens', () {
+  test('Doh Myot Daw logo is preloaded before Flutter UI starts', () {
     final logoSource = File(
       'lib/core/branding/doh_myot_daw_logo.dart',
     ).readAsStringSync();
+    final mainSource = File('lib/main.dart').readAsStringSync();
     final loginSource = File(
       'lib/features/auth/presentation/login_screen.dart',
     ).readAsStringSync();
@@ -15,15 +16,26 @@ void main() {
     ).readAsStringSync();
     final pubspec = File('pubspec.yaml').readAsStringSync();
 
+    expect(logoSource, contains('Future<void> preloadDohMyotDawLogo()'));
     expect(
       logoSource,
-      contains('base64Decode(dmdLogoData1 + dmdLogoData2 + dmdLogoData3)'),
+      contains("rootBundle.loadString('assets/images/doh_myot_daw_logo_1.b64')"),
+    );
+    expect(
+      logoSource,
+      contains("rootBundle.loadString('assets/images/doh_myot_daw_logo_2.b64')"),
+    );
+    expect(
+      logoSource,
+      contains("rootBundle.loadString('assets/images/doh_myot_daw_logo_3.b64')"),
     );
     expect(logoSource, contains('Image.memory('));
     expect(logoSource, contains('FilterQuality.high'));
-    expect(logoSource, isNot(contains('rootBundle.loadString')));
     expect(logoSource, isNot(contains('FutureBuilder')));
-    expect(pubspec, isNot(contains('assets/images/doh_myot_daw_logo.b64')));
+    expect(mainSource, contains('await preloadDohMyotDawLogo();'));
+    expect(pubspec, contains('assets/images/doh_myot_daw_logo_1.b64'));
+    expect(pubspec, contains('assets/images/doh_myot_daw_logo_2.b64'));
+    expect(pubspec, contains('assets/images/doh_myot_daw_logo_3.b64'));
     expect(loginSource, contains('DohMyotDawLogo('));
     expect(routerSource, contains('DohMyotDawLogo('));
   });
