@@ -15,7 +15,10 @@ void main() {
     ).readAsStringSync();
     final pubspec = File('pubspec.yaml').readAsStringSync();
 
-    expect(logoSource, contains('base64Decode(_dohMyotDawLogoBase64Chunks.join())'));
+    expect(
+      logoSource,
+      contains('base64Decode(dmdLogoData1 + dmdLogoData2 + dmdLogoData3)'),
+    );
     expect(logoSource, contains('Image.memory('));
     expect(logoSource, contains('FilterQuality.high'));
     expect(logoSource, isNot(contains('rootBundle.loadString')));
@@ -44,8 +47,8 @@ void main() {
     expect(adaptiveIcon, contains('@drawable/dmd_logo_vector'));
     expect(adaptiveRoundIcon, contains('@color/dmd_brand_dark'));
     expect(adaptiveRoundIcon, contains('@drawable/dmd_logo_vector'));
-    expect(vector, contains('android:viewportWidth="192"'));
-    expect(vector, contains('android:viewportHeight="192"'));
+    expect(vector, contains('android:viewportWidth="96"'));
+    expect(vector, contains('android:viewportHeight="96"'));
   });
 
   test('native splash uses the same high-detail artwork on the dark brand background', () {
