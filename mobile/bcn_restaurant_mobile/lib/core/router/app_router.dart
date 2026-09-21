@@ -119,8 +119,8 @@ class BcnLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF1E5E96),
+    return Scaffold(
+      backgroundColor: const Color(0xFF1E5E96),
       body: SafeArea(
         child: Center(
           child: Column(
@@ -129,13 +129,13 @@ class BcnLoadingScreen extends StatelessWidget {
               SizedBox(
                 width: 190,
                 height: 190,
-                child: Image(
-                  image: AssetImage('assets/images/bcn_brand_mark.png'),
+                child: Image.asset(
+                  'assets/images/bcn_brand_mark.png',
                   fit: BoxFit.contain,
                 ),
               ),
-              SizedBox(height: 30),
-              SizedBox(
+              const SizedBox(height: 30),
+              const SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
