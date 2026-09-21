@@ -7,6 +7,7 @@ import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../orders/data/orders_repository.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
+import '../../waiter_progress/presentation/waiter_ready_screen.dart';
 import '../domain/cart_controller.dart';
 
 final ordersRepositoryProvider = Provider<OrdersRepository>(
@@ -32,6 +33,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       final result = await ref.read(ordersRepositoryProvider).createOrder(cart);
       ref.invalidate(tablesProvider('dine_in'));
       ref.invalidate(tablesProvider('takeaway'));
+      ref.invalidate(waiterProgressProvider);
       ref.read(cartProvider.notifier).clear();
       if (!mounted) return;
       await showDialog<void>(
