@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+
+final Uint8List _dohMyotDawLogoBytes = base64Decode(_dohMyotDawLogoBase64);
 
 class DohMyotDawLogo extends StatelessWidget {
   const DohMyotDawLogo({
@@ -13,123 +18,17 @@ class DohMyotDawLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipOval(
-      child: CustomPaint(
-        size: Size(width ?? 160, height ?? width ?? 160),
-        painter: const _DohMyotDawLogoPainter(),
+      child: Image.memory(
+        _dohMyotDawLogoBytes,
+        width: width,
+        height: height ?? width,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        gaplessPlayback: true,
       ),
     );
   }
 }
 
-class _DohMyotDawLogoPainter extends CustomPainter {
-  const _DohMyotDawLogoPainter();
-
-  static const int _gridSize = 40;
-  static const List<int> _palette = <int>[
-    0xFFCFB280, 0xFFAF8B58, 0xFF9B713F, 0xFF7B6A52, 0xFF87532B, 0xFF705134, 0xFF5D4F3E, 0xFF584231, 0xFF5B3B27, 0xFF4A3729, 0xFF3B312A, 0xFF302721, 0xFF232223, 0xFF19191B, 0xFF0F1216, 0xFF060A0E,
-  ];
-
-  static const List<int> _runs = <int>[
-    3, 12, 6, 11, 1, 10, 1, 6, 1, 7, 1, 6, 1, 7, 1, 9, 4, 10, 6, 9, 2, 7, 1, 6, 12, 7, 3, 12,
-    7, 11, 3, 9, 2, 10, 1, 7, 1, 6, 1, 5, 4, 3, 2, 5, 16, 7, 4, 12, 8, 11, 1, 9, 1, 5, 1, 3,
-    1, 2, 9, 1, 1, 2, 1, 3, 1, 7, 1, 9, 11, 7, 5, 12, 3, 11, 1, 10, 1, 11, 1, 10, 1, 5, 4, 3,
-    8, 2, 4, 1, 1, 3, 1, 7, 1, 9, 9, 7, 5, 12, 4, 11, 1, 7, 1, 2, 2, 3, 3, 0, 2, 2, 6, 1,
-    2, 2, 4, 1, 1, 5, 1, 9, 8, 7, 5, 12, 3, 11, 1, 6, 1, 1, 2, 3, 1, 0, 1, 3, 2, 0, 1, 2,
-    3, 1, 2, 0, 4, 1, 2, 2, 2, 1, 1, 2, 1, 3, 1, 9, 3, 7, 4, 9, 7, 12, 1, 5, 1, 1, 1, 0,
-    1, 1, 1, 8, 1, 0, 1, 1, 1, 0, 1, 3, 2, 0, 2, 1, 1, 0, 1, 1, 1, 3, 4, 0, 1, 1, 1, 2,
-    1, 1, 2, 0, 1, 2, 1, 9, 2, 7, 4, 9, 5, 12, 1, 13, 2, 5, 1, 3, 2, 0, 2, 2, 5, 0, 1, 1,
-    1, 2, 2, 0, 1, 1, 1, 0, 1, 5, 1, 0, 1, 1, 1, 0, 1, 1, 2, 0, 1, 3, 2, 2, 1, 9, 2, 7,
-    3, 9, 4, 12, 1, 13, 1, 7, 1, 5, 1, 2, 1, 10, 1, 1, 2, 0, 1, 6, 1, 0, 1, 3, 1, 0, 1, 1,
-    2, 0, 2, 3, 1, 1, 1, 5, 3, 0, 1, 5, 1, 0, 1, 1, 1, 0, 1, 1, 1, 8, 3, 2, 2, 7, 3, 9,
-    3, 12, 1, 13, 1, 9, 1, 5, 1, 2, 1, 8, 1, 4, 1, 3, 1, 7, 1, 0, 2, 1, 1, 2, 1, 8, 1, 3,
-    2, 0, 1, 1, 1, 8, 1, 4, 1, 2, 2, 4, 1, 3, 1, 0, 1, 3, 1, 8, 1, 0, 1, 1, 2, 4, 2, 2,
-    1, 5, 1, 10, 3, 9, 1, 13, 3, 12, 2, 5, 1, 7, 1, 4, 1, 2, 1, 8, 1, 3, 1, 0, 2, 1, 1, 0,
-    2, 1, 1, 9, 1, 6, 2, 5, 1, 3, 1, 5, 4, 4, 1, 5, 2, 0, 1, 4, 1, 2, 1, 4, 1, 5, 2, 2,
-    1, 9, 3, 10, 1, 13, 1, 12, 1, 13, 1, 9, 2, 5, 1, 8, 1, 4, 1, 2, 1, 4, 1, 8, 1, 3, 1, 0,
-    1, 3, 1, 6, 2, 10, 1, 3, 1, 1, 1, 3, 1, 2, 2, 1, 1, 3, 1, 5, 3, 4, 1, 5, 2, 4, 1, 1,
-    1, 2, 1, 4, 2, 2, 1, 5, 3, 10, 2, 13, 1, 12, 1, 5, 1, 4, 1, 8, 5, 4, 1, 8, 1, 5, 2, 7,
-    1, 1, 2, 0, 1, 1, 1, 3, 1, 5, 1, 1, 2, 0, 1, 1, 1, 6, 1, 5, 7, 4, 1, 5, 1, 2, 1, 4,
-    3, 10, 1, 12, 1, 13, 1, 10, 2, 5, 1, 8, 1, 4, 1, 8, 3, 4, 1, 8, 2, 7, 2, 0, 2, 1, 1, 4,
-    2, 5, 1, 4, 2, 1, 2, 0, 1, 6, 2, 5, 5, 4, 1, 5, 2, 2, 1, 7, 1, 11, 1, 10, 1, 12, 1, 13,
-    1, 7, 1, 5, 1, 7, 2, 8, 1, 4, 1, 2, 1, 4, 1, 8, 1, 5, 1, 6, 1, 0, 3, 1, 1, 2, 3, 5,
-    1, 7, 1, 2, 3, 1, 1, 0, 1, 6, 2, 5, 1, 4, 1, 2, 3, 4, 1, 5, 1, 2, 1, 5, 1, 11, 1, 10,
-    2, 13, 1, 7, 1, 5, 1, 10, 2, 5, 1, 2, 1, 4, 2, 8, 1, 6, 4, 1, 1, 2, 2, 5, 2, 4, 2, 5,
-    1, 2, 1, 0, 1, 1, 1, 0, 1, 1, 1, 6, 1, 5, 1, 4, 2, 2, 2, 4, 1, 7, 1, 2, 1, 5, 1, 10,
-    1, 11, 1, 14, 1, 12, 2, 5, 1, 10, 1, 8, 2, 4, 1, 2, 1, 8, 1, 7, 1, 3, 1, 0, 1, 1, 1, 5,
-    1, 1, 1, 4, 1, 6, 3, 3, 1, 8, 1, 7, 1, 2, 1, 1, 1, 5, 1, 1, 1, 0, 1, 3, 1, 7, 1, 8,
-    1, 2, 3, 4, 1, 8, 1, 2, 1, 4, 1, 9, 1, 11, 1, 14, 1, 11, 1, 5, 1, 7, 1, 10, 1, 8, 1, 4,
-    1, 5, 1, 4, 1, 9, 1, 6, 1, 3, 2, 1, 1, 3, 1, 5, 1, 6, 4, 0, 1, 1, 1, 7, 1, 5, 2, 4,
-    2, 1, 1, 3, 1, 5, 1, 9, 3, 4, 1, 5, 1, 9, 1, 5, 1, 4, 1, 9, 1, 12, 1, 14, 1, 10, 1, 5,
-    1, 7, 1, 10, 1, 8, 1, 4, 2, 5, 1, 10, 1, 6, 1, 3, 1, 5, 1, 2, 1, 3, 1, 5, 6, 0, 1, 7,
-    2, 8, 1, 5, 1, 2, 1, 4, 1, 3, 1, 6, 1, 9, 1, 4, 1, 5, 1, 4, 1, 8, 1, 9, 1, 7, 1, 4,
-    1, 9, 1, 12, 1, 14, 1, 10, 1, 5, 1, 9, 1, 10, 1, 9, 3, 5, 1, 10, 1, 6, 1, 1, 2, 5, 1, 4,
-    1, 8, 1, 1, 1, 0, 1, 3, 1, 0, 2, 3, 2, 6, 1, 3, 1, 2, 2, 5, 1, 1, 1, 6, 1, 9, 1, 4,
-    2, 5, 2, 8, 1, 7, 1, 4, 1, 9, 1, 12, 1, 14, 1, 10, 1, 5, 1, 9, 1, 11, 1, 9, 1, 5, 2, 8,
-    1, 10, 1, 6, 1, 1, 1, 5, 1, 8, 1, 9, 1, 11, 1, 3, 1, 1, 2, 0, 1, 2, 3, 3, 1, 2, 2, 1,
-    1, 8, 1, 1, 1, 6, 1, 9, 1, 5, 1, 8, 1, 5, 1, 8, 1, 11, 1, 9, 1, 4, 1, 9, 1, 12, 1, 14,
-    1, 11, 1, 5, 1, 7, 1, 13, 1, 12, 1, 9, 1, 5, 1, 8, 1, 11, 1, 9, 1, 3, 1, 2, 1, 6, 1, 10,
-    2, 9, 1, 1, 1, 0, 1, 1, 1, 2, 1, 5, 1, 6, 1, 1, 1, 7, 1, 4, 1, 0, 1, 2, 1, 1, 1, 7,
-    1, 11, 2, 5, 1, 8, 1, 11, 1, 12, 1, 7, 1, 5, 1, 10, 1, 13, 1, 14, 1, 11, 1, 5, 1, 7, 1, 11,
-    1, 2, 1, 5, 1, 10, 1, 8, 1, 5, 1, 10, 3, 2, 1, 3, 1, 7, 1, 11, 2, 0, 2, 2, 1, 4, 1, 6,
-    1, 0, 1, 3, 1, 5, 1, 0, 1, 2, 1, 3, 1, 10, 1, 4, 1, 7, 1, 10, 1, 4, 1, 2, 1, 10, 1, 7,
-    1, 5, 1, 11, 1, 13, 1, 14, 1, 13, 1, 8, 1, 7, 1, 12, 2, 4, 1, 9, 1, 7, 1, 4, 1, 12, 1, 11,
-    1, 4, 1, 3, 1, 6, 1, 3, 1, 7, 1, 1, 1, 0, 2, 2, 1, 4, 1, 9, 1, 1, 1, 5, 1, 7, 3, 1,
-    1, 10, 1, 4, 1, 5, 1, 9, 2, 4, 1, 11, 2, 7, 1, 12, 1, 13, 2, 14, 1, 9, 1, 8, 2, 12, 2, 4,
-    1, 9, 1, 12, 1, 7, 1, 8, 1, 9, 1, 6, 2, 5, 1, 9, 2, 1, 1, 2, 1, 4, 1, 5, 1, 6, 1, 3,
-    1, 10, 1, 2, 1, 1, 1, 7, 1, 8, 1, 7, 1, 12, 1, 9, 1, 2, 1, 5, 2, 12, 1, 5, 1, 8, 1, 13,
-    1, 12, 1, 14, 1, 15, 1, 10, 1, 5, 1, 9, 1, 13, 2, 5, 1, 12, 1, 10, 1, 5, 1, 7, 1, 5, 3, 9,
-    1, 7, 1, 1, 1, 2, 1, 4, 1, 8, 1, 9, 1, 3, 1, 6, 1, 8, 2, 10, 2, 6, 1, 5, 1, 10, 1, 12,
-    1, 5, 1, 8, 1, 12, 1, 10, 1, 5, 1, 9, 1, 13, 1, 12, 1, 14, 1, 15, 1, 13, 2, 8, 1, 14, 2, 12,
-    1, 10, 1, 5, 1, 11, 2, 3, 1, 6, 1, 9, 1, 10, 1, 6, 1, 1, 2, 0, 1, 1, 1, 6, 1, 10, 3, 8,
-    1, 6, 1, 3, 1, 6, 1, 11, 1, 4, 1, 10, 1, 12, 1, 11, 1, 13, 2, 8, 1, 11, 1, 13, 1, 12, 2, 14,
-    1, 15, 1, 9, 1, 8, 2, 11, 2, 4, 1, 9, 1, 11, 1, 10, 3, 3, 1, 7, 1, 9, 1, 7, 1, 6, 1, 3,
-    1, 7, 1, 9, 1, 10, 1, 9, 1, 6, 3, 3, 1, 6, 1, 10, 1, 9, 2, 4, 1, 10, 1, 11, 1, 5, 1, 9,
-    1, 14, 1, 13, 1, 12, 2, 14, 1, 15, 1, 12, 2, 8, 1, 9, 1, 4, 1, 8, 1, 9, 1, 6, 1, 1, 1, 7,
-    1, 12, 1, 3, 1, 6, 1, 3, 1, 10, 1, 6, 1, 7, 2, 6, 4, 3, 1, 10, 1, 6, 1, 3, 1, 6, 1, 11,
-    1, 8, 1, 2, 2, 9, 1, 8, 1, 11, 1, 14, 2, 12, 3, 14, 1, 15, 1, 10, 1, 8, 2, 10, 1, 8, 1, 9,
-    1, 10, 1, 6, 1, 3, 1, 6, 1, 12, 1, 11, 1, 6, 1, 7, 3, 3, 3, 6, 1, 12, 2, 6, 1, 1, 1, 3,
-    1, 10, 1, 9, 1, 5, 2, 9, 1, 7, 1, 9, 1, 14, 3, 13, 2, 14, 2, 15, 1, 14, 1, 9, 1, 8, 1, 12,
-    1, 11, 1, 9, 2, 11, 1, 7, 1, 3, 1, 6, 1, 10, 1, 6, 1, 10, 1, 13, 1, 11, 3, 12, 1, 7, 2, 3,
-    1, 6, 1, 10, 1, 7, 1, 12, 1, 9, 2, 11, 1, 5, 1, 8, 1, 13, 1, 14, 4, 13, 3, 12, 1, 15, 1, 13,
-    1, 10, 1, 8, 1, 12, 1, 14, 2, 12, 2, 11, 1, 12, 2, 3, 1, 10, 4, 3, 1, 6, 1, 3, 1, 6, 3, 11,
-    1, 13, 1, 12, 1, 14, 1, 12, 2, 8, 1, 11, 1, 15, 5, 13, 1, 12, 1, 9, 1, 11, 1, 14, 1, 15, 1, 11,
-    1, 9, 1, 8, 1, 11, 1, 13, 1, 12, 1, 6, 1, 12, 1, 13, 1, 12, 6, 10, 2, 11, 1, 12, 2, 11, 1, 9,
-    1, 12, 1, 13, 1, 11, 2, 8, 1, 11, 1, 15, 3, 13, 1, 14, 1, 13, 2, 14, 1, 15, 4, 14, 1, 15, 3, 14, 2, 15, 1, 13, 1, 11, 2, 9, 1, 8, 1, 9,
-    2, 11, 2, 10, 2, 11, 1, 9, 1, 8, 3, 9, 1, 13, 2, 15, 6, 14, 1, 13, 5, 14, 2, 15, 4, 14, 4, 15,
-    1, 14, 2, 11, 1, 10, 2, 9, 1, 8, 4, 9, 2, 11, 1, 13, 2, 15, 8, 14, 1, 13, 14, 14, 5, 15, 6, 13,
-    4, 15, 2, 13, 2, 14, 1, 13, 2, 14, 2, 13, 9, 14, 2, 15, 7, 14, 10, 15, 1, 14, 5, 13, 1, 14, 2, 13,
-    7, 14,
-  ];
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cellWidth = size.width / _gridSize;
-    final cellHeight = size.height / _gridSize;
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    var pixel = 0;
-    for (var i = 0; i < _runs.length; i += 2) {
-      final count = _runs[i];
-      final colorIndex = _runs[i + 1];
-      paint.color = Color(_palette[colorIndex]);
-
-      for (var n = 0; n < count; n++) {
-        final x = pixel % _gridSize;
-        final y = pixel ~/ _gridSize;
-        canvas.drawRect(
-          Rect.fromLTWH(
-            x * cellWidth,
-            y * cellHeight,
-            cellWidth + 0.5,
-            cellHeight + 0.5,
-          ),
-          paint,
-        );
-        pixel++;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
+const String _dohMyotDawLogoBase64 =
+    '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'}
