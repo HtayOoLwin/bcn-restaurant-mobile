@@ -322,23 +322,30 @@ class _ProgressCardState extends State<_ProgressCard> {
               ],
             ),
             if (_expanded) ...[
-              const Divider(height: 20),
+              const Divider(height: 24),
               ...widget.order.items.map(
-                (item) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(item.itemName),
-                  subtitle: Text(
-                    '${item.qty.g} ${item.uom}${item.kitchenCounter?.isNotEmpty == true ? ' · ${item.kitchenCounter}' : ''}${item.kitchenNote?.isNotEmpty == true ? '\n${item.kitchenNote}' : ''}',
-                  ),
-                  trailing: item.canCancel
-                      ? TextButton(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${item.qty.g} × ${item.itemName}',
+                        ),
+                      ),
+                      if (item.canCancel) ...[
+                        const SizedBox(width: 12),
+                        TextButton(
                           onPressed:
                               requesting || widget.busyRow == item.rowName
                               ? null
                               : () => widget.onCancel(item),
                           child: const Text('Cancel'),
-                        )
-                      : null,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ],
