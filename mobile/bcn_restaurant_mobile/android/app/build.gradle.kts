@@ -12,7 +12,9 @@ val dmdLogoParts = listOf(
     file("../../assets/images/doh_myot_daw_logo_3.b64"),
 )
 
-val generatedBrandingResDir = layout.buildDirectory.dir("generated/dmdBranding/res")
+// Use a concrete File here instead of a Provider. Newer Android Gradle Plugin
+// versions reject Provider instances passed to the legacy SourceSet API.
+val generatedBrandingResDir = file("$buildDir/generated/dmdBranding/res")
 
 val generateDmdBrandingResources = tasks.register("generateDmdBrandingResources") {
     inputs.files(dmdLogoParts)
@@ -23,7 +25,7 @@ val generateDmdBrandingResources = tasks.register("generateDmdBrandingResources"
             logoPart.readText().filterNot { it.isWhitespace() }
         }
         val logoBytes = Base64.getDecoder().decode(encoded)
-        val resRoot = generatedBrandingResDir.get().asFile
+        val resRoot = generatedBrandingResDir
         val drawableDir = resRoot.resolve("drawable-nodpi").apply { mkdirs() }
         val mipmapDir = resRoot.resolve("mipmap-nodpi").apply { mkdirs() }
 
