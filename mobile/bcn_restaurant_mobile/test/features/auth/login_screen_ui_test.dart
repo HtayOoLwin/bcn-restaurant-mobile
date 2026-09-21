@@ -21,9 +21,17 @@ void main() {
     expect(source, contains("'Powered by BCN'"));
   });
 
-  test('login form uses branded card and input icons', () {
-    expect(source, contains('Color(0xFFF4F7FB)'));
+  test('page, card, and input fields use distinct brand surfaces', () {
+    expect(source, contains('Color(0xFFEEF4FA)'));
+    expect(source, contains('Color(0xFFFFFFFF)'));
+    expect(source, contains('Color(0xFFEAF1F8)'));
+    expect(source, contains('Color(0xFF1E5E96)'));
+    expect(source, contains('filled: true'));
+    expect(source, contains('fillColor: _inputFillColor'));
     expect(source, contains('BorderRadius.circular(24)'));
+  });
+
+  test('login form uses clear field icons and password visibility control', () {
     expect(source, contains('Icons.person_outline_rounded'));
     expect(source, contains('Icons.lock_outline_rounded'));
     expect(source, contains('Icons.visibility_rounded'));
