@@ -70,8 +70,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/loading',
-        builder: (context, state) =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        builder: (context, state) => const BcnLoadingScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
@@ -114,6 +113,40 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class BcnLoadingScreen extends StatelessWidget {
+  const BcnLoadingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1E5E96),
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 190,
+                height: 190,
+                child: Image.asset('assets/images/bcn_brand_mark.png', fit: BoxFit.contain),
+              ),
+              const SizedBox(height: 30),
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class UnsupportedRoleScreen extends StatelessWidget {
   const UnsupportedRoleScreen({super.key, required this.onLogout});

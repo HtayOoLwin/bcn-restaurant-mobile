@@ -5,11 +5,37 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const screenPath =
       'lib/features/waiter_progress/presentation/waiter_progress_screen.dart';
+  const cartPath = 'lib/features/cart/presentation/cart_screen.dart';
 
   late String source;
+  late String cartSource;
 
   setUpAll(() {
     source = File(screenPath).readAsStringSync();
+    cartSource = File(cartPath).readAsStringSync();
+  });
+
+  test('progress screen refreshes immediately when opened', () {
+    final initStart = source.indexOf('void initState()');
+    final timerStart = source.indexOf('Timer.periodic', initStart);
+    final initPrefix = source.substring(initStart, timerStart);
+
+    expect(initPrefix, contains('WidgetsBinding.instance.addPostFrameCallback'));
+    expect(initPrefix, contains('ref.invalidate(waiterProgressProvider);'));
+  });
+
+  test('progress screen keeps orders fresh while visible', () {
+    expect(source, contains('Timer.periodic'));
+    expect(source, contains('const Duration(seconds: 5)'));
+    expect(source, contains('ref.invalidate(waiterProgressProvider);'));
+  });
+
+  test('placing an order invalidates waiter progress cache', () {
+    final methodStart = cartSource.indexOf('Future<void> _placeOrder() async');
+    final buildStart = cartSource.indexOf('\n  @override\n  Widget build', methodStart);
+    final placeOrderMethod = cartSource.substring(methodStart, buildStart);
+
+    expect(placeOrderMethod, contains('ref.invalidate(waiterProgressProvider);'));
   });
 
   test('progress card hides kitchen status summary labels', () {
@@ -53,9 +79,20 @@ void main() {
     expect(itemList, greaterThan(expandedStart));
   });
 
-  test('item rows show quantity and counter without item preparation status', () {
-    expect(source, isNot(contains('\${item.status}')));
-    expect(source, contains('\${item.qty.g} \${item.uom}'));
-    expect(source, contains('item.kitchenCounter'));
+  test('expanded item rows mirror cashier quantity x item style without money totals', () {
+    final expandedStart = source.indexOf('if (_expanded) ...[');
+    final cardEnd = source.indexOf('\n  }\n}\n\nextension on double', expandedStart);
+    final expandedContent = source.substring(expandedStart, cardEnd);
+
+    expect(
+      expandedContent,
+      contains("'\${item.qty.g} × \${item.itemName}'"),
+    );
+    expect(expandedContent, isNot(contains('item.uom')));
+    expect(expandedContent, isNot(contains('item.kitchenCounter')));
+    expect(expandedContent, isNot(contains('item.kitchenNote')));
+    expect(expandedContent, isNot(contains('formatMoney(')));
+    expect(expandedContent, isNot(contains("'Subtotal'")));
+    expect(expandedContent, isNot(contains("'Grand Total'")));
   });
 }
