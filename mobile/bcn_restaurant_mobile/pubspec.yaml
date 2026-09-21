@@ -24,3 +24,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/bcn_brand_mark.png
+    - assets/images/doh_myot_daw_logo.b64
