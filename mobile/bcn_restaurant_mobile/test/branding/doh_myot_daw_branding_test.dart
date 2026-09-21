@@ -40,7 +40,8 @@ void main() {
     expect(routerSource, contains('DohMyotDawLogo('));
   });
 
-  test('Android launcher uses a high-detail adaptive Doh Myot Daw icon', () {
+  test('Android build generates launcher bitmaps from the same real logo data', () {
+    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
     final manifest = File('android/app/src/main/AndroidManifest.xml')
         .readAsStringSync();
     final adaptiveIcon = File(
@@ -49,21 +50,25 @@ void main() {
     final adaptiveRoundIcon = File(
       'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
     ).readAsStringSync();
-    final vector = File(
-      'android/app/src/main/res/drawable/dmd_logo_vector.xml',
+    final adaptiveForeground = File(
+      'android/app/src/main/res/drawable/dmd_launcher_foreground.xml',
     ).readAsStringSync();
 
+    expect(gradle, contains('generateDmdBrandingResources'));
+    expect(gradle, contains('Base64.getDecoder().decode(encoded)'));
+    expect(gradle, contains('dmd_logo.png'));
+    expect(gradle, contains('ic_launcher.png'));
+    expect(gradle, contains('ic_launcher_round.png'));
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:roundIcon="@mipmap/ic_launcher_round"'));
     expect(adaptiveIcon, contains('@color/dmd_brand_dark'));
-    expect(adaptiveIcon, contains('@drawable/dmd_logo_vector'));
+    expect(adaptiveIcon, contains('@drawable/dmd_launcher_foreground'));
     expect(adaptiveRoundIcon, contains('@color/dmd_brand_dark'));
-    expect(adaptiveRoundIcon, contains('@drawable/dmd_logo_vector'));
-    expect(vector, contains('android:viewportWidth="96"'));
-    expect(vector, contains('android:viewportHeight="96"'));
+    expect(adaptiveRoundIcon, contains('@drawable/dmd_launcher_foreground'));
+    expect(adaptiveForeground, contains('@drawable/dmd_logo'));
   });
 
-  test('native splash uses the same high-detail artwork on the dark brand background', () {
+  test('native splash uses the generated real logo bitmap on the dark brand background', () {
     final launchBackground = File(
       'android/app/src/main/res/drawable/launch_background.xml',
     ).readAsStringSync();
@@ -77,9 +82,9 @@ void main() {
       'android/app/src/main/res/values/colors.xml',
     ).readAsStringSync();
 
-    expect(launchBackground, contains('@drawable/dmd_logo_vector'));
-    expect(launchBackgroundV21, contains('@drawable/dmd_logo_vector'));
-    expect(stylesV31, contains('@drawable/dmd_logo_vector'));
+    expect(launchBackground, contains('@drawable/dmd_logo'));
+    expect(launchBackgroundV21, contains('@drawable/dmd_logo'));
+    expect(stylesV31, contains('@drawable/dmd_logo'));
     expect(stylesV31, contains('@color/dmd_brand_dark'));
     expect(colors, contains('<color name="dmd_brand_dark">#171614</color>'));
   });
