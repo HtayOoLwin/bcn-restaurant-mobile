@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../branding/doh_myot_daw_logo.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
@@ -119,20 +120,19 @@ class BcnLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1E5E96),
+    return const Scaffold(
+      backgroundColor: Color(0xFF171614),
       body: SafeArea(
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
+              DohMyotDawLogo(
                 width: 190,
                 height: 190,
-                child: Image.asset('assets/images/bcn_brand_mark.png', fit: BoxFit.contain),
               ),
-              const SizedBox(height: 30),
-              const SizedBox(
+              SizedBox(height: 30),
+              SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
