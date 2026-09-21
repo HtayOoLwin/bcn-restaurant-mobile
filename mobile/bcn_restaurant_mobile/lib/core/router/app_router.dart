@@ -129,10 +129,7 @@ class BcnLoadingScreen extends StatelessWidget {
               SizedBox(
                 width: 190,
                 height: 190,
-                child: Image.asset(
-                  'assets/images/bcn_brand_mark.png',
-                  fit: BoxFit.contain,
-                ),
+                child: Image.asset('assets/images/bcn_brand_mark.png', fit: BoxFit.contain),
               ),
               const SizedBox(height: 30),
               const SizedBox(
