@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Doh Myot Daw logo uses high-resolution bitmap on Flutter screens', () {
+  test('Doh Myot Daw logo uses external high-resolution bitmap on Flutter screens', () {
     final logoSource = File(
       'lib/core/branding/doh_myot_daw_logo.dart',
     ).readAsStringSync();
@@ -13,11 +13,17 @@ void main() {
     final routerSource = File(
       'lib/core/router/app_router.dart',
     ).readAsStringSync();
+    final pubspec = File('pubspec.yaml').readAsStringSync();
 
-    expect(logoSource, contains('base64Decode('));
+    expect(
+      logoSource,
+      contains("rootBundle.loadString('assets/images/doh_myot_daw_logo.b64')"),
+    );
+    expect(logoSource, contains('base64Decode(encoded.trim())'));
     expect(logoSource, contains('Image.memory('));
     expect(logoSource, contains('FilterQuality.high'));
-    expect(logoSource, isNot(contains('static const int _gridSize = 40')));
+    expect(logoSource, isNot(contains('_dohMyotDawLogoBase64')));
+    expect(pubspec, contains('assets/images/doh_myot_daw_logo.b64'));
     expect(loginSource, contains('DohMyotDawLogo('));
     expect(routerSource, contains('DohMyotDawLogo('));
   });
