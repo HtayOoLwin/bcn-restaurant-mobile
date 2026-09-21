@@ -14,7 +14,8 @@ void main() {
       'lib/core/router/app_router.dart',
     ).readAsStringSync();
 
-    expect(logoSource, contains('base64Decode(_dohMyotDawLogoBase64)'));
+    expect(logoSource, contains('class _DohMyotDawLogoPainter'));
+    expect(logoSource, contains('static const int _gridSize = 40'));
     expect(loginSource, contains('DohMyotDawLogo('));
     expect(routerSource, contains('DohMyotDawLogo('));
   });
