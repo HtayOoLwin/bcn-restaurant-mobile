@@ -5,5 +5,5 @@
         android:width="160dp"
         android:height="160dp"
         android:gravity="center"
-        android:drawable="@drawable/dmd_logo_vector" />
+        android:drawable="@drawable/dmd_logo" />
 </layer-list>
