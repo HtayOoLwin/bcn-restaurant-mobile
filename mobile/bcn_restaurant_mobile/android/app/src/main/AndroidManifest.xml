@@ -3,8 +3,8 @@
     <application
         android:label="BCN Restaurant"
         android:name="${applicationName}"
-        android:icon="@drawable/dmd_logo_vector"
-        android:roundIcon="@drawable/dmd_logo_vector">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <activity
             android:name=".MainActivity"
             android:exported="true"
