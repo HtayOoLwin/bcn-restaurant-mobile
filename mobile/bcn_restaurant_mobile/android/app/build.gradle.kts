@@ -27,9 +27,9 @@ val generateDmdBrandingResources = tasks.register("generateDmdBrandingResources"
         val drawableDir = resRoot.resolve("drawable-nodpi").apply { mkdirs() }
         val mipmapDir = resRoot.resolve("mipmap-nodpi").apply { mkdirs() }
 
-        drawableDir.resolve("dmd_logo.png").writeBytes(logoBytes)
-        mipmapDir.resolve("ic_launcher.png").writeBytes(logoBytes)
-        mipmapDir.resolve("ic_launcher_round.png").writeBytes(logoBytes)
+        drawableDir.resolve("dmd_logo.jpg").writeBytes(logoBytes)
+        mipmapDir.resolve("ic_launcher.jpg").writeBytes(logoBytes)
+        mipmapDir.resolve("ic_launcher_round.jpg").writeBytes(logoBytes)
     }
 }
 
