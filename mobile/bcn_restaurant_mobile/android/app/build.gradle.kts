@@ -1,7 +1,45 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val dmdLogoParts = listOf(
+    file("../../assets/images/doh_myot_daw_logo_1.b64"),
+    file("../../assets/images/doh_myot_daw_logo_2.b64"),
+    file("../../assets/images/doh_myot_daw_logo_3.b64"),
+)
+
+// Decode the exact supplied Doh Myot Daw artwork directly into Android's
+// normal resource folders before Android resource processing starts.
+// This avoids generated SourceSet Provider issues and keeps launcher/splash
+// using the same artwork as Flutter login/loading screens.
+val prepareDmdBrandingResources = tasks.register("prepareDmdBrandingResources") {
+    inputs.files(dmdLogoParts)
+
+    val drawableDir = file("src/main/res/drawable-nodpi")
+    val mipmapDir = file("src/main/res/mipmap-nodpi")
+    outputs.files(
+        drawableDir.resolve("dmd_logo.jpg"),
+        mipmapDir.resolve("ic_launcher.jpg"),
+        mipmapDir.resolve("ic_launcher_round.jpg"),
+    )
+
+    doLast {
+        val encoded = dmdLogoParts.joinToString("") { logoPart ->
+            logoPart.readText().filterNot { it.isWhitespace() }
+        }
+        val logoBytes = Base64.getDecoder().decode(encoded)
+
+        drawableDir.mkdirs()
+        mipmapDir.mkdirs()
+
+        drawableDir.resolve("dmd_logo.jpg").writeBytes(logoBytes)
+        mipmapDir.resolve("ic_launcher.jpg").writeBytes(logoBytes)
+        mipmapDir.resolve("ic_launcher_round.jpg").writeBytes(logoBytes)
+    }
 }
 
 android {
@@ -15,10 +53,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.bcn.restaurant.bcn_restaurant_mobile"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -27,11 +62,13 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(prepareDmdBrandingResources)
 }
 
 kotlin {
