@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/bcn_launcher_blue" />
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/bcn_splash_mark" />
-    </item>
+    <item android:drawable="@color/dmd_brand_dark" />
+    <item
+        android:width="160dp"
+        android:height="160dp"
+        android:gravity="center"
+        android:drawable="@drawable/dmd_logo_vector" />
 </layer-list>
