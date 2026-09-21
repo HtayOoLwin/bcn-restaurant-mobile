@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('BCN launcher uses adaptive icon resources with a scaled foreground', () {
+  test('BCN launcher uses adaptive icon resources with a safe inset foreground', () {
     final manifest = File(
       'android/app/src/main/AndroidManifest.xml',
     ).readAsStringSync();
@@ -20,6 +20,10 @@ void main() {
     expect(adaptiveIcon, contains('@color/bcn_launcher_blue'));
     expect(adaptiveIcon, contains('@drawable/ic_launcher_foreground'));
     expect(foreground, contains('@drawable/bcn_splash_mark'));
+    expect(foreground, contains('android:left="20dp"'));
+    expect(foreground, contains('android:top="20dp"'));
+    expect(foreground, contains('android:right="20dp"'));
+    expect(foreground, contains('android:bottom="20dp"'));
     expect(foreground, contains('android:gravity="fill"'));
   });
 
