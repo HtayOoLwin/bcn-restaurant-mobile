@@ -58,9 +58,20 @@ void main() {
     expect(itemList, greaterThan(expandedStart));
   });
 
-  test('item rows show quantity and counter without item preparation status', () {
-    expect(source, isNot(contains('\${item.status}')));
-    expect(source, contains('\${item.qty.g} \${item.uom}'));
-    expect(source, contains('item.kitchenCounter'));
+  test('expanded item rows mirror cashier quantity x item style without money totals', () {
+    final expandedStart = source.indexOf('if (_expanded) ...[');
+    final cardEnd = source.indexOf('\n  }\n}\n\nextension on double', expandedStart);
+    final expandedContent = source.substring(expandedStart, cardEnd);
+
+    expect(
+      expandedContent,
+      contains("'\${item.qty.g} × \${item.itemName}'"),
+    );
+    expect(expandedContent, isNot(contains('item.uom')));
+    expect(expandedContent, isNot(contains('item.kitchenCounter')));
+    expect(expandedContent, isNot(contains('item.kitchenNote')));
+    expect(expandedContent, isNot(contains('formatMoney(')));
+    expect(expandedContent, isNot(contains("'Subtotal'")));
+    expect(expandedContent, isNot(contains("'Grand Total'")));
   });
 }
