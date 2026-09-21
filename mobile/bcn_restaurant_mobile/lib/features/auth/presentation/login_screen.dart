@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/branding/doh_myot_daw_logo.dart';
 import 'auth_controller.dart';
 
 const _pageBackgroundColor = Color(0xFFEEF4FA);
@@ -10,6 +11,7 @@ const _primaryBlue = Color(0xFF1E5E96);
 const _textColor = Color(0xFF102F4F);
 const _mutedTextColor = Color(0xFF5E7891);
 const _inputBorderColor = Color(0xFFD7E3EE);
+const _brandDark = Color(0xFF171614);
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -108,23 +110,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        width: 104,
-                        height: 104,
-                        padding: const EdgeInsets.all(14),
+                        width: 112,
+                        height: 112,
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: _primaryBlue,
-                          borderRadius: BorderRadius.circular(24),
+                          color: _brandDark,
+                          shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: _primaryBlue.withValues(alpha: 0.18),
+                              color: _brandDark.withValues(alpha: 0.24),
                               blurRadius: 22,
                               offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        child: Image.asset(
-                          'assets/images/bcn_brand_mark.png',
-                          fit: BoxFit.contain,
+                        child: const DohMyotDawLogo(
+                          width: 100,
+                          height: 100,
                         ),
                       ),
                       const SizedBox(height: 20),
