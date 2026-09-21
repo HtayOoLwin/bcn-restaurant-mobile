@@ -28,6 +28,11 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(waiterProgressProvider);
+    });
+
     _autoRefreshTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) {
