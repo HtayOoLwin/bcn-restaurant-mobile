@@ -12,8 +12,9 @@ void main() {
     source = File(screenPath).readAsStringSync();
   });
 
-  test('progress screen refreshes orders when opened', () {
-    expect(source, contains('WidgetsBinding.instance.addPostFrameCallback'));
+  test('progress screen keeps orders fresh while visible', () {
+    expect(source, contains('Timer.periodic'));
+    expect(source, contains('const Duration(seconds: 5)'));
     expect(source, contains('ref.invalidate(waiterProgressProvider);'));
   });
 
