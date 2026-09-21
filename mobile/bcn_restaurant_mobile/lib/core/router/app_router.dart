@@ -119,45 +119,31 @@ class BcnLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+    return const Scaffold(
+      backgroundColor: Color(0xFF1E5E96),
       body: SafeArea(
         child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 156,
-                  height: 156,
-                  child: Image.asset(
-                    'assets/images/bcn_loading_logo.jpg',
-                    fit: BoxFit.contain,
-                  ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 190,
+                height: 190,
+                child: Image(
+                  image: AssetImage('assets/images/bcn_brand_mark.png'),
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 20),
-                const Text(
-                  'BCN Restaurant',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF173A5E),
-                    fontSize: 23,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
-                  ),
+              ),
+              SizedBox(height: 30),
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: Colors.white,
                 ),
-                const SizedBox(height: 24),
-                const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: Color(0xFF1E5E96),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
