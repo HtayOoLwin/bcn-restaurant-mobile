@@ -11,8 +11,9 @@ void main() {
     source = File(screenPath).readAsStringSync();
   });
 
-  test('login screen uses BCN branding and restaurant subtitle', () {
-    expect(source, contains("'assets/images/bcn_brand_mark.png'"));
+  test('login screen uses Doh Myot Daw restaurant branding', () {
+    expect(source, contains("import '../../../core/branding/doh_myot_daw_logo.dart';"));
+    expect(source, contains('DohMyotDawLogo('));
     expect(source, contains("'BCN Restaurant'"));
     expect(source, contains("'Restaurant Management System'"));
     expect(source, contains("'Powered by BCN'"));
