@@ -44,6 +44,11 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(tablesProvider(customerGroup));
+    });
+
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
 
