@@ -52,6 +52,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(cashierBillingProvider);
+    });
+
     _autoRefreshTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) {
@@ -98,7 +103,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           ),
           IconButton(
             tooltip: 'Settings',
-            onPressed: () => context.push('/settings'),
+            onPressed: () async {
+              await context.push('/settings');
+              if (!mounted) return;
+              ref.invalidate(cashierBillingProvider);
+            },
             icon: const Icon(Icons.settings),
           ),
         ],
