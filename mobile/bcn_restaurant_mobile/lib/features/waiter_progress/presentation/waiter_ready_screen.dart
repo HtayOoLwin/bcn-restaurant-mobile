@@ -33,6 +33,16 @@ class _WaiterReadyScreenState extends ConsumerState<WaiterReadyScreen> {
   String? _busyKey;
 
   @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(waiterReadyProvider);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ready = ref.watch(waiterReadyProvider);
     return Scaffold(
