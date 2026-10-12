@@ -123,7 +123,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ],
                         ),
                         child: Image.asset(
-                          'assets/images/bcn_brand_mark.png',
+                          'assets/images/OurCityLogo.png',
                           fit: BoxFit.contain,
                         ),
                       ),
