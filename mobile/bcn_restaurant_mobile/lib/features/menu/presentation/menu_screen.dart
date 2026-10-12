@@ -32,6 +32,16 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   final _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.invalidate(menuProvider);
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -178,7 +188,13 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
           child: FilledButton(
-            onPressed: cart.lines.isEmpty ? null : () => context.push('/cart'),
+            onPressed: cart.lines.isEmpty
+                ? null
+                : () async {
+                    await context.push('/cart');
+                    if (!mounted) return;
+                    ref.invalidate(menuProvider);
+                  },
             child: Row(
               children: [
                 const Icon(Icons.shopping_cart_outlined),
