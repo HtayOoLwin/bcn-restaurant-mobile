@@ -34,6 +34,7 @@ flutter_launcher_icons:
   image_path: "assets/images/OurCityLogo.png"
   adaptive_icon_background: "#1E5E96"
   adaptive_icon_foreground: "assets/images/OurCityLogo.png"
+  adaptive_icon_foreground_inset: 30
 
 flutter_native_splash:
   color: "#1E5E96"
