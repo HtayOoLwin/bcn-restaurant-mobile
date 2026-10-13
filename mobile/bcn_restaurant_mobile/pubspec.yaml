@@ -33,5 +33,5 @@ flutter_launcher_icons:
   image_path: "assets/images/OurCityLogo.png"
   adaptive_icon_background: "#6B3A14"
   adaptive_icon_foreground: "assets/images/OurCityLogo.png"
-  adaptive_icon_foreground_inset: 24
+  adaptive_icon_foreground_inset: 36
 
