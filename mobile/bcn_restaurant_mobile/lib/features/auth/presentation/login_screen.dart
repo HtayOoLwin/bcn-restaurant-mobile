@@ -148,12 +148,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       SizedBox(
-                        width: 138,
-                        height: 138,
-                        child: Image.asset(
-                          'assets/images/OurCityLogo.png',
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
+                        width: 150,
+                        height: 150,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Image.asset(
+                            'assets/images/OurCityLogo.png',
+                            fit: BoxFit.contain,
+                            alignment: Alignment.center,
+                            filterQuality: FilterQuality.high,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
