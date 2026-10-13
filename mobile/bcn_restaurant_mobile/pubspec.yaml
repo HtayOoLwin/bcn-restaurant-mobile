@@ -20,7 +20,6 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
-  flutter_native_splash: ^2.4.8
 
 flutter:
   uses-material-design: true
@@ -36,11 +35,3 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/images/OurCityLogo.png"
   adaptive_icon_foreground_inset: 24
 
-flutter_native_splash:
-  color: "#1E5E96"
-  android: true
-  ios: false
-  fullscreen: false
-  android_12:
-    color: "#1E5E96"
-    icon_background_color: "#1E5E96"
