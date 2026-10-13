@@ -30,19 +30,17 @@ flutter:
 
 flutter_launcher_icons:
   android: true
-  ios: true
+  ios: false
   image_path: "assets/images/OurCityLogo.png"
   adaptive_icon_background: "#1E5E96"
   adaptive_icon_foreground: "assets/images/OurCityLogo.png"
-  remove_alpha_ios: true
 
 flutter_native_splash:
   color: "#1E5E96"
   image: assets/images/OurCityLogo.png
   android: true
-  ios: true
+  ios: false
   android_gravity: center
-  ios_content_mode: center
   fullscreen: false
   android_12:
     color: "#1E5E96"
