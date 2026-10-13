@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'auth_controller.dart';
 
@@ -22,7 +23,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _secureStorage = const FlutterSecureStorage();
   bool _obscurePassword = true;
+  bool _rememberMe = false;
+
+  static const _rememberMeKey = 'restaurant_remember_me';
+  static const _rememberedUserKey = 'restaurant_remembered_user';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedUser();
+  }
+
+  Future<void> _loadRememberedUser() async {
+    final remember = await _secureStorage.read(key: _rememberMeKey);
+    final rememberedUser = await _secureStorage.read(key: _rememberedUserKey);
+    if (!mounted) return;
+    setState(() {
+      _rememberMe = remember == 'true';
+      if (_rememberMe && rememberedUser != null && rememberedUser.isNotEmpty) {
+        _usernameController.text = rememberedUser;
+      }
+    });
+  }
+
+  Future<void> _saveRememberedUser() async {
+    if (_rememberMe) {
+      await _secureStorage.write(key: _rememberMeKey, value: 'true');
+      await _secureStorage.write(
+        key: _rememberedUserKey,
+        value: _usernameController.text.trim(),
+      );
+    } else {
+      await _secureStorage.delete(key: _rememberMeKey);
+      await _secureStorage.delete(key: _rememberedUserKey);
+    }
+  }
 
   @override
   void dispose() {
@@ -41,6 +78,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
     if (!mounted) return;
     final auth = ref.read(authControllerProvider);
+    if (!auth.hasError) {
+      await _saveRememberedUser();
+    }
     if (auth.hasError) {
       ScaffoldMessenger.of(
         context,
@@ -107,36 +147,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 104,
-                        height: 104,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: _primaryBlue,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _primaryBlue.withValues(alpha: 0.18),
-                              blurRadius: 22,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
+                      SizedBox(
+                        width: 138,
+                        height: 138,
                         child: Image.asset(
                           'assets/images/OurCityLogo.png',
                           fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'BCN Restaurant',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: _textColor,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 14),
                       Text(
                         'Restaurant Management System',
                         textAlign: TextAlign.center,
@@ -226,7 +246,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ? 'Password is required'
                                     : null,
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: Checkbox(
+                                      value: _rememberMe,
+                                      activeColor: _primaryBlue,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _rememberMe = value ?? false;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Remember me',
+                                    style: TextStyle(
+                                      color: _textColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
                               SizedBox(
                                 height: 54,
                                 child: FilledButton(
