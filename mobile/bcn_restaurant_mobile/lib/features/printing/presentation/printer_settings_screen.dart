@@ -21,7 +21,7 @@ class PrinterSettingsScreen extends ConsumerWidget {
 
     if (permissions?.canViewPrintStatus != true) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Windows Print Service')),
+        appBar: AppBar(title: const Text('Android Printer Worker')),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -32,7 +32,7 @@ class PrinterSettingsScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Windows Print Service')),
+      appBar: AppBar(title: const Text('Android Printer Worker')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -52,7 +52,7 @@ class PrinterSettingsScreen extends ConsumerWidget {
                             SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                'Windows Printer Client',
+                                'Android Printer Worker',
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w700,
@@ -63,10 +63,10 @@ class PrinterSettingsScreen extends ConsumerWidget {
                         ),
                         SizedBox(height: 16),
                         Text(
-                          'The Windows printer client polls OurCity for queued print jobs. Mobile no longer retries or monitors printer jobs directly.',
+                          'The Android printer worker polls OurCity for pending print jobs and sends them to the configured Kitchen, Bar, or Service printer. Printed quantities are acknowledged back to ERPNext through the printer worker APIs.',
                         ),
                         SizedBox(height: 12),
-                        Text('Print and reprint bills from the Cashier screen.'),
+                        Text('Kitchen ticket polling uses bcn_get_pending_print_jobs_printer and bcn_update_print_job_printer. Print and reprint bills can still be requested from the Cashier screen.'),
                       ],
                     ),
                   ),
