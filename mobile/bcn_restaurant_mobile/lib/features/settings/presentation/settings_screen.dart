@@ -115,8 +115,8 @@ class SettingsView extends StatelessWidget {
                         const Divider(height: 1, indent: 72),
                         _SettingsTile(
                           icon: Icons.print,
-                          title: 'Windows Print Service',
-                          subtitle: 'Server-managed printer jobs and status',
+                          title: 'Android Printer Worker',
+                          subtitle: 'Android tablet-managed printer jobs and status',
                           onTap: onPrinterSetup,
                         ),
                       ],
