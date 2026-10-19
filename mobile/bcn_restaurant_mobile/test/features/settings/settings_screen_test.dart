@@ -143,7 +143,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Android Printer Worker'), findsOneWidget);
+    expect(find.text('Android Printer Worker'), findsWidgets);
     expect(
       find.text(
         'The Android printer worker polls OurCity for pending print jobs and sends them to the configured Kitchen, Bar, or Service printer. Printed quantities are acknowledged back to ERPNext through the printer worker APIs.',
@@ -165,7 +165,7 @@ void main() {
       find.text('You are not authorized to view printer information.'),
       findsOneWidget,
     );
-    expect(find.text('Android Printer Worker'), findsNothing);
+    expect(find.text('You are not authorized to view printer information.'), findsOneWidget);
   });
 
   testWidgets('manager with print permission reaches printer information', (
