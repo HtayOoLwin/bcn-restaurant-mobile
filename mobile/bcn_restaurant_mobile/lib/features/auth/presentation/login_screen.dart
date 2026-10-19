@@ -81,6 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!auth.hasError) {
       await _saveRememberedUser();
     }
+    if (!mounted) return;
     if (auth.hasError) {
       ScaffoldMessenger.of(
         context,
