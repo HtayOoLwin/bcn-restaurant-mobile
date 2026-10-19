@@ -62,7 +62,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Windows Print Service'));
+    await tester.tap(find.text('Android Printer Worker'));
     expect(printerOpened, isTrue);
 
     await tester.ensureVisible(find.text('Log Out'));
@@ -143,14 +143,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Windows Printer Client'), findsOneWidget);
+    expect(find.text('Android Printer Worker'), findsOneWidget);
     expect(
       find.text(
-        'The Windows printer client polls OurCity for queued print jobs. Mobile no longer retries or monitors printer jobs directly.',
+        'The Android printer worker polls OurCity for pending print jobs and sends them to the configured Kitchen, Bar, or Service printer. Printed quantities are acknowledged back to ERPNext through the printer worker APIs.',
       ),
       findsOneWidget,
     );
-    expect(find.text('Print and reprint bills from the Cashier screen.'), findsOneWidget);
+    expect(find.text('Kitchen ticket polling uses bcn_get_pending_print_jobs_printer and bcn_update_print_job_printer. Print and reprint bills can still be requested from the Cashier screen.'), findsOneWidget);
     expect(find.text('Retry This Job'), findsNothing);
     expect(find.text('Online'), findsNothing);
   });
@@ -165,7 +165,7 @@ void main() {
       find.text('You are not authorized to view printer information.'),
       findsOneWidget,
     );
-    expect(find.text('Windows Printer Client'), findsNothing);
+    expect(find.text('Android Printer Worker'), findsNothing);
   });
 
   testWidgets('manager with print permission reaches printer information', (
@@ -181,11 +181,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Windows Print Service'), findsOneWidget);
+    expect(find.text('Android Printer Worker'), findsOneWidget);
 
-    await tester.tap(find.text('Windows Print Service'));
+    await tester.tap(find.text('Android Printer Worker'));
     await tester.pumpAndSettle();
-    expect(find.text('Windows Printer Client'), findsOneWidget);
+    expect(find.text('Android Printer Worker'), findsOneWidget);
   });
 
   testWidgets('waiter without print permission is denied the printer route', (
@@ -207,7 +207,7 @@ void main() {
       container.read(routerProvider).routeInformationProvider.value.uri.path,
       '/settings',
     );
-    expect(find.text('Windows Printer Client'), findsNothing);
+    expect(find.text('Android Printer Worker'), findsNothing);
   });
 }
 
