@@ -80,19 +80,44 @@ if item_groups:
             limit_page_length=20,
         )
 
-        rate = 0
+        factors = {item.stock_uom: 1.0}
+        conversion_rows = frappe.get_all(
+            "UOM Conversion Detail",
+            filters={"parent": item.item_code, "parenttype": "Item"},
+            fields=["uom", "conversion_factor"],
+            limit_page_length=100,
+        )
+        for conversion in conversion_rows:
+            factor = frappe.utils.flt(conversion.conversion_factor)
+            if conversion.uom and factor > 0:
+                factors[conversion.uom] = factor
+
+        options = []
+        seen_uoms = []
         for price in price_rows:
-            if not price.uom or price.uom == item.stock_uom:
-                rate = frappe.utils.flt(price.price_list_rate)
-                break
+            unit = (price.uom or item.stock_uom).strip()
+            if unit in factors and unit not in seen_uoms:
+                seen_uoms.append(unit)
+                options.append({
+                    "uom": unit,
+                    "rate": frappe.utils.flt(price.price_list_rate),
+                    "conversion_factor": factors[unit],
+                })
+        if not options:
+            continue
+        primary = next(
+            (option for option in options if option["uom"] == item.stock_uom),
+            options[0],
+        )
 
         items_out.append(
             {
                 "item_code": item.item_code,
                 "item_name": item.item_name,
                 "item_group": item.item_group,
-                "uom": item.stock_uom,
-                "rate": rate,
+                "uom": primary["uom"],
+                "rate": primary["rate"],
+                "uoms": options,
                 "currency": CURRENCY,
                 "is_stock_item": bool(item.is_stock_item),
                 "image": item.image,
