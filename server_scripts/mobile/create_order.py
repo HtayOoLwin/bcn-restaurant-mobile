@@ -180,33 +180,32 @@ if not is_duplicate:
         kitchen_counter = (item.get("custom_kitchen_counter") or "").strip()
         uom = requested_uom or item.stock_uom
 
+        conversion_factor = 1.0
         if uom != item.stock_uom:
-            frappe.throw(
-                "Please use Stock UOM "
-                + item.stock_uom
-                + " for item "
-                + item_code
+            factor_row = frappe.db.get_value(
+                "UOM Conversion Detail",
+                {"parent": item_code, "parenttype": "Item", "uom": uom},
+                "conversion_factor",
             )
+            conversion_factor = frappe.utils.flt(factor_row)
+            if conversion_factor <= 0:
+                frappe.throw("UOM " + uom + " is not configured for " + item_code)
 
         price_rows = frappe.get_all(
             "Item Price",
-            filters={
-                "price_list": PRICE_LIST,
-                "item_code": item_code,
-            },
+            filters={"price_list": PRICE_LIST, "item_code": item_code},
             fields=["price_list_rate", "uom"],
             order_by="modified desc",
-            limit_page_length=20,
+            limit_page_length=100,
         )
-
         rate = None
         for price in price_rows:
-            if not price.uom or price.uom == uom:
+            price_uom = (price.uom or item.stock_uom).strip()
+            if price_uom == uom:
                 rate = frappe.utils.flt(price.price_list_rate)
                 break
-
         if rate is None:
-            frappe.throw("No Standard Selling Item Price found for " + item_code)
+            frappe.throw("No " + PRICE_LIST + " Item Price for " + item_code + " / " + uom)
 
         description = item.description or item.item_name or item_code
         matching_row = None
@@ -231,6 +230,7 @@ if not is_duplicate:
         if matching_row:
             matching_row.qty = frappe.utils.flt(matching_row.qty) + qty
             matching_row.rate = rate
+            matching_row.conversion_factor = conversion_factor
             matching_row.custom_kitchen_counter = kitchen_counter
         else:
             sales_order.append(
@@ -242,7 +242,7 @@ if not is_duplicate:
                     "qty": qty,
                     "uom": uom,
                     "stock_uom": item.stock_uom,
-                    "conversion_factor": 1,
+                    "conversion_factor": conversion_factor,
                     "rate": rate,
                     "delivery_date": today,
                     "custom_kitchen_note": kitchen_note,
