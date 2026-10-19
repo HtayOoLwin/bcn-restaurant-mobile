@@ -11,7 +11,7 @@ void main() {
     expect(source, contains("String _searchQuery = '';"));
     expect(source, contains('final _searchController = TextEditingController();'));
     expect(source, contains("hintText: 'Search menu items'"));
-    expect(source, contains('prefixIcon: const Icon(Icons.search)'));
+    expect(source, contains('prefixIcon: const Icon(Icons.search_rounded)'));
     expect(source, contains("setState(() => _searchQuery = '');"));
     expect(source, contains('_searchController.dispose();'));
   });
