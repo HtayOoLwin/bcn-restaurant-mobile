@@ -98,7 +98,7 @@ class CartController extends Notifier<CartState> {
   void add(MenuItemModel item) {
     final lines = [...state.lines];
     final index = lines.indexWhere(
-      (line) => line.item.itemCode == item.itemCode,
+      (line) => line.item.itemCode == item.itemCode && line.item.uom == item.uom,
     );
     if (index == -1) {
       lines.add(CartLine(item: item, qty: 1));
@@ -108,9 +108,9 @@ class CartController extends Notifier<CartState> {
     state = state.copyWith(lines: lines);
   }
 
-  void decrement(String itemCode) {
+  void decrement(String itemCode, {String? uom}) {
     final lines = [...state.lines];
-    final index = lines.indexWhere((line) => line.item.itemCode == itemCode);
+    final index = lines.indexWhere((line) => line.item.itemCode == itemCode && (uom == null || line.item.uom == uom));
     if (index == -1) return;
     final nextQty = lines[index].qty - 1;
     if (nextQty <= 0) {
@@ -121,19 +121,19 @@ class CartController extends Notifier<CartState> {
     state = state.copyWith(lines: lines);
   }
 
-  void remove(String itemCode) {
+  void remove(String itemCode, {String? uom}) {
     state = state.copyWith(
       lines: state.lines
-          .where((line) => line.item.itemCode != itemCode)
+          .where((line) => line.item.itemCode != itemCode || (uom != null && line.item.uom != uom))
           .toList(),
     );
   }
 
-  void setKitchenNote(String itemCode, String note) {
+  void setKitchenNote(String itemCode, String note, {String? uom}) {
     state = state.copyWith(
       lines: state.lines
           .map(
-            (line) => line.item.itemCode == itemCode
+            (line) => line.item.itemCode == itemCode && (uom == null || line.item.uom == uom)
                 ? line.copyWith(kitchenNote: note.trim())
                 : line,
           )
