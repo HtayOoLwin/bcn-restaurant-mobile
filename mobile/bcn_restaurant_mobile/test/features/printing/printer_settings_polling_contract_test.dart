@@ -24,7 +24,7 @@ void main() {
     expect(screen, isNot(contains('requestCashierBillLegacy')));
     expect(
       screen,
-      contains('Print and reprint bills from the Cashier screen.'),
+      contains('Print and reprint bills can still be requested from the Cashier screen.'),
     );
   });
 }
