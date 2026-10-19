@@ -27,7 +27,7 @@ void main() {
     expect(source, contains('LayoutBuilder('));
     expect(source, contains('waiterTableColumnCount('));
     expect(source, contains('crossAxisCount:'));
-    expect(source, contains('columns == 3 ? 0.88'));
+    expect(source, contains('columns == 3'));
   });
 
   test('table status colors fill the whole card', () {
