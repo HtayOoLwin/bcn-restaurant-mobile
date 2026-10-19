@@ -11,9 +11,8 @@ void main() {
     source = File(screenPath).readAsStringSync();
   });
 
-  test('login screen uses BCN branding and restaurant subtitle', () {
-    expect(source, contains("'assets/images/bcn_brand_mark.png'"));
-    expect(source, contains("'BCN Restaurant'"));
+  test('login screen uses OurCity branding and restaurant subtitle', () {
+    expect(source, contains("'assets/images/OurCityLogo.png'"));
     expect(source, contains("'Restaurant Management System'"));
     expect(source, contains("'Powered by BCN'"));
   });
