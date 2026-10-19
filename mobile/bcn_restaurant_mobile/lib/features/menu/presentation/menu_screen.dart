@@ -241,17 +241,35 @@ class _MenuItemCard extends ConsumerWidget {
 
   final MenuItemModel item;
 
+  Future<void> _chooseUom(BuildContext context, WidgetRef ref, MenuItemModel item) async {
+    final selected = await showModalBottomSheet<MenuUomOption>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.bold))),
+            for (final option in item.availableUoms)
+              ListTile(
+                title: Text(option.uom),
+                subtitle: Text(formatMoney(option.rate, item.currency)),
+                onTap: () => Navigator.pop(sheetContext, option),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) {
+      ref.read(cartProvider.notifier).add(item.withUom(selected));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final imageUri = AppConfig.resolveAssetUrl(item.image);
     final cart = ref.watch(cartProvider);
-    var quantity = 0.0;
-    for (final line in cart.lines) {
-      if (line.item.itemCode == item.itemCode) {
-        quantity = line.qty;
-        break;
-      }
-    }
+    final quantity = cart.lines.where((line) => line.item.itemCode == item.itemCode).fold<double>(0, (sum, line) => sum + line.qty);
 
     return Container(
       decoration: BoxDecoration(
@@ -322,7 +340,13 @@ class _MenuItemCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 8),
-          _QuantityControl(item: item, quantity: quantity),
+          item.availableUoms.length > 1
+              ? IconButton.filled(
+                  tooltip: 'Choose UOM',
+                  onPressed: () => _chooseUom(context, ref, item),
+                  icon: const Icon(Icons.add_shopping_cart_rounded),
+                )
+              : _QuantityControl(item: item, quantity: quantity),
         ],
       ),
     );
