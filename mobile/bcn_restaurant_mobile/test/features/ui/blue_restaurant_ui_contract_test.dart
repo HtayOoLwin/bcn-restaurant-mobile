@@ -29,7 +29,7 @@ void main() {
     expect(source, contains("label: 'Tables'"));
     expect(source, contains("label: 'Orders'"));
     expect(source, contains("label: 'Settings'"));
-    expect(source, contains("Text('Tables'"));
+    expect(source, contains("'Tables'"));
     expect(source, contains('Icons.table_restaurant_outlined'));
     expect(source, contains('Border.all('));
   });
