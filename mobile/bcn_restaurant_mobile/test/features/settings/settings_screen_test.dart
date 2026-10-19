@@ -185,7 +185,7 @@ void main() {
 
     await tester.tap(find.text('Android Printer Worker'));
     await tester.pumpAndSettle();
-    expect(find.text('Android Printer Worker'), findsOneWidget);
+    expect(find.text('Android Printer Worker'), findsNWidgets(2));
   });
 
   testWidgets('waiter without print permission is denied the printer route', (
