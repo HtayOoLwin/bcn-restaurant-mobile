@@ -32,7 +32,7 @@ void main() {
 
   test('placing an order invalidates waiter progress cache', () {
     final methodStart = cartSource.indexOf('Future<void> _placeOrder() async');
-    final buildStart = cartSource.indexOf('\n  @override\n  Widget build', methodStart);
+    final buildStart = cartSource.indexOf('  @override', methodStart);
     final placeOrderMethod = cartSource.substring(methodStart, buildStart);
 
     expect(placeOrderMethod, contains('ref.invalidate(waiterProgressProvider);'));
@@ -81,7 +81,7 @@ void main() {
 
   test('expanded item rows mirror cashier quantity x item style without money totals', () {
     final expandedStart = source.indexOf('if (_expanded) ...[');
-    final cardEnd = source.indexOf('\n  }\n}\n\nextension on double', expandedStart);
+    final cardEnd = source.indexOf('\nextension on double', expandedStart);
     final expandedContent = source.substring(expandedStart, cardEnd);
 
     expect(
