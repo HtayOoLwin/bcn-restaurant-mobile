@@ -261,7 +261,7 @@ class _CartLineCard extends ConsumerWidget {
                     tooltip: 'Decrease',
                     onPressed: () => ref
                         .read(cartProvider.notifier)
-                        .decrement(line.item.itemCode),
+                        .decrement(line.item.itemCode, uom: line.item.uom),
                     icon: const Icon(Icons.remove_rounded),
                   ),
                   SizedBox(
@@ -292,7 +292,7 @@ class _CartLineCard extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           TextFormField(
-            key: ValueKey('note-${line.item.itemCode}'),
+            key: ValueKey('note-${line.item.itemCode}-${line.item.uom}'),
             initialValue: line.kitchenNote,
             decoration: const InputDecoration(
               labelText: 'Kitchen note',
@@ -301,7 +301,7 @@ class _CartLineCard extends ConsumerWidget {
             ),
             onChanged: (value) => ref
                 .read(cartProvider.notifier)
-                .setKitchenNote(line.item.itemCode, value),
+                .setKitchenNote(line.item.itemCode, value, uom: line.item.uom),
           ),
         ],
       ),
