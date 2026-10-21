@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +32,119 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   String _selectedCategory = 'All';
   String _searchQuery = '';
   final _searchController = TextEditingController();
+  DateTime? _started;
+  DateTime? _stopped;
+  Timer? _ticker;
+  bool _billing = false;
+  bool? _print;
+  Duration get _elapsed => _started == null ? Duration.zero :
+      (_stopped ?? DateTime.now()).difference(_started!);
+  int get _hours => _started == null ? 0 :
+      ((_elapsed.inMilliseconds / 3600000).ceil()).clamp(1, 99999);
+
+  void _begin() {
+    setState(() {
+      _started = DateTime.now();
+      _stopped = null;
+      _billing = false;
+      _print = null;
+    });
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _stopped == null) setState(() {});
+    });
+  }
+
+  Future<void> _bill() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Billing'),
+        content: const Text('Lock ordering in this local UI demo? The timer keeps running.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
+        ],
+      ),
+    );
+    if (ok == true && mounted) setState(() => _billing = true);
+  }
+
+  Widget _roomControls(double food) {
+    final room = _hours * 10000.0;
+    final tax = food * 0.05;
+    final service = food * 0.10;
+    final duration = _elapsed;
+    final durationText =
+        '${duration.inHours.toString().padLeft(2, '0')}:'
+        '${(duration.inMinutes % 60).toString().padLeft(2, '0')}:'
+        '${(duration.inSeconds % 60).toString().padLeft(2, '0')}';
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              const Icon(Icons.timer_outlined),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Room Timer (Local Demo)',
+                  style: TextStyle(fontWeight: FontWeight.bold))),
+              Text(durationText),
+            ]),
+            const Text('Sample rate: 10,000 MMK/hr; not saved to ERPNext.',
+                style: TextStyle(fontSize: 11)),
+            if (_started == null)
+              FilledButton(onPressed: _begin, child: const Text('Start Timer'))
+            else if (!_billing)
+              FilledButton(onPressed: _bill, child: const Text('Billing'))
+            else if (_stopped == null)
+              FilledButton(
+                onPressed: () {
+                  setState(() => _stopped = DateTime.now());
+                  _ticker?.cancel();
+                },
+                child: const Text('Stop Timer'),
+              )
+            else ...[
+              const Divider(),
+              Text('Food Cart: ${formatAmount(food)}'),
+              Text('Commercial Tax (demo 5%): ${formatAmount(tax)}'),
+              Text('Service Charge (demo 10%): ${formatAmount(service)}'),
+              Text('Room Charge ($_hours hr): ${formatAmount(room)}'),
+              Text('Total: ${formatAmount(food + tax + service + room)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              if (_print == null)
+                Row(children: [
+                  const Expanded(child: Text('Print bill?')),
+                  TextButton(onPressed: () => setState(() => _print = true),
+                      child: const Text('Yes')),
+                  TextButton(onPressed: () => setState(() => _print = false),
+                      child: const Text('No')),
+                ])
+              else Text(_print! ? 'Print selected (demo; not sent)' :
+                  'Print skipped (demo)'),
+            ],
+            if (_started != null)
+              TextButton(
+                onPressed: () {
+                  _ticker?.cancel();
+                  setState(() {
+                    _started = null;
+                    _stopped = null;
+                    _billing = false;
+                    _print = null;
+                  });
+                },
+                child: const Text('Reset Demo'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   @override
   void initState() {
@@ -43,6 +158,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -100,6 +216,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
           return Column(
             children: [
+              _roomControls(cart.grandTotal),
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
@@ -159,7 +276,11 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                 ),
               ),
               Expanded(
-                child: visibleItems.isEmpty
+                child: (_started == null || _billing) ? Center(
+                        child: Text(_started == null
+                            ? 'Start Timer to unlock ordering.'
+                            : 'Ordering locked. Stop Timer to view bill.'),
+                      ) : visibleItems.isEmpty
                     ? Center(
                         child: Text(
                           normalizedQuery.isEmpty
@@ -191,7 +312,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
           child: FilledButton(
-            onPressed: cart.lines.isEmpty
+            onPressed: (_started == null || _billing || cart.lines.isEmpty)
                 ? null
                 : () async {
                     await context.push('/cart');
