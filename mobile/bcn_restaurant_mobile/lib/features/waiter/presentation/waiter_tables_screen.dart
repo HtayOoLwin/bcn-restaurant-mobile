@@ -110,6 +110,11 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
               icon: const Icon(Icons.point_of_sale_outlined),
             ),
           IconButton(
+            tooltip: 'Room Timer UI Demo (local only)',
+            onPressed: () => context.push('/room-timer-demo'),
+            icon: const Icon(Icons.timer_outlined),
+          ),
+          IconButton(
             tooltip: 'Refresh',
             onPressed: () => ref.invalidate(tablesProvider(customerGroup)),
             icon: const Icon(Icons.refresh_rounded),
