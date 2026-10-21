@@ -347,18 +347,18 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
                   ],
                 ),
               ),
-              if (!hasMultipleUoms) ...[
-                const SizedBox(width: 8),
-                _QuantityControl(item: selectedItem, quantity: quantity),
-              ],
-            ],
-          ),
-          if (hasMultipleUoms) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
+              const SizedBox(width: 8),
+              if (!hasMultipleUoms)
+                _QuantityControl(item: selectedItem, quantity: quantity)
+              else
+                SizedBox(
+                  width: 132,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _QuantityControl(item: selectedItem, quantity: quantity),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
                     key: ValueKey('${item.itemCode}-${selected.uom}'),
                     initialValue: selected.uom,
                     isExpanded: true,
@@ -380,18 +380,17 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
                           ),
                         ),
                     ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _selectedUom = value);
-                      }
-                    },
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _selectedUom = value);
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                _QuantityControl(item: selectedItem, quantity: quantity),
-              ],
-            ),
-          ],
+            ],
+          ),
         ],
       ),
     );
