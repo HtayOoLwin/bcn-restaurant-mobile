@@ -1,7 +1,7 @@
 # OurCity Restaurant — Google Play production build
 
 App display name: **OurCity Restaurant**  
-Application ID: **com.bcn.restaurant.bcn_restaurant_mobile**  
+Application ID: **com.bcncl.ourcityrestaurant**  
 Branch: `our-city-restaurant-mobile`
 
 ## Local signing (never commit the actual credentials)
