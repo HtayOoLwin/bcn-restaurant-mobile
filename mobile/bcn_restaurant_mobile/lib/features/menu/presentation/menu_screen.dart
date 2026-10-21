@@ -36,7 +36,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   DateTime? _stopped;
   Timer? _ticker;
   bool _billing = false;
-  bool? _print;
   Duration get _elapsed => _started == null ? Duration.zero :
       (_stopped ?? DateTime.now()).difference(_started!);
   int get _hours => _started == null ? 0 :
@@ -47,7 +46,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
       _started = DateTime.now();
       _stopped = null;
       _billing = false;
-      _print = null;
     });
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -67,7 +65,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         ],
       ),
     );
-    if (ok == true && mounted) setState(() => _billing = true);
+    if (ok == true && mounted) {
+      setState(() => _billing = true);
+    }
   }
 
   Future<void> _showRoomDialog() async {
@@ -92,8 +92,11 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         ),
       );
       if (!mounted) return;
-      if (start == true) _begin();
-      else if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
+      if (start == true) {
+        _begin();
+      } else if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     } else if (!_billing) {
       await _bill();
     } else if (_stopped == null) {
@@ -146,7 +149,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         ),
       );
       if (selected != null && mounted) {
-        setState(() => _print = selected);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(selected
               ? 'Print selected — demo only, no printer job sent.'
