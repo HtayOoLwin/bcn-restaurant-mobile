@@ -24,6 +24,26 @@ class LocalRoomTimer {
     return draft;
   }
 
+  /// Manual demo fallback for an ERPNext Billing order without a local timer.
+  /// Duration and food total are user-entered estimates, never server facts.
+  static RoomTimerDraft createBillingDemo(
+    String customer, {
+    required int elapsedMinutes,
+    required double foodTotal,
+  }) {
+    if (elapsedMinutes <= 0 || foodTotal < 0) {
+      throw ArgumentError('Invalid demo room duration or food amount.');
+    }
+    final end = DateTime.now();
+    final draft = RoomTimerDraft(
+      end.subtract(Duration(minutes: elapsedMinutes)),
+    );
+    draft.billing = true;
+    draft.foodTotal = foodTotal;
+    _rooms[customer] = draft;
+    return draft;
+  }
+
   static void clear(String customer) => _rooms.remove(customer);
 }
 
