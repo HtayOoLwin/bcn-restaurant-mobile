@@ -175,7 +175,10 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                         itemCount: visibleItems.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 9),
                         itemBuilder: (context, index) =>
-                            _MenuItemCard(item: visibleItems[index]),
+                            _MenuItemCard(
+                              key: ValueKey(visibleItems[index].itemCode),
+                              item: visibleItems[index],
+                            ),
                       ),
               ),
             ],
@@ -236,40 +239,43 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   }
 }
 
-class _MenuItemCard extends ConsumerWidget {
-  const _MenuItemCard({required this.item});
+class _MenuItemCard extends ConsumerStatefulWidget {
+  const _MenuItemCard({super.key, required this.item});
 
   final MenuItemModel item;
 
-  Future<void> _chooseUom(BuildContext context, WidgetRef ref, MenuItemModel item) async {
-    final selected = await showModalBottomSheet<MenuUomOption>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            ListTile(title: Text(item.itemName, style: const TextStyle(fontWeight: FontWeight.bold))),
-            for (final option in item.availableUoms)
-              ListTile(
-                title: Text(option.uom),
-                subtitle: Text(formatMoney(option.rate, item.currency)),
-                onTap: () => Navigator.pop(sheetContext, option),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (selected != null) {
-      ref.read(cartProvider.notifier).add(item.withUom(selected));
+  @override
+  ConsumerState<_MenuItemCard> createState() => _MenuItemCardState();
+}
+
+class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
+  String? _selectedUom;
+
+  @override
+  void didUpdateWidget(covariant _MenuItemCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.itemCode != widget.item.itemCode) {
+      _selectedUom = null;
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final item = widget.item;
     final imageUri = AppConfig.resolveAssetUrl(item.image);
     final cart = ref.watch(cartProvider);
-    final quantity = cart.lines.where((line) => line.item.itemCode == item.itemCode).fold<double>(0, (sum, line) => sum + line.qty);
+    final options = item.availableUoms;
+    final hasMultipleUoms = options.length > 1;
+    final selected = options.firstWhere(
+      (option) => option.uom == (_selectedUom ?? item.uom),
+      orElse: () => options.first,
+    );
+    final selectedItem = item.withUom(selected);
+    final quantity = cart.lines
+        .where((line) =>
+            line.item.itemCode == item.itemCode &&
+            line.item.uom == selected.uom)
+        .fold<double>(0, (sum, line) => sum + line.qty);
 
     return Container(
       decoration: BoxDecoration(
@@ -278,75 +284,114 @@ class _MenuItemCard extends ConsumerWidget {
         border: Border.all(color: const Color(0xFFDCE7F1)),
       ),
       padding: const EdgeInsets.all(10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 74,
-              height: 74,
-              color: const Color(0xFFEAF1F8),
-              child: imageUri.hasScheme
-                  ? Image.network(
-                      imageUri.toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const Icon(
-                        Icons.restaurant_menu_rounded,
-                        size: 34,
-                        color: Color(0xFF5E7D9C),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 74,
+                  height: 74,
+                  color: const Color(0xFFEAF1F8),
+                  child: imageUri.hasScheme
+                      ? Image.network(
+                          imageUri.toString(),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.restaurant_menu_rounded,
+                            size: 34,
+                            color: Color(0xFF5E7D9C),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.restaurant_menu_rounded,
+                          size: 34,
+                          color: Color(0xFF5E7D9C),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.itemName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFF102F4F),
+                        fontWeight: FontWeight.w800,
                       ),
-                    )
-                  : const Icon(
-                      Icons.restaurant_menu_rounded,
-                      size: 34,
-                      color: Color(0xFF5E7D9C),
                     ),
-            ),
+                    const SizedBox(height: 3),
+                    Text(
+                      item.itemGroup,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF66829D),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${formatMoney(selected.rate, item.currency)} / ${selected.uom}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF173A5E),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!hasMultipleUoms) ...[
+                const SizedBox(width: 8),
+                _QuantityControl(item: selectedItem, quantity: quantity),
+              ],
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (hasMultipleUoms) ...[
+            const SizedBox(height: 10),
+            Row(
               children: [
-                Text(
-                  item.itemName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFF102F4F),
-                    fontWeight: FontWeight.w800,
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('${item.itemCode}-${selected.uom}'),
+                    initialValue: selected.uom,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'UOM',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                    items: [
+                      for (final option in options)
+                        DropdownMenuItem(
+                          value: option.uom,
+                          child: Text(
+                            option.uom,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedUom = value);
+                      }
+                    },
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  item.itemGroup,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF66829D),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${formatMoney(item.rate, item.currency)} / ${item.uom}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF173A5E),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                const SizedBox(width: 10),
+                _QuantityControl(item: selectedItem, quantity: quantity),
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-          item.availableUoms.length > 1
-              ? IconButton.filled(
-                  tooltip: 'Choose UOM',
-                  onPressed: () => _chooseUom(context, ref, item),
-                  icon: const Icon(Icons.add_shopping_cart_rounded),
-                )
-              : _QuantityControl(item: item, quantity: quantity),
+          ],
         ],
       ),
     );
@@ -382,7 +427,7 @@ class _QuantityControl extends ConsumerWidget {
           visualDensity: VisualDensity.compact,
           tooltip: 'Decrease',
           onPressed: () =>
-              ref.read(cartProvider.notifier).decrement(item.itemCode),
+              ref.read(cartProvider.notifier).decrement(item.itemCode, uom: item.uom),
           icon: const Icon(Icons.remove_rounded),
         ),
         SizedBox(
