@@ -10,6 +10,8 @@ import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../cart/domain/cart_controller.dart';
 import '../data/tables_repository.dart';
 import '../domain/table_models.dart';
+import '../../room/domain/local_room_timer.dart';
+import '../../../core/formatters/amount_format.dart';
 
 final tablesRepositoryProvider = Provider<TablesRepository>(
   (ref) => TablesRepository(ref.watch(apiClientProvider)),
@@ -260,14 +262,89 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                                 return _TableCard(
                                   table: table,
                                   onTap: () async {
-                                    if ((table.sessionStatus ?? '')
-                                            .toLowerCase() ==
-                                        'billing') {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Bill already requested. This order is locked.',
+                                    final draft = LocalRoomTimer.get(table.customer);
+                                    final serverBilling = (table.sessionStatus ?? '')
+                                            .toLowerCase() == 'billing';
+                                    if (draft?.billing == true || serverBilling) {
+                                      if (draft == null) {
+                                        await showDialog<void>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: const Text('Billing'),
+                                            content: const Text(
+                                              'This room is locked by ERPNext. '
+                                              'No local timer was started for this session, '
+                                              'so a demo check-out cannot be calculated.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(ctx),
+                                                child: const Text('Close'),
+                                              ),
+                                            ],
                                           ),
+                                        );
+                                        return;
+                                      }
+                                      if (draft.stoppedAt == null) {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: const Text('Stop Room Timer?'),
+                                            content: const Text(
+                                              'Ordering is locked. Stop the local timer '
+                                              'and show the room bill summary?',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(ctx, false),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              FilledButton(
+                                                onPressed: () => Navigator.pop(ctx, true),
+                                                child: const Text('Stop Timer'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm != true) return;
+                                        LocalRoomTimer.stop(table.customer);
+                                      }
+                                      if (!context.mounted) return;
+                                      final summary = LocalRoomTimer.get(table.customer)!;
+                                      await showDialog<void>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text('Bill Summary · Local Demo'),
+                                          content: SingleChildScrollView(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text('Duration: ${summary.elapsed.inMinutes} min'),
+                                                Text('Billable: ${summary.billableHours} hr'),
+                                                Text('Food: ${formatAmount(summary.foodTotal)}'),
+                                                Text('Commercial Tax (demo): ${formatAmount(summary.foodTax)}'),
+                                                Text('Service Charge (demo): ${formatAmount(summary.foodService)}'),
+                                                Text('Room: ${formatAmount(summary.roomCharges)}'),
+                                                const Divider(),
+                                                Text('Total: ${formatAmount(summary.total)}',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                const SizedBox(height: 8),
+                                                const Text('Print? Demo only; no printer job will be sent.'),
+                                              ],
+                                            ),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx),
+                                              child: const Text('No'),
+                                            ),
+                                            FilledButton(
+                                              onPressed: () => Navigator.pop(ctx),
+                                              child: const Text('Yes, Print'),
+                                            ),
+                                          ],
                                         ),
                                       );
                                       return;
