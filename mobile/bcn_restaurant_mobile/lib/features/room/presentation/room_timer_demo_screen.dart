@@ -47,7 +47,7 @@ class _RoomTimerDemoScreenState extends State<RoomTimerDemoScreen> {
   String _money(num amount) {
     final text = amount.round().toString();
     return text.replaceAllMapped(
-      RegExp(r'\\B(?=(\\d{3})+(?!\\d))'),
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
       (_) => ',',
     );
   }
