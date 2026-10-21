@@ -70,81 +70,105 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     if (ok == true && mounted) setState(() => _billing = true);
   }
 
-  Widget _roomControls(double food) {
+  Future<void> _showRoomDialog() async {
+    if (!mounted) return;
+    final food = ref.read(cartProvider).grandTotal;
     final room = _hours * 10000.0;
     final tax = food * 0.05;
     final service = food * 0.10;
-    final duration = _elapsed;
-    final durationText =
-        '${duration.inHours.toString().padLeft(2, '0')}:'
-        '${(duration.inMinutes % 60).toString().padLeft(2, '0')}:'
-        '${(duration.inSeconds % 60).toString().padLeft(2, '0')}';
-    return Card(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(children: [
-              const Icon(Icons.timer_outlined),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('Room Timer (Local Demo)',
-                  style: TextStyle(fontWeight: FontWeight.bold))),
-              Text(durationText),
-            ]),
-            const Text('Sample rate: 10,000 MMK/hr; not saved to ERPNext.',
-                style: TextStyle(fontSize: 11)),
-            if (_started == null)
-              FilledButton(onPressed: _begin, child: const Text('Start Timer'))
-            else if (!_billing)
-              FilledButton(onPressed: _bill, child: const Text('Billing'))
-            else if (_stopped == null)
-              FilledButton(
-                onPressed: () {
-                  setState(() => _stopped = DateTime.now());
-                  _ticker?.cancel();
-                },
-                child: const Text('Stop Timer'),
-              )
-            else ...[
-              const Divider(),
-              Text('Food Cart: ${formatAmount(food)}'),
-              Text('Commercial Tax (demo 5%): ${formatAmount(tax)}'),
-              Text('Service Charge (demo 10%): ${formatAmount(service)}'),
-              Text('Room Charge ($_hours hr): ${formatAmount(room)}'),
-              Text('Total: ${formatAmount(food + tax + service + room)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              if (_print == null)
-                Row(children: [
-                  const Expanded(child: Text('Print bill?')),
-                  TextButton(onPressed: () => setState(() => _print = true),
-                      child: const Text('Yes')),
-                  TextButton(onPressed: () => setState(() => _print = false),
-                      child: const Text('No')),
-                ])
-              else Text(_print! ? 'Print selected (demo; not sent)' :
-                  'Print skipped (demo)'),
-            ],
-            if (_started != null)
-              TextButton(
-                onPressed: () {
-                  _ticker?.cancel();
-                  setState(() {
-                    _started = null;
-                    _stopped = null;
-                    _billing = false;
-                    _print = null;
-                  });
-                },
-                child: const Text('Reset Demo'),
-              ),
+    if (_started == null) {
+      final start = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Start Room Timer'),
+          content: const Text('Start the timer before ordering. Demo rate: 10,000 MMK/hour. No data is saved.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Back')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Start Timer')),
           ],
         ),
+      );
+      if (!mounted) return;
+      if (start == true) _begin();
+      else if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
+    } else if (!_billing) {
+      await _bill();
+    } else if (_stopped == null) {
+      final stop = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Stop Room Timer?'),
+          content: const Text('Ordering is locked. Stop the timer to calculate the bill.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Stop Timer')),
+          ],
+        ),
+      );
+      if (stop == true && mounted) {
+        setState(() => _stopped = DateTime.now());
+        _ticker?.cancel();
+        await _showRoomDialog();
+      }
+    } else {
+      final selected = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Final Bill Summary · Demo'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Food: ${formatAmount(food)}'),
+                Text('Commercial Tax (demo 5%): ${formatAmount(tax)}'),
+                Text('Service Charge (demo 10%): ${formatAmount(service)}'),
+                Text('Room ($_hours hr): ${formatAmount(room)}'),
+                const Divider(),
+                Text('Total: ${formatAmount(food + tax + service + room)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text('Print bill? No actual print job will be sent.'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('No')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Yes, Print')),
+          ],
+        ),
+      );
+      if (selected != null && mounted) {
+        setState(() => _print = selected);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(selected
+              ? 'Print selected — demo only, no printer job sent.'
+              : 'Print skipped — demo only.'),
+        ));
+      }
+    }
+  }
+
+  Widget _roomStatus() {
+    final stage = _started == null ? 'Start Timer'
+        : !_billing ? 'Ordering'
+        : _stopped == null ? 'Stop Timer' : 'Bill Summary';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: OutlinedButton.icon(
+        onPressed: _showRoomDialog,
+        icon: const Icon(Icons.timer_outlined),
+        label: Text('Room · $stage  |  ${_elapsed.inMinutes} min'),
       ),
     );
   }
-
 
   @override
   void initState() {
@@ -153,6 +177,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.invalidate(menuProvider);
+      _showRoomDialog();
     });
   }
 
@@ -216,7 +241,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
           return Column(
             children: [
-              _roomControls(cart.grandTotal),
+              _roomStatus(),
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
