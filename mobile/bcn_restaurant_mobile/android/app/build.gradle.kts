@@ -35,10 +35,7 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            if (!keystorePropertiesFile.exists()) {
-                throw GradleException("Missing android/key.properties for release signing.")
-            }
+        if (keystorePropertiesFile.exists()) create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
             keyPassword = keystoreProperties.getProperty("keyPassword")
             storePassword = keystoreProperties.getProperty("storePassword")
@@ -50,7 +47,11 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+                throw GradleException("Release signing requires android/key.properties. See PLAY_CONSOLE_RELEASE.md.")
+            }
         }
     }
 }
