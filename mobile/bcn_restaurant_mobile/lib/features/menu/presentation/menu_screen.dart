@@ -10,6 +10,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../../cart/domain/cart_controller.dart';
 import '../data/menu_repository.dart';
 import '../domain/menu_models.dart';
+import '../../room/domain/local_room_timer.dart';
 
 final menuRepositoryProvider = Provider<MenuRepository>(
   (ref) => MenuRepository(ref.watch(apiClientProvider)),
@@ -36,14 +37,14 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   DateTime? _stopped;
   Timer? _ticker;
   bool _billing = false;
-  Duration get _elapsed => _started == null ? Duration.zero :
-      (_stopped ?? DateTime.now()).difference(_started!);
+  Duration get _elapsed => LocalRoomTimer.get(widget.customer)?.elapsed ?? Duration.zero;
   int get _hours => _started == null ? 0 :
       ((_elapsed.inMilliseconds / 3600000).ceil()).clamp(1, 99999);
 
   void _begin() {
+    LocalRoomTimer.start(widget.customer);
     setState(() {
-      _started = DateTime.now();
+      _started = LocalRoomTimer.get(widget.customer)!.startedAt;
       _stopped = null;
       _billing = false;
     });
@@ -66,6 +67,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
       ),
     );
     if (ok == true && mounted) {
+      LocalRoomTimer.markBilling(widget.customer,
+          foodTotal: ref.read(cartProvider).grandTotal);
       setState(() => _billing = true);
     }
   }
@@ -114,7 +117,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
         ),
       );
       if (stop == true && mounted) {
-        setState(() => _stopped = DateTime.now());
+        final draft = LocalRoomTimer.stop(widget.customer);
+        setState(() => _stopped = draft?.stoppedAt);
         _ticker?.cancel();
         await _showRoomDialog();
       }
@@ -179,6 +183,19 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.invalidate(menuProvider);
+      final saved = LocalRoomTimer.get(widget.customer);
+      if (saved != null) {
+        setState(() {
+          _started = saved.startedAt;
+          _stopped = saved.stoppedAt;
+          _billing = saved.billing;
+        });
+        if (_stopped == null) {
+          _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+            if (mounted) setState(() {});
+          });
+        }
+      }
       _showRoomDialog();
     });
   }
