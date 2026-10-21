@@ -267,26 +267,78 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                                             .toLowerCase() == 'billing';
                                     if (draft?.billing == true || serverBilling) {
                                       if (draft == null) {
-                                        await showDialog<void>(
+                                        final durationController = TextEditingController();
+                                        final foodController = TextEditingController(text: '0');
+                                        final demoValues = await showDialog<List<num>>(
                                           context: context,
                                           builder: (ctx) => AlertDialog(
-                                            title: const Text('Billing'),
-                                            content: const Text(
-                                              'This room is locked by ERPNext. '
-                                              'No local timer was started for this session, '
-                                              'so a demo check-out cannot be calculated.',
+                                            title: const Text('Demo Room Checkout'),
+                                            content: SingleChildScrollView(
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    'No timer was recorded in this app session. '
+                                                    'Enter sample values to TEST checkout. '
+                                                    'These are not actual ERPNext times or amounts.',
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  TextField(
+                                                    controller: durationController,
+                                                    keyboardType: TextInputType.number,
+                                                    decoration: const InputDecoration(
+                                                      labelText: 'Elapsed minutes',
+                                                      hintText: 'Example: 140',
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  TextField(
+                                                    controller: foodController,
+                                                    keyboardType: TextInputType.number,
+                                                    decoration: const InputDecoration(
+                                                      labelText: 'Food subtotal (MMK)',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                             actions: [
                                               TextButton(
                                                 onPressed: () => Navigator.pop(ctx),
-                                                child: const Text('Close'),
+                                                child: const Text('Cancel'),
+                                              ),
+                                              FilledButton(
+                                                onPressed: () {
+                                                  final minutes = int.tryParse(durationController.text.trim());
+                                                  final food = double.tryParse(foodController.text.trim());
+                                                  if (minutes == null || minutes <= 0 ||
+                                                      food == null || food < 0) {
+                                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                                      const SnackBar(content: Text(
+                                                        'Enter positive minutes and a non-negative food subtotal.',
+                                                      )),
+                                                    );
+                                                    return;
+                                                  }
+                                                  Navigator.pop(ctx, <num>[minutes, food]);
+                                                },
+                                                child: const Text('Continue Demo'),
                                               ),
                                             ],
                                           ),
                                         );
-                                        return;
+                                        durationController.dispose();
+                                        foodController.dispose();
+                                        if (demoValues == null || !context.mounted) return;
+                                        LocalRoomTimer.createBillingDemo(
+                                          table.customer,
+                                          elapsedMinutes: demoValues[0].toInt(),
+                                          foodTotal: demoValues[1].toDouble(),
+                                        );
                                       }
-                                      if (draft.stoppedAt == null) {
+                                      final currentDraft = LocalRoomTimer.get(table.customer)!;
+                                      if (currentDraft.stoppedAt == null) {
                                         final confirm = await showDialog<bool>(
                                           context: context,
                                           builder: (ctx) => AlertDialog(
@@ -331,7 +383,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                                                 Text('Total: ${formatAmount(summary.total)}',
                                                   style: const TextStyle(fontWeight: FontWeight.bold)),
                                                 const SizedBox(height: 8),
-                                                const Text('Print? Demo only; no printer job will be sent.'),
+                                                const Text('TEST VALUES ONLY — no server data saved or print job sent.'),
                                               ],
                                             ),
                                           ),
