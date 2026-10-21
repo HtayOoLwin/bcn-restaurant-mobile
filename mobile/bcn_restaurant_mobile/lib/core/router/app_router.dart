@@ -7,6 +7,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/cashier/presentation/cashier_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
+import '../../features/room/presentation/room_timer_demo_screen.dart';
 import '../../features/printing/domain/windows_print_status.dart';
 import '../../features/printing/presentation/printer_settings_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
@@ -104,6 +105,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/cart', builder: (context, state) => const CartScreen()),
+      GoRoute(path: '/room-timer-demo', builder: (context, state) => const RoomTimerDemoScreen()),
       GoRoute(
         path: '/unsupported',
         builder: (context, state) => UnsupportedRoleScreen(
