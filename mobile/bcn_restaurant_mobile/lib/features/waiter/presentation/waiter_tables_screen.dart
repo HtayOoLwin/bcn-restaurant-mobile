@@ -422,9 +422,14 @@ class _TableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = table.isOpen
-        ? (table.sessionStatus ?? 'Occupied')
-        : 'Available';
+    final localDraft = LocalRoomTimer.get(table.customer);
+    final status = localDraft?.billing == true
+        ? 'Billing'
+        : localDraft != null && localDraft.stoppedAt == null
+            ? 'Occupied'
+            : table.isOpen
+                ? (table.sessionStatus ?? 'Occupied')
+                : 'Available';
 
     Color cardBackground;
     Color borderColor;
