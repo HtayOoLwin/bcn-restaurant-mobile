@@ -196,7 +196,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           });
         }
       }
-      _showRoomDialog();
+      if (saved == null) {
+        _showRoomDialog();
+      }
     });
   }
 
