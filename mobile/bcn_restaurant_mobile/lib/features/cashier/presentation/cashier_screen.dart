@@ -266,13 +266,42 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     }
   }
 
+  Future<void> _prepareAndOpenPayment({
+    required BuildContext context,
+    required CashierBillingResponse billing,
+    required CashierBill bill,
+  }) async {
+    final status = bill.restaurantStatus.trim().toLowerCase();
+    if (status != 'billing' && status != 'payment pending') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Waiter must Request for Bill first.')),
+      );
+      return;
+    }
+    try {
+      if (status == 'billing') {
+        await ref.read(cashierRepositoryProvider).preparePayment(bill.salesOrder);
+        ref.invalidate(cashierBillingProvider);
+      }
+      if (!mounted || !context.mounted) return;
+      await _openPaymentSheet(context: context, ref: ref, billing: billing, bill: bill);
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
+  }
+
   Future<void> _openPaymentSheet({
     required BuildContext context,
     required WidgetRef ref,
     required CashierBillingResponse billing,
     required CashierBill bill,
   }) async {
-    if (bill.restaurantStatus.trim().toLowerCase() != 'billing') {
+    if (bill.restaurantStatus.trim().toLowerCase() != 'billing' &&
+        bill.restaurantStatus.trim().toLowerCase() != 'payment pending') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please wait for Request for Bill first.')),
       );
@@ -509,7 +538,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                 try {
                                   final result = await ref
                                       .read(cashierRepositoryProvider)
-                                      .paySplit(
+                                      .confirmPayment(
                                         salesOrder: bill.salesOrder,
                                         payments: tenders,
                                       );
@@ -663,7 +692,8 @@ class _BillCardState extends State<_BillCard> {
   @override
   Widget build(BuildContext context) {
     final bill = widget.bill;
-    final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'billing';
+    final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'billing' ||
+        bill.restaurantStatus.trim().toLowerCase() == 'payment pending';
     final cardColor = isBilling ? _billingCardColor : _openCardColor;
     final statusBackground =
         isBilling ? _billingStatusBackground : _openStatusBackground;
