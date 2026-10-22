@@ -55,11 +55,22 @@ class OrdersRepository {
       throw StateError('Invalid response from Create Order API');
     }
     var body = Map<String, dynamic>.from(data);
-    if (body['sales_order'] == null && body['message'] is Map) {
-      body = Map<String, dynamic>.from(body['message'] as Map);
+    // Handle nested Frappe API Server Script return envelopes.
+    for (var i = 0; i < 5; i++) {
+      if ((body['sales_order']?.toString().trim() ?? '').isNotEmpty) {
+        break;
+      }
+      final nested = body['message'] ?? body['data'] ?? body['result'];
+      if (nested is! Map) break;
+      body = Map<String, dynamic>.from(nested);
     }
-    if ((body['sales_order']?.toString() ?? '').isEmpty) {
-      throw StateError('Create Order API did not return a Sales Order number');
+    final name = body['sales_order']?.toString().trim() ?? '';
+    if (name.isEmpty) {
+      final fields = body.keys.join(', ');
+      throw StateError(
+        'Create Order API response missing sales_order (fields: $fields). '
+        'Check ERPNext Sales Orders for this table before retrying.',
+      );
     }
     return OrderResult.fromJson(body);
   }
