@@ -243,23 +243,28 @@ if not is_duplicate:
             matching_row.conversion_factor = conversion_factor
             matching_row.custom_kitchen_counter = kitchen_counter
         else:
-            sales_order.append(
-                "items",
-                {
-                    "item_code": item_code,
-                    "item_name": item.item_name,
-                    "description": description,
-                    "qty": qty,
-                    "uom": uom,
-                    "stock_uom": item.stock_uom,
-                    "conversion_factor": conversion_factor,
-                    "rate": rate,
-                    "delivery_date": today,
-                    "custom_kitchen_note": kitchen_note,
-                    "custom_kitchen_counter": kitchen_counter,
-                    "custom_printed_qty": 0,
-                },
-            )
+            # Validate and append a NEW row separately; this path differs
+            # from increasing the quantity of an existing SO Item.
+            try:
+                sales_order.append(
+                    "items",
+                    {
+                        "item_code": item_code,
+                        "item_name": item.item_name,
+                        "description": description,
+                        "qty": qty,
+                        "uom": uom,
+                        "stock_uom": item.stock_uom,
+                        "conversion_factor": conversion_factor,
+                        "rate": rate,
+                        "delivery_date": frappe.utils.getdate(today),
+                        "custom_kitchen_note": kitchen_note,
+                        "custom_kitchen_counter": kitchen_counter,
+                        "custom_printed_qty": 0,
+                    },
+                )
+            except Exception as error:
+                frappe.throw("CREATE ORDER NEW ITEM [" + item_code + "]: " + str(error))
 
     if not sales_order.items:
         frappe.throw("Sales Order has no items.")
@@ -291,17 +296,23 @@ if not is_duplicate:
             }
             sales_order.append("taxes", tax_values)
 
-    sales_order.calculate_taxes_and_totals()
+    try:
+        sales_order.calculate_taxes_and_totals()
+    except Exception as error:
+        frappe.throw("CREATE ORDER TOTALS: " + str(error))
     sales_order.custom_client_order_id = client_order_id
     sales_order.custom_restaurant_status = "Open"
     if not sales_order.get("custom_check_in"):
         sales_order.custom_check_in = sales_order.creation or frappe.utils.now_datetime()
     sales_order.flags.ignore_permissions = True
 
-    if is_new_order:
-        sales_order.insert(ignore_permissions=True)
-    else:
-        sales_order.save(ignore_permissions=True)
+    try:
+        if is_new_order:
+            sales_order.insert(ignore_permissions=True)
+        else:
+            sales_order.save(ignore_permissions=True)
+    except Exception as error:
+        frappe.throw("CREATE ORDER SAVE: " + str(error))
 
 frappe.response["message"] = {
     "sales_order": sales_order.name,
