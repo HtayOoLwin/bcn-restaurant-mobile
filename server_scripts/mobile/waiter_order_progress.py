@@ -3,7 +3,7 @@
 #
 # Current Server-Script-only restaurant flow:
 # - waiter orders are Open Draft Sales Orders
-# - Request for Bill moves the order out of this Open list into Billing
+# - Draft Billing orders stay visible so waiter can re-request an updated bill
 # - this endpoint reads the same active-order state used by the table screen
 
 COMPANY = "Doh Myot Daw BBQ & Restaurant"
@@ -43,7 +43,7 @@ orders = frappe.get_all(
     filters={
         "company": COMPANY,
         "docstatus": 0,
-        "custom_restaurant_status": "Open",
+        "custom_restaurant_status": ["in", ["Open", "Billing"]],
     },
     fields=[
         "name",
