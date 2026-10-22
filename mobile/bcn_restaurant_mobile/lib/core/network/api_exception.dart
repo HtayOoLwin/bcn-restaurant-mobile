@@ -30,6 +30,16 @@ class ApiException implements Exception {
       }
       message ??= data['message']?.toString();
       message ??= data['exception']?.toString();
+      message ??= data['exc_type']?.toString();
+      if (message == null && data['exc'] is String) {
+        final lines = data['exc'].toString().split('\\n');
+        for (final line in lines.reversed) {
+          if (line.trim().isNotEmpty) {
+            message = line.trim();
+            break;
+          }
+        }
+      }
     }
 
     message ??= error.message;
