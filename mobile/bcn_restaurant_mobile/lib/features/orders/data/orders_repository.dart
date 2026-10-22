@@ -51,6 +51,16 @@ class OrdersRepository {
       'bcn_mobile_create_order',
       data: payload,
     );
-    return OrderResult.fromJson(Map<String, dynamic>.from(data as Map));
+    if (data is! Map) {
+      throw StateError('Invalid response from Create Order API');
+    }
+    var body = Map<String, dynamic>.from(data);
+    if (body['sales_order'] == null && body['message'] is Map) {
+      body = Map<String, dynamic>.from(body['message'] as Map);
+    }
+    if ((body['sales_order']?.toString() ?? '').isEmpty) {
+      throw StateError('Create Order API did not return a Sales Order number');
+    }
+    return OrderResult.fromJson(body);
   }
 }
