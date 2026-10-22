@@ -91,9 +91,9 @@ active_orders = frappe.get_all(
 billing_orders = []
 open_draft_orders = []
 for active_order in active_orders:
-    if active_order.custom_restaurant_status == "Billing":
+    if active_order.custom_restaurant_status == "Billing" and active_order.docstatus == 1:
         billing_orders.append(active_order)
-    elif (
+    if (
         active_order.docstatus == 0
         and active_order.custom_restaurant_status in ["Open", "Billing"]
     ):
@@ -180,9 +180,7 @@ if not is_duplicate:
 
         is_room_charge = bool(item.get("custom_is_room_charge"))
         if is_room_charge:
-            if not item.is_stock_item:
-                pass
-            else:
+            if item.is_stock_item:
                 frappe.throw("Room charge must be a non-stock Item: " + item_code)
             if requested_uom and requested_uom != "Hour":
                 frappe.throw("Room charge UOM must be Hour")
