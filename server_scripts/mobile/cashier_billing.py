@@ -381,7 +381,7 @@ def build_bill_row(order, has_print_job_doctype):
         )
 
     draft_invoice = None
-    if order.custom_restaurant_status == "Billing" and order.docstatus == 1:
+    if order.custom_restaurant_status == "Payment Pending" and order.docstatus == 1:
         draft_invoices = get_linked_draft_sales_invoice_names(order.name)
         if len(draft_invoices) == 1:
             draft_invoice = draft_invoices[0]
@@ -414,7 +414,7 @@ def build_bill_row(order, has_print_job_doctype):
         "grand_total": float(order.grand_total or 0),
         "currency": order.currency,
         "restaurant_status": order.custom_restaurant_status,
-        "payment_enabled": bool(draft_invoice),
+        "payment_enabled": bool(draft_invoice) or (order.docstatus == 0 and order.custom_restaurant_status == "Billing"),
         "last_print_status": last_print_status,
         "last_print_job": last_print_job,
         "items": item_rows,
@@ -455,6 +455,63 @@ if not allowed_user:
 action = (frappe.form_dict.get("action") or "").strip()
 
 if action == "Pay":
+    sales_order_name = (frappe.form_dict.get("sales_order") or "").strip()
+    if not sales_order_name:
+        frappe.throw("sales_order is required")
+    locked_rows = frappe.db.sql(
+        "SELECT name FROM `tabSales Order` WHERE name=%(name)s FOR UPDATE",
+        {"name": sales_order_name}, as_dict=True,
+    )
+    if not locked_rows:
+        frappe.throw("Sales Order not found")
+    so = frappe.get_doc("Sales Order", sales_order_name)
+    if so.company != COMPANY or so.currency != CURRENCY:
+        frappe.throw("Restaurant company/currency mismatch")
+
+    state = (so.get("custom_restaurant_status") or "").strip()
+    if so.docstatus == 1 and state in ["Payment Pending", "Closed"]:
+        invoices = (
+            get_linked_draft_sales_invoice_names(so.name)
+            if state == "Payment Pending"
+            else get_linked_submitted_sales_invoice_names(so.name)
+        )
+        if len(invoices) != 1:
+            frappe.throw("Submitted order must have exactly one linked Sales Invoice")
+        frappe.response["message"] = {
+            "sales_order": so.name, "sales_invoice": invoices[0],
+            "restaurant_status": state, "duplicate": True,
+        }
+    elif so.docstatus == 0 and state == "Billing":
+        if not int(so.get("custom_bill_revision") or 0):
+            frappe.throw("Please request bill before Pay")
+        print_id = "bill-request|" + so.name + "|" + str(int(so.custom_bill_revision))
+        if not frappe.db.exists("BCN Print Job", {"request_id": print_id}):
+            frappe.throw("Latest bill print snapshot missing. Request bill again")
+        if get_linked_draft_sales_invoice_names(so.name):
+            frappe.throw("Unexpected Draft Invoice exists before Pay")
+        so.custom_restaurant_status = "Payment Pending"
+        so.flags.ignore_permissions = True
+        so.submit()
+        si = frappe.call(
+            "erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice",
+            source_name=so.name, ignore_permissions=True,
+        )
+        si.flags.ignore_permissions = True
+        si.update_stock = 1
+        si.calculate_taxes_and_totals()
+        validate_invoice_totals(
+            si, float(so.net_total or 0),
+            float(so.total_taxes_and_charges or 0), float(so.grand_total or 0),
+        )
+        si.insert(ignore_permissions=True)
+        frappe.response["message"] = {
+            "sales_order": so.name, "sales_invoice": si.name,
+            "restaurant_status": "Payment Pending", "duplicate": False,
+        }
+    else:
+        frappe.throw("Only latest billed Draft Sales Orders can be paid")
+
+elif action == "ConfirmPayment":
     sales_order_name = (frappe.form_dict.get("sales_order") or "").strip()
     raw_payments = frappe.form_dict.get("payments")
 
@@ -517,7 +574,7 @@ if action == "Pay":
             "duplicate": True,
         }
 
-    elif sales_order.docstatus == 1 and restaurant_status == "Billing":
+    elif sales_order.docstatus == 1 and restaurant_status == "Payment Pending":
         draft_invoices = get_linked_draft_sales_invoice_names(
             sales_order.name
         )
@@ -630,7 +687,7 @@ else:
         "Sales Order",
         filters={
             "company": COMPANY,
-            "docstatus": 1,
+            "docstatus": 0,
             "custom_restaurant_status": "Billing",
         },
         fields=[
@@ -649,7 +706,13 @@ else:
         limit_page_length=500,
     )
 
-    orders = ordering_orders + billing_orders
+    pending_orders = frappe.get_all(
+        "Sales Order",
+        filters={"company": COMPANY, "docstatus": 1, "custom_restaurant_status": "Payment Pending"},
+        fields=["name", "customer", "customer_name", "creation", "net_total", "total_taxes_and_charges", "grand_total", "currency", "docstatus", "custom_restaurant_status"],
+        order_by="creation asc", limit_page_length=500,
+    )
+    orders = ordering_orders + billing_orders + pending_orders
     orders = sorted(
         orders,
         key=lambda row: str(row.creation or ""),
