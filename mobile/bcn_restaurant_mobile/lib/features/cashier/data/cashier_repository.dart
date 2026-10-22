@@ -15,24 +15,28 @@ class CashierRepository {
     );
   }
 
-  Future<CashierPaymentResult> paySplit({
+  Future<Map<String, dynamic>> preparePayment(String salesOrder) async {
+    final data = await _apiClient.postMethod(
+      'bcn_cashier_billing',
+      data: {'action': 'Pay', 'sales_order': salesOrder},
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
+  Future<CashierPaymentResult> confirmPayment({
     required String salesOrder,
     required List<CashierPaymentTender> payments,
   }) async {
     final data = await _apiClient.postMethod(
       'bcn_cashier_billing',
       data: {
-        'action': 'Pay',
+        'action': 'ConfirmPayment',
         'sales_order': salesOrder,
         'payments': jsonEncode(
-          payments
-              .map(
-                (tender) => {
-                  'mode_of_payment': tender.modeOfPayment,
-                  'amount': tender.amount,
-                },
-              )
-              .toList(),
+          payments.map((t) => {
+            'mode_of_payment': t.modeOfPayment,
+            'amount': t.amount,
+          }).toList(),
         ),
       },
     );
@@ -40,4 +44,10 @@ class CashierRepository {
       Map<String, dynamic>.from(data as Map),
     );
   }
+
+  @Deprecated('Use preparePayment and confirmPayment in two separate steps')
+  Future<CashierPaymentResult> paySplit({
+    required String salesOrder,
+    required List<CashierPaymentTender> payments,
+  }) => confirmPayment(salesOrder: salesOrder, payments: payments);
 }
