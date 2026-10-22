@@ -243,7 +243,11 @@ void main() {
       await tester.tap(find.text('Confirm Payment'));
       await tester.pumpAndSettle();
 
-      expect(api.paymentSalesOrders, ['SAL-ORD-2026-00005']);
+      expect(api.paymentSalesOrders, [
+        'SAL-ORD-2026-00005',
+        'SAL-ORD-2026-00005',
+      ]);
+      expect(api.paymentActions, ['Pay', 'ConfirmPayment']);
       expect(find.text('Reprint Bill'), findsOneWidget);
 
       await tester.tap(find.text('Reprint Bill'));
@@ -362,6 +366,7 @@ class _FakeApiClient extends ApiClient {
   final Map<String, dynamic> paymentResponse;
   final bool removeBillAfterPayment;
   final List<String> paymentSalesOrders = [];
+  final List<String> paymentActions = [];
 
   @override
   Future<bool> hasSession() async => false;
@@ -392,7 +397,20 @@ class _FakeApiClient extends ApiClient {
     if (method != 'bcn_cashier_billing') {
       throw StateError('Unexpected POST method: $method');
     }
+    final action = data?['action']?.toString() ?? '';
     paymentSalesOrders.add(data?['sales_order']?.toString() ?? '');
+    paymentActions.add(action);
+    if (action == 'Pay') {
+      return {
+        'sales_order': data?['sales_order'],
+        'sales_invoice': 'ACC-SINV-2026-00001',
+        'restaurant_status': 'Payment Pending',
+        'duplicate': false,
+      };
+    }
+    if (action != 'ConfirmPayment') {
+      throw StateError('Unexpected cashier action: $action');
+    }
     if (removeBillAfterPayment) {
       billingResponse = {
         'bills': const [],
