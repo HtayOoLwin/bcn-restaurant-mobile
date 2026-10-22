@@ -142,9 +142,9 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Confirm Bill Request'),
         content: const Text(
-          'Once you request the bill, this order will be locked. '
-          'You cannot add or edit items after this. '
-          'The bill will be printed automatically.',
+          'Check-out and room charges will be recalculated. '
+          'The Sales Order stays in Draft until Cashier Pay. '
+          'Additional orders require requesting a fresh bill.',
         ),
         actions: [
           TextButton(
@@ -174,13 +174,13 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       ref.invalidate(tablesProvider('takeaway'));
 
       if (mounted) {
-        final invoice = result['sales_invoice']?.toString() ?? '';
+        final printJob = result['print_job']?.toString() ?? '';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              invoice.isEmpty
-                  ? 'Bill requested. Order is now locked.'
-                  : 'Bill requested. Draft Invoice: $invoice · Printing queued.',
+              printJob.isEmpty
+                  ? 'Bill updated. Sales Order remains Draft.'
+                  : 'Bill updated · Print queued: $printJob · Additional items allowed.',
             ),
           ),
         );
