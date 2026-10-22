@@ -45,7 +45,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
           content: Text(
             'Sales Order: ${result.salesOrder}\n'
-            'Session: ${result.session}\n'
+            '${result.session.isNotEmpty ? 'Session: ${result.session}\n' : ''}'
             'Total: ${formatAmount(result.grandTotal)}',
           ),
           actions: [
