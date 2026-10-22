@@ -208,9 +208,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                 context: context,
                                 salesOrder: bill.salesOrder,
                               ),
-                              onPayment: () => _openPaymentSheet(
+                              onPayment: () => _prepareAndOpenPayment(
                                 context: context,
-                                ref: ref,
                                 billing: data,
                                 bill: bill,
                               ),
