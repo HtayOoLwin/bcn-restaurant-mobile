@@ -10,8 +10,6 @@ import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../cart/domain/cart_controller.dart';
 import '../data/tables_repository.dart';
 import '../domain/table_models.dart';
-import '../../room/domain/local_room_timer.dart';
-import '../../../core/formatters/amount_format.dart';
 
 final tablesRepositoryProvider = Provider<TablesRepository>(
   (ref) => TablesRepository(ref.watch(apiClientProvider)),
@@ -262,146 +260,6 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
                                 return _TableCard(
                                   table: table,
                                   onTap: () async {
-                                    final draft = LocalRoomTimer.get(table.customer);
-                                    final serverBilling = (table.sessionStatus ?? '')
-                                            .toLowerCase() == 'billing';
-                                    if (draft?.billing == true || serverBilling) {
-                                      if (draft == null) {
-                                        final durationController = TextEditingController();
-                                        final foodController = TextEditingController(text: '0');
-                                        final demoValues = await showDialog<List<num>>(
-                                          context: context,
-                                          builder: (ctx) => AlertDialog(
-                                            title: const Text('Demo Room Checkout'),
-                                            content: SingleChildScrollView(
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  const Text(
-                                                    'No timer was recorded in this app session. '
-                                                    'Enter sample values to TEST checkout. '
-                                                    'These are not actual ERPNext times or amounts.',
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                  TextField(
-                                                    controller: durationController,
-                                                    keyboardType: TextInputType.number,
-                                                    decoration: const InputDecoration(
-                                                      labelText: 'Elapsed minutes',
-                                                      hintText: 'Example: 140',
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  TextField(
-                                                    controller: foodController,
-                                                    keyboardType: TextInputType.number,
-                                                    decoration: const InputDecoration(
-                                                      labelText: 'Food subtotal (MMK)',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(ctx),
-                                                child: const Text('Cancel'),
-                                              ),
-                                              FilledButton(
-                                                onPressed: () {
-                                                  final minutes = int.tryParse(durationController.text.trim());
-                                                  final food = double.tryParse(foodController.text.trim());
-                                                  if (minutes == null || minutes <= 0 ||
-                                                      food == null || food < 0) {
-                                                    ScaffoldMessenger.of(ctx).showSnackBar(
-                                                      const SnackBar(content: Text(
-                                                        'Enter positive minutes and a non-negative food subtotal.',
-                                                      )),
-                                                    );
-                                                    return;
-                                                  }
-                                                  Navigator.pop(ctx, <num>[minutes, food]);
-                                                },
-                                                child: const Text('Continue Demo'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        durationController.dispose();
-                                        foodController.dispose();
-                                        if (demoValues == null || !context.mounted) return;
-                                        LocalRoomTimer.createBillingDemo(
-                                          table.customer,
-                                          elapsedMinutes: demoValues[0].toInt(),
-                                          foodTotal: demoValues[1].toDouble(),
-                                        );
-                                      }
-                                      final currentDraft = LocalRoomTimer.get(table.customer)!;
-                                      if (currentDraft.stoppedAt == null) {
-                                        final confirm = await showDialog<bool>(
-                                          context: context,
-                                          builder: (ctx) => AlertDialog(
-                                            title: const Text('Stop Room Timer?'),
-                                            content: const Text(
-                                              'Ordering is locked. Stop the local timer '
-                                              'and show the room bill summary?',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(ctx, false),
-                                                child: const Text('Cancel'),
-                                              ),
-                                              FilledButton(
-                                                onPressed: () => Navigator.pop(ctx, true),
-                                                child: const Text('Stop Timer'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        if (confirm != true) return;
-                                        LocalRoomTimer.stop(table.customer);
-                                      }
-                                      if (!context.mounted) return;
-                                      final summary = LocalRoomTimer.get(table.customer)!;
-                                      await showDialog<void>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: const Text('Bill Summary · Local Demo'),
-                                          content: SingleChildScrollView(
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text('Duration: ${summary.elapsed.inMinutes} min'),
-                                                Text('Billable: ${summary.billableHours} hr'),
-                                                Text('Food: ${formatAmount(summary.foodTotal)}'),
-                                                Text('Commercial Tax (demo): ${formatAmount(summary.foodTax)}'),
-                                                Text('Service Charge (demo): ${formatAmount(summary.foodService)}'),
-                                                Text('Room: ${formatAmount(summary.roomCharges)}'),
-                                                const Divider(),
-                                                Text('Total: ${formatAmount(summary.total)}',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                const SizedBox(height: 8),
-                                                const Text('TEST VALUES ONLY — no server data saved or print job sent.'),
-                                              ],
-                                            ),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(ctx),
-                                              child: const Text('No'),
-                                            ),
-                                            FilledButton(
-                                              onPressed: () => Navigator.pop(ctx),
-                                              child: const Text('Yes, Print'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      return;
-                                    }
-
                                     ref
                                         .read(cartProvider.notifier)
                                         .setOrderContext(
@@ -474,14 +332,9 @@ class _TableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localDraft = LocalRoomTimer.get(table.customer);
-    final status = localDraft?.billing == true
-        ? 'Billing'
-        : localDraft != null && localDraft.stoppedAt == null
-            ? 'Occupied'
-            : table.isOpen
-                ? (table.sessionStatus ?? 'Occupied')
-                : 'Available';
+    final status = table.isOpen
+        ? (table.sessionStatus ?? 'Occupied')
+        : 'Available';
 
     Color cardBackground;
     Color borderColor;
