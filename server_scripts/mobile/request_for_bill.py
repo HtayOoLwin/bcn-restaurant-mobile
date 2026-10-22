@@ -13,7 +13,7 @@ user = frappe.session.user
 if not user or user == "Guest":
     frappe.throw("Authentication is required.")
 
-roles = frappe.get_roles(user)
+roles = [row.role for row in frappe.get_all(\"Has Role\", filters={\"parent\": user, \"parenttype\": \"User\"}, fields=[\"role\"], limit_page_length=200)]
 if not (
     user == "Administrator"
     or any(role in roles for role in ["Admin", "System Manager", "Waiter", "Restaurant Manager"])
@@ -84,8 +84,6 @@ if room_rows:
         frappe.throw("Room Charges Item must be non-stock")
     # Keep rate frozen on SO item; changing qty triggers amount recalculation.
     room.qty = billable
-    room.amount = frappe.utils.flt(room.qty) * frappe.utils.flt(room.rate)
-    room.base_amount = frappe.utils.flt(room.amount) * frappe.utils.flt(so.conversion_rate or 1)
 
 so.custom_check_in = check_in
 so.custom_check_out = now
