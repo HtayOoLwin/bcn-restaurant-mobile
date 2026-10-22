@@ -268,13 +268,28 @@ if not is_duplicate:
         sales_order.taxes_and_charges = profile.taxes_and_charges
 
     if sales_order.taxes_and_charges and not sales_order.taxes:
-        taxes = frappe.call(
-            "erpnext.accounts.services.taxes.get_taxes_and_charges",
-            master_doctype="Sales Taxes and Charges Template",
-            master_name=sales_order.taxes_and_charges,
-        ) or []
-        for tax in taxes:
-            sales_order.append("taxes", tax)
+        # Read the selected template directly. The ERPNext Python method
+        # erpnext.accounts.services.taxes.get_taxes_and_charges is not
+        # available on every deployed ERPNext version.
+        tax_template = frappe.get_doc(
+            "Sales Taxes and Charges Template",
+            sales_order.taxes_and_charges,
+        )
+        if tax_template.company and tax_template.company != COMPANY:
+            frappe.throw("Sales Tax Template company does not match")
+
+        for template_row in tax_template.taxes:
+            tax_values = {
+                "charge_type": template_row.charge_type,
+                "account_head": template_row.account_head,
+                "description": template_row.description,
+                "rate": template_row.rate,
+                "tax_amount": template_row.tax_amount,
+                "row_id": template_row.row_id,
+                "included_in_print_rate": template_row.included_in_print_rate,
+                "cost_center": template_row.cost_center,
+            }
+            sales_order.append("taxes", tax_values)
 
     sales_order.calculate_taxes_and_totals()
     sales_order.custom_client_order_id = client_order_id
