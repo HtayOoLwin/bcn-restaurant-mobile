@@ -141,32 +141,28 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('Confirm Bill Request'),
-        content: const Text(
-          'Check-out and room charges will be recalculated. '
-          'The Sales Order stays in Draft until Cashier Pay. '
-          'Additional orders require requesting a fresh bill.',
-        ),
+        content: const Text('Do you want to print bill?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('No'),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.pop(context, true),
             icon: const Icon(Icons.print),
-            label: const Text('Confirm & Print'),
+            label: const Text('Yes'),
           ),
         ],
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed == null) return;
 
     setState(() => _busyOrder = order.name);
     try {
       final result = await ref
           .read(waiterOperationsRepositoryProvider)
-          .requestBill(order.name);
+          .requestBill(order.name, printBill: confirmed);
 
       ref.invalidate(waiterProgressProvider);
       ref.invalidate(waiterReadyProvider);
@@ -179,8 +175,8 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
           SnackBar(
             content: Text(
               printJob.isEmpty
-                  ? 'Bill updated. Sales Order remains Draft.'
-                  : 'Bill updated · Print queued: $printJob · Additional items allowed.',
+                  ? 'Bill requested successfully.'
+                  : 'Bill requested · Print queued: $printJob',
             ),
           ),
         );
