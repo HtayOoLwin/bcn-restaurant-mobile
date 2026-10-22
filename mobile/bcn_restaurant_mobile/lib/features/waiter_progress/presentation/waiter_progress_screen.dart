@@ -140,7 +140,6 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Bill Request'),
         content: const Text('Do you want to print bill?'),
         actions: [
           TextButton(
