@@ -4,7 +4,7 @@
 # Restaurant flow:
 # - one Open Draft Sales Order per table/customer
 # - later orders reuse the same Draft Sales Order
-# - Billing locks the table against new waiter orders, including after SO submit
+# - Draft Billing permits additions; each addition invalidates the old bill
 # - Sales Order Item stores kitchen note, kitchen counter snapshot, printed qty
 # - this script does not submit the Sales Order and does not print directly
 
@@ -91,16 +91,16 @@ active_orders = frappe.get_all(
 billing_orders = []
 open_draft_orders = []
 for active_order in active_orders:
-    if active_order.custom_restaurant_status == "Billing":
+    if active_order.custom_restaurant_status == "Billing" and active_order.docstatus == 1:
         billing_orders.append(active_order)
-    elif (
+    if (
         active_order.docstatus == 0
-        and active_order.custom_restaurant_status == "Open"
+        and active_order.custom_restaurant_status in ["Open", "Billing"]
     ):
         open_draft_orders.append(active_order)
 
-if billing_orders:
-    frappe.throw("Table is currently in Billing: " + customer)
+if billing_orders and any(order.docstatus == 1 for order in billing_orders):
+    frappe.throw("Table is already submitted for payment: " + customer)
 
 if len(open_draft_orders) > 1:
     frappe.throw(
@@ -136,6 +136,7 @@ if not is_duplicate:
         sales_order.conversion_rate = 1
         sales_order.plc_conversion_rate = 1
         sales_order.custom_restaurant_status = "Open"
+        sales_order.custom_check_in = frappe.utils.now_datetime()
 
         if profile.warehouse:
             sales_order.set_warehouse = profile.warehouse
@@ -177,8 +178,17 @@ if not is_duplicate:
         if item.item_group not in allowed_item_groups:
             frappe.throw("Item is not allowed in POS Profile DMT: " + item_code)
 
-        kitchen_counter = (item.get("custom_kitchen_counter") or "").strip()
-        uom = requested_uom or item.stock_uom
+        is_room_charge = bool(item.get("custom_is_room_charge"))
+        if is_room_charge:
+            if item.is_stock_item:
+                frappe.throw("Room charge must be a non-stock Item: " + item_code)
+            if requested_uom and requested_uom != "Hour":
+                frappe.throw("Room charge UOM must be Hour")
+            if any(bool(frappe.db.get_value("Item", row.item_code, "custom_is_room_charge")) for row in sales_order.items):
+                frappe.throw("Only one Room Charge Item is permitted per Sales Order")
+            qty = 1.0  # provisional: Request for Bill calculates duration
+        kitchen_counter = "" if is_room_charge else (item.get("custom_kitchen_counter") or "").strip()
+        uom = "Hour" if is_room_charge else (requested_uom or item.stock_uom)
 
         conversion_factor = 1.0
         if uom != item.stock_uom:
@@ -269,6 +279,8 @@ if not is_duplicate:
     sales_order.calculate_taxes_and_totals()
     sales_order.custom_client_order_id = client_order_id
     sales_order.custom_restaurant_status = "Open"
+    if not sales_order.get("custom_check_in"):
+        sales_order.custom_check_in = sales_order.creation or frappe.utils.now_datetime()
     sales_order.flags.ignore_permissions = True
 
     if is_new_order:
