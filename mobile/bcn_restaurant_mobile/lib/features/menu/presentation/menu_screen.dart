@@ -133,16 +133,21 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            TextButton.icon(
+            FilledButton.icon(
               onPressed: _addingRoomCharge || menu.asData == null
                   ? null
                   : () => _selectRoomCharge(menu.asData!.value.items),
               icon: const Icon(Icons.meeting_room_outlined, size: 18),
               label: const Text('Room Charges'),
-              style: TextButton.styleFrom(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFED9418),
                 foregroundColor: Colors.white,
-                disabledForegroundColor: Colors.white54,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                disabledBackgroundColor: const Color(0xFFB7A186),
+                disabledForegroundColor: Colors.white70,
+                elevation: 1,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                shape: const StadiumBorder(),
+                textStyle: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
           ],
