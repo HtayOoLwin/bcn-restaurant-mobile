@@ -30,10 +30,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   String _selectedCategory = 'All';
   String _searchQuery = '';
   final _searchController = TextEditingController();
-  bool _addingRoomCharge = false;
 
   Future<void> _selectRoomCharge(List<MenuItemModel> items) async {
-    if (_addingRoomCharge) return;
     final roomItems = items.where((item) =>
         item.itemGroup.trim().toLowerCase() == 'room charges' &&
         !item.isStockItem).toList();
@@ -122,7 +120,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
             ),
             const SizedBox(width: 8),
             FilledButton.icon(
-              onPressed: _addingRoomCharge || menu.asData == null
+              onPressed: menu.asData == null
                   ? null
                   : () => _selectRoomCharge(menu.asData!.value.items),
               icon: const Icon(Icons.meeting_room_outlined, size: 18),
