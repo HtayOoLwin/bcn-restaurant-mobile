@@ -26,12 +26,14 @@ class CashierRepository {
   Future<CashierPaymentResult> confirmPayment({
     required String salesOrder,
     required List<CashierPaymentTender> payments,
+    double discountAmount = 0,
   }) async {
     final data = await _apiClient.postMethod(
       'bcn_cashier_billing',
       data: {
         'action': 'ConfirmPayment',
         'sales_order': salesOrder,
+        'discount_amount': discountAmount,
         'payments': jsonEncode(
           payments.map((t) => {
             'mode_of_payment': t.modeOfPayment,
