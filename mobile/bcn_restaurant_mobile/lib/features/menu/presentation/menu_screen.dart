@@ -34,6 +34,15 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
   Future<void> _selectRoomCharge(List<MenuItemModel> items) async {
     if (_addingRoomCharge) return;
+    final roomItems = items.where((item) =>
+        item.itemGroup.trim().toLowerCase() == 'room charges' &&
+        !item.isStockItem).toList();
+    if (roomItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No items found in Room Charges item group.')),
+      );
+      return;
+    }
     final selected = await showDialog<MenuItemModel>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -43,7 +52,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           height: 330,
           child: ListView(
             shrinkWrap: true,
-            children: items.where((item) => !item.isStockItem).map((item) =>
+            children: roomItems.map((item) =>
               ListTile(
                 title: Text(item.itemName),
                 subtitle: Text('${item.itemCode} · ${formatMoney(item.rate, item.currency)} / ${item.uom}'),
@@ -99,21 +108,41 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 72,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        title: Row(
           children: [
-            Text(
-              widget.customer,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.customer,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Select menu items',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              'Select menu items',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.82),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: _addingRoomCharge || menu.asData == null
+                  ? null
+                  : () => _selectRoomCharge(menu.asData!.value.items),
+              icon: const Icon(Icons.meeting_room_outlined, size: 18),
+              label: const Text('Room Charges'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                disabledForegroundColor: Colors.white54,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
             ),
           ],
@@ -199,14 +228,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                       ],
                     ],
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: OutlinedButton.icon(
-                  onPressed: _addingRoomCharge ? null : () => _selectRoomCharge(response.items),
-                  icon: const Icon(Icons.meeting_room_outlined),
-                  label: Text(_addingRoomCharge ? 'Saving Room Charges...' : 'Add Room Charges'),
                 ),
               ),
               Expanded(
