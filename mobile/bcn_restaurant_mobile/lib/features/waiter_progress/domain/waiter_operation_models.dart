@@ -44,6 +44,7 @@ class WaiterProgressOrder {
     required this.preparingQty,
     required this.readyQty,
     required this.servedQty,
+    required this.billRevision,
   });
 
   factory WaiterProgressOrder.fromJson(Map<String, dynamic> json) {
@@ -66,6 +67,7 @@ class WaiterProgressOrder {
       preparingQty: number('preparing_qty'),
       readyQty: number('ready_qty'),
       servedQty: number('served_qty'),
+      billRevision: (json['bill_revision'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -77,6 +79,7 @@ class WaiterProgressOrder {
   final double preparingQty;
   final double readyQty;
   final double servedQty;
+  final int billRevision;
 }
 
 class WaiterProgressResponse {
