@@ -26,6 +26,10 @@ class WaiterOperationsRepository {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  Future<void> markReadyForPayment(String salesOrder) async {
+    await _apiClient.postMethod('bcn_waiter_pay', data: {'sales_order': salesOrder});
+  }
+
   Future<void> itemAction({
     required String rowName,
     required String action,
