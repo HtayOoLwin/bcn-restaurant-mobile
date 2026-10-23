@@ -65,9 +65,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     if (selected == null || !mounted) return;
     ref.read(cartProvider.notifier).setOrderContext(customer: widget.customer);
     ref.read(cartProvider.notifier).selectRoomCharge(selected);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Room Charges added to cart: ${selected.itemName}. Place Order to save.')),
-    );
+
   }
 
   @override
