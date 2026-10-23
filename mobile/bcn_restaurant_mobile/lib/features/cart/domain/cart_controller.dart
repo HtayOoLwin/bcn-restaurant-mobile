@@ -32,6 +32,7 @@ class CartState {
     this.session,
     this.remarks = '',
     this.clientOrderId,
+    this.roomChargeItemCode,
   });
 
   const CartState.empty() : this(lines: const []);
@@ -41,6 +42,7 @@ class CartState {
   final String? session;
   final String remarks;
   final String? clientOrderId;
+  final String? roomChargeItemCode;
 
   double get totalQty => lines.fold(0, (sum, line) => sum + line.qty);
   double get grandTotal => lines.fold(0, (sum, line) => sum + line.amount);
@@ -53,6 +55,8 @@ class CartState {
     String? remarks,
     String? clientOrderId,
     bool clearClientOrderId = false,
+    String? roomChargeItemCode,
+    bool clearRoomCharge = false,
   }) {
     return CartState(
       lines: lines ?? this.lines,
@@ -62,6 +66,7 @@ class CartState {
       clientOrderId: clearClientOrderId
           ? null
           : (clientOrderId ?? this.clientOrderId),
+      roomChargeItemCode: clearRoomCharge ? null : (roomChargeItemCode ?? this.roomChargeItemCode),
     );
   }
 }
@@ -91,6 +96,7 @@ class CartController extends Notifier<CartState> {
       customer: customer,
       session: session,
       remarks: state.remarks,
+      roomChargeItemCode: state.roomChargeItemCode,
       clientOrderId: state.clientOrderId ?? generateUuidV4(),
     );
   }
@@ -108,7 +114,14 @@ class CartController extends Notifier<CartState> {
     state = state.copyWith(lines: lines);
   }
 
+  void selectRoomCharge(MenuItemModel item) {
+    final lines = state.lines.where((line) => line.item.itemCode != state.roomChargeItemCode && line.item.itemCode != item.itemCode).toList();
+    lines.add(CartLine(item: item, qty: 1));
+    state = state.copyWith(lines: lines, roomChargeItemCode: item.itemCode);
+  }
+
   void decrement(String itemCode, {String? uom}) {
+    if (itemCode == state.roomChargeItemCode) return;
     final lines = [...state.lines];
     final index = lines.indexWhere((line) => line.item.itemCode == itemCode && (uom == null || line.item.uom == uom));
     if (index == -1) return;
@@ -123,6 +136,7 @@ class CartController extends Notifier<CartState> {
 
   void remove(String itemCode, {String? uom}) {
     state = state.copyWith(
+      clearRoomCharge: itemCode == state.roomChargeItemCode,
       lines: state.lines
           .where((line) => line.item.itemCode != itemCode || (uom != null && line.item.uom != uom))
           .toList(),
