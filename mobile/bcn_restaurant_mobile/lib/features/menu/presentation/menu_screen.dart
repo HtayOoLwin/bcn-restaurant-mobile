@@ -30,6 +30,51 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
   String _selectedCategory = 'All';
   String _searchQuery = '';
   final _searchController = TextEditingController();
+  bool _addingRoomCharge = false;
+
+  Future<void> _selectRoomCharge(List<MenuItemModel> items) async {
+    if (_addingRoomCharge) return;
+    final selected = await showDialog<MenuItemModel>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Select Room Charges Item'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 330,
+          child: ListView(
+            shrinkWrap: true,
+            children: items.where((item) => !item.isStockItem).map((item) =>
+              ListTile(
+                title: Text(item.itemName),
+                subtitle: Text('${item.itemCode} · ${formatMoney(item.rate, item.currency)} / ${item.uom}'),
+                onTap: () => Navigator.pop(dialogContext, item),
+              ),
+            ).toList(),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel'))],
+      ),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => _addingRoomCharge = true);
+    try {
+      await ref.read(apiClientProvider).postMethod(
+        'bcn_set_room_charge',
+        data: {'customer': widget.customer, 'item_code': selected.itemCode},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Room Charges selected: ${selected.itemName}')),
+      );
+      ref.invalidate(menuProvider);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _addingRoomCharge = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -154,6 +199,14 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                       ],
                     ],
                   ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: OutlinedButton.icon(
+                  onPressed: _addingRoomCharge ? null : () => _selectRoomCharge(response.items),
+                  icon: const Icon(Icons.meeting_room_outlined),
+                  label: Text(_addingRoomCharge ? 'Saving Room Charges...' : 'Add Room Charges'),
                 ),
               ),
               Expanded(
