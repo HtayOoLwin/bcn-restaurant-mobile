@@ -122,6 +122,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                             busyOrder: _busyOrder,
                             onCancel: _cancelItem,
                             onRequestBill: _requestBill,
+                            onPay: _pay,
                           ),
                         ),
                 );
@@ -191,6 +192,47 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
     }
   }
 
+  Future<void> _pay(WaiterProgressOrder order) async {
+    if (_busyOrder != null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: Text('Send ${order.customer} to cashier for payment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Pay'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busyOrder = order.name);
+    try {
+      await ref.read(waiterOperationsRepositoryProvider).markReadyForPayment(order.name);
+      ref.invalidate(waiterProgressProvider);
+      ref.invalidate(tablesProvider('dine_in'));
+      ref.invalidate(tablesProvider('takeaway'));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sent to cashier for payment.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busyOrder = null);
+    }
+  }
+
   Future<void> _cancelItem(WaiterProgressItem item) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -241,6 +283,7 @@ class _ProgressCard extends StatefulWidget {
     required this.busyOrder,
     required this.onCancel,
     required this.onRequestBill,
+    required this.onPay,
   });
 
   final WaiterProgressOrder order;
@@ -248,6 +291,7 @@ class _ProgressCard extends StatefulWidget {
   final String? busyOrder;
   final Future<void> Function(WaiterProgressItem item) onCancel;
   final Future<void> Function(WaiterProgressOrder order) onRequestBill;
+  final Future<void> Function(WaiterProgressOrder order) onPay;
 
   @override
   State<_ProgressCard> createState() => _ProgressCardState();
@@ -304,6 +348,14 @@ class _ProgressCardState extends State<_ProgressCard> {
                   ),
                 ),
                 const SizedBox(width: 12),
+                if (widget.order.billRevision > 0) ...[
+                  OutlinedButton.icon(
+                    onPressed: requesting ? null : () => widget.onPay(widget.order),
+                    icon: const Icon(Icons.payments_outlined),
+                    label: const Text('Pay'),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 FilledButton.icon(
                   onPressed: requesting
                       ? null
