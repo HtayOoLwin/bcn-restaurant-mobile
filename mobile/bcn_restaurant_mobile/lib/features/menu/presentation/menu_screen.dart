@@ -65,23 +65,11 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
       ),
     );
     if (selected == null || !mounted) return;
-    setState(() => _addingRoomCharge = true);
-    try {
-      await ref.read(apiClientProvider).postMethod(
-        'bcn_set_room_charge',
-        data: {'customer': widget.customer, 'item_code': selected.itemCode},
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Room Charges selected: ${selected.itemName}')),
-      );
-      ref.invalidate(menuProvider);
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
-    } finally {
-      if (mounted) setState(() => _addingRoomCharge = false);
-    }
+    ref.read(cartProvider.notifier).setOrderContext(customer: widget.customer);
+    ref.read(cartProvider.notifier).selectRoomCharge(selected);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Room Charges added to cart: ${selected.itemName}. Place Order to save.')),
+    );
   }
 
   @override
