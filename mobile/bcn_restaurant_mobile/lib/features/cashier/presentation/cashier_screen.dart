@@ -308,6 +308,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     }
 
     final controllers = <String, TextEditingController>{};
+    final discountController = TextEditingController();
+    controllers['__discount__'] = discountController;
     for (final mode in billing.modes) {
       controllers[mode.name] = TextEditingController();
     }
@@ -321,7 +323,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
     bool busy = false;
     String selectedPaymentType = primaryMode?.name ?? '';
-    final fullAmountText = formatAmount(bill.grandTotal);
+    double discountAmount() => _parseTender(discountController.text);
+    double amountDue() => (bill.grandTotal - discountAmount()).clamp(0, double.infinity).toDouble();
+    bool discountValid() => discountAmount() >= 0 && discountAmount() < bill.grandTotal && !discountController.text.contains('-');
 
     void setControllerAmount(TextEditingController? controller, double amount) {
       if (controller == null) return;
@@ -334,16 +338,16 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
     void setPaymentType(String type) {
       selectedPaymentType = type;
-      for (final controller in controllers.values) {
-        controller.clear();
+      for (final entry in controllers.entries) {
+        if (entry.key != '__discount__') entry.value.clear();
       }
       final target = type == 'Split'
           ? (primaryMode == null ? null : controllers[primaryMode.name])
           : controllers[type];
       if (target != null) {
         target.value = TextEditingValue(
-          text: fullAmountText,
-          selection: TextSelection.collapsed(offset: fullAmountText.length),
+          text: formatAmount(amountDue()),
+          selection: TextSelection.collapsed(offset: formatAmount(amountDue()).length),
         );
       }
     }
@@ -357,7 +361,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       }
 
       final secondAmount = _parseTender(controllers[secondaryMode.name]?.text);
-      final balance = (bill.grandTotal - secondAmount)
+      final balance = (amountDue() - secondAmount)
           .clamp(0, double.infinity)
           .toDouble();
       setControllerAmount(controllers[primaryMode.name], balance);
@@ -408,15 +412,19 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               }
             }
 
-            final remaining = totalTendered < bill.grandTotal
-                ? bill.grandTotal - totalTendered
+            final payable = amountDue();
+            final validDiscount = discountValid();
+            final remaining = totalTendered < payable
+                ? payable - totalTendered
                 : 0.0;
-            final change = totalTendered > bill.grandTotal
-                ? totalTendered - bill.grandTotal
+            final change = totalTendered > payable
+                ? totalTendered - payable
                 : 0.0;
-            final nonCashOver = nonCashTotal > bill.grandTotal + 0.0001;
+            final nonCashOver = nonCashTotal > payable + 0.0001;
             final overWithoutCash = change > 0 && cashTendered <= 0;
             final canPay =
+                validDiscount &&
+                payable > 0 &&
                 tenders.isNotEmpty &&
                 remaining <= 0.0001 &&
                 !nonCashOver &&
@@ -441,10 +449,26 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         style: Theme.of(sheetContext).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'Amount Due: ${formatMoney(bill.grandTotal, bill.currency)}',
-                        style: Theme.of(sheetContext).textTheme.titleMedium,
+                      _AmountSummaryRow(label: 'Original Total', value: formatMoney(bill.grandTotal, bill.currency)),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: discountController,
+                        enabled: !busy,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: const [ThousandsSeparatorInputFormatter()],
+                        decoration: InputDecoration(
+                          labelText: 'Discount Amount',
+                          hintText: '0',
+                          suffixText: bill.currency,
+                          border: const OutlineInputBorder(),
+                          errorText: validDiscount ? null : 'Discount must be less than Grand Total',
+                        ),
+                        onChanged: (_) => setSheetState(() {
+                          setPaymentType(selectedPaymentType);
+                        }),
                       ),
+                      const SizedBox(height: 8),
+                      _AmountSummaryRow(label: 'Net Payable', value: formatMoney(payable, bill.currency), emphasize: true),
                       const SizedBox(height: 20),
                       Text(
                         'Payment Type',
@@ -540,6 +564,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                       .confirmPayment(
                                         salesOrder: bill.salesOrder,
                                         payments: tenders,
+                                        discountAmount: discountAmount(),
                                       );
                                   if (mounted) {
                                     setState(() {
