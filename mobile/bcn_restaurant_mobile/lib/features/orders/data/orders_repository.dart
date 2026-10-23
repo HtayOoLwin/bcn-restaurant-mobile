@@ -40,6 +40,9 @@ class OrdersRepository {
             .toList(),
       ),
     };
+    if (cart.roomChargeItemCode != null) {
+      payload['room_charge_item'] = cart.roomChargeItemCode;
+    }
     if (cart.session != null && cart.session!.isNotEmpty) {
       payload['session'] = cart.session;
     }
