@@ -279,11 +279,24 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     }
     try {
       if (status == 'billing') {
-        await ref.read(cashierRepositoryProvider).preparePayment(bill.salesOrder);
+        final prepared = await ref
+            .read(cashierRepositoryProvider)
+            .preparePayment(bill.salesOrder);
+        final draftInvoice = prepared['sales_invoice']?.toString() ?? '';
+        if (draftInvoice.isEmpty) {
+          throw StateError(
+            'Draft Sales Invoice was not returned. Payment has not started.',
+          );
+        }
         ref.invalidate(cashierBillingProvider);
       }
       if (!mounted || !context.mounted) return;
-      await _openPaymentSheet(context: context, ref: ref, billing: billing, bill: bill);
+      await _openPaymentSheet(
+        context: context,
+        ref: ref,
+        billing: billing,
+        bill: bill,
+      );
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -449,7 +462,15 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         style: Theme.of(sheetContext).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
-                      _AmountSummaryRow(label: 'Original Total', value: formatMoney(bill.grandTotal, bill.currency)),
+                      Text(
+                        'Discount applies to the Draft Sales Invoice only.',
+                        style: Theme.of(sheetContext).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      _AmountSummaryRow(
+                        label: 'Original Total',
+                        value: formatMoney(bill.grandTotal, bill.currency),
+                      ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: discountController,
