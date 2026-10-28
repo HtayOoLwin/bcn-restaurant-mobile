@@ -745,122 +745,190 @@ class _BillCardState extends State<_BillCard> {
     final statusForeground =
         isBilling ? _billingStatusForeground : _openStatusForeground;
 
+    final orderDetails = InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    bill.customerName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  color: statusForeground,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Tooltip(
+              message: bill.salesOrder,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3EFFC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  bill.salesOrder,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF153D69),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final statusChip = Chip(
+      avatar: Icon(
+        isBilling ? Icons.receipt_long : Icons.schedule,
+        size: 18,
+        color: statusForeground,
+      ),
+      label: Text(
+        bill.restaurantStatus,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: statusForeground,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      backgroundColor: statusBackground,
+      side: BorderSide(color: statusForeground.withValues(alpha: 0.35)),
+    );
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       color: cardColor,
       surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+        padding: const EdgeInsets.all(14),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 570;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => setState(() => _expanded = !_expanded),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Column(
+                if (compact) ...[
+                  orderDetails,
+                  Align(alignment: Alignment.centerLeft, child: statusChip),
+                ] else
+                  Row(
+                    children: [
+                      Expanded(child: orderDetails),
+                      const SizedBox(width: 12),
+                      statusChip,
+                    ],
+                  ),
+                if (isBilling && !_expanded) ...[
+                  const SizedBox(height: 10),
+                  _actionButtons(isBilling),
+                ],
+                if (_expanded) ...[
+                  if (bill.lastPrintStatus?.isNotEmpty == true) ...[
+                    const SizedBox(height: 6),
+                    Text('Last Print: ${bill.lastPrintStatus}'),
+                  ],
+                  const Divider(height: 24),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECF3FA),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Items (${bill.items.length})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF153D69),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...bill.items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  bill.customerName,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 42),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE3EFFC),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${formatQuantity(item.qty)} ×',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF153D69),
+                                fontWeight: FontWeight.w600,
                               ),
-                              const SizedBox(width: 6),
-                              Icon(
-                                _expanded ? Icons.expand_less : Icons.expand_more,
-                                color: statusForeground,
-                              ),
-                            ],
+                            ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            bill.salesOrder,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(item.itemName)),
+                          const SizedBox(width: 8),
+                          Text(formatMoney(item.amount, bill.currency)),
                         ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Chip(
-                  avatar: Icon(
-                    isBilling ? Icons.receipt_long : Icons.schedule,
-                    size: 18,
-                    color: statusForeground,
+                  const Divider(height: 24),
+                  _AmountSummaryRow(
+                    label: 'Subtotal',
+                    value: formatMoney(bill.netTotal, bill.currency),
                   ),
-                  label: Text(
-                    bill.restaurantStatus,
-                    style: TextStyle(
-                      color: statusForeground,
-                      fontWeight: FontWeight.w600,
+                  ...bill.taxes.map(
+                    (tax) => _AmountSummaryRow(
+                      label: tax.rate == 0
+                          ? tax.description
+                          : '${tax.description} ${formatQuantity(tax.rate)}%',
+                      value: formatMoney(tax.taxAmount, bill.currency),
                     ),
                   ),
-                  backgroundColor: statusBackground,
-                  side: BorderSide(color: statusForeground.withValues(alpha: 0.35)),
-                ),
-              ],
-            ),
-            if (isBilling && !_expanded) ...[
-              const SizedBox(height: 12),
-              _actionButtons(isBilling),
-            ],
-            if (_expanded) ...[
-              if (bill.lastPrintStatus?.isNotEmpty == true) ...[
-                const SizedBox(height: 6),
-                Text('Last Print: ${bill.lastPrintStatus}'),
-              ],
-              const Divider(height: 24),
-              ...bill.items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${formatQuantity(item.qty)} × ${item.itemName}',
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(formatMoney(item.amount, bill.currency)),
-                    ],
+                  const SizedBox(height: 4),
+                  _AmountSummaryRow(
+                    label: 'Grand Total',
+                    value: formatMoney(bill.grandTotal, bill.currency),
+                    emphasize: true,
                   ),
-                ),
-              ),
-              const Divider(height: 24),
-              _AmountSummaryRow(
-                label: 'Subtotal',
-                value: formatMoney(bill.netTotal, bill.currency),
-              ),
-              ...bill.taxes.map(
-                (tax) => _AmountSummaryRow(
-                  label: tax.rate == 0
-                      ? tax.description
-                      : '${tax.description} ${formatQuantity(tax.rate)}%',
-                  value: formatMoney(tax.taxAmount, bill.currency),
-                ),
-              ),
-              const SizedBox(height: 4),
-              _AmountSummaryRow(
-                label: 'Grand Total',
-                value: formatMoney(bill.grandTotal, bill.currency),
-                emphasize: true,
-              ),
-              const Divider(height: 24),
-              _actionButtons(isBilling),
-            ],
-          ],
+                  const Divider(height: 24),
+                  _actionButtons(isBilling),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
