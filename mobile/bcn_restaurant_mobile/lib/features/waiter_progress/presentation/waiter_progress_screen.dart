@@ -303,105 +303,203 @@ class _ProgressCardState extends State<_ProgressCard> {
   @override
   Widget build(BuildContext context) {
     final requesting = widget.busyOrder == widget.order.name;
+    const payGreen = Color(0xFF159B55);
+    const billBlue = Color(0xFF1F5F92);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+    final orderDetails = InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => setState(() => _expanded = !_expanded),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => setState(() => _expanded = !_expanded),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
+                Flexible(
+                  child: Text(
+                    widget.order.customer,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Tooltip(
+              message: widget.order.name,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3EFFC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  widget.order.name,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF153D69),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final payButton = widget.order.billRevision > 0
+        ? FilledButton.icon(
+            onPressed: requesting ? null : () => widget.onPay(widget.order),
+            style: FilledButton.styleFrom(
+              backgroundColor: payGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            icon: const Icon(Icons.payments_outlined, size: 18),
+            label: const Text('Pay', maxLines: 1),
+          )
+        : null;
+
+    final billButton = FilledButton.icon(
+      onPressed: requesting ? null : () => widget.onRequestBill(widget.order),
+      style: FilledButton.styleFrom(
+        backgroundColor: billBlue,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+      icon: requesting
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.receipt_long, size: 18),
+      label: Text(
+        requesting ? 'Requesting…' : 'Request for Bill',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 570;
+            final actions = Row(
+              children: [
+                if (payButton != null) ...[
+                  Expanded(flex: 2, child: payButton),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(flex: 3, child: billButton),
+              ],
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (compact) ...[
+                  orderDetails,
+                  const SizedBox(height: 10),
+                  actions,
+                ] else
+                  Row(
+                    children: [
+                      Expanded(child: orderDetails),
+                      const SizedBox(width: 16),
+                      SizedBox(width: payButton == null ? 190 : 320, child: actions),
+                    ],
+                  ),
+                if (_expanded) ...[
+                  const Divider(height: 24),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECF3FA),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Items (${widget.order.items.length})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF153D69),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...widget.order.items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 5,
+                      ),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  widget.order.customer,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 42),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE3EFFC),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${item.qty.g} ×',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF153D69),
+                                fontWeight: FontWeight.w600,
                               ),
-                              Icon(
-                                _expanded ? Icons.expand_less : Icons.expand_more,
-                                size: 24,
-                              ),
-                            ],
+                            ),
                           ),
-                          const SizedBox(height: 3),
-                          Text(
-                            widget.order.name,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(item.itemName)),
+                          if (item.canCancel) ...[
+                            const SizedBox(width: 6),
+                            TextButton(
+                              onPressed: requesting ||
+                                      widget.busyRow == item.rowName
+                                  ? null
+                                  : () => widget.onCancel(item),
+                              child: const Text('Cancel'),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                if (widget.order.billRevision > 0) ...[
-                  OutlinedButton.icon(
-                    onPressed: requesting ? null : () => widget.onPay(widget.order),
-                    icon: const Icon(Icons.payments_outlined),
-                    label: const Text('Pay'),
-                  ),
-                  const SizedBox(width: 8),
                 ],
-                FilledButton.icon(
-                  onPressed: requesting
-                      ? null
-                      : () => widget.onRequestBill(widget.order),
-                  icon: requesting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.receipt_long),
-                  label: Text(
-                    requesting ? 'Requesting…' : 'Request for Bill',
-                  ),
-                ),
               ],
-            ),
-            if (_expanded) ...[
-              const Divider(height: 24),
-              ...widget.order.items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${item.qty.g} × ${item.itemName}',
-                        ),
-                      ),
-                      if (item.canCancel) ...[
-                        const SizedBox(width: 12),
-                        TextButton(
-                          onPressed:
-                              requesting || widget.busyRow == item.rowName
-                              ? null
-                              : () => widget.onCancel(item),
-                          child: const Text('Cancel'),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
