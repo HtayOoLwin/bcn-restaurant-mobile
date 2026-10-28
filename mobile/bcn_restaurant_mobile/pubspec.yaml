@@ -1,7 +1,7 @@
 name: bcn_restaurant_mobile
 description: BCN Restaurant mobile client for ERPNext/Frappe v16
 publish_to: "none"
-version: 1.0.3+3
+version: 1.0.4+4
 
 environment:
   sdk: ">=3.12.0 <4.0.0"
