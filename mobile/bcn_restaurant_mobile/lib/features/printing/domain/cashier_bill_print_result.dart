@@ -46,7 +46,21 @@ class CashierBillPrintResult {
 }
 
 bool _asBool(Object? value, {required String field}) {
-  if (value == true || value == 1 || value == '1') return true;
-  if (value == false || value == 0 || value == '0') return false;
+  // Older Server Scripts may omit these optional response metadata flags.
+  if (value == null) return false;
+  if (value is bool) return value;
+  if (value == 1) return true;
+  if (value == 0) return false;
+  if (value is String) {
+    switch (value.trim().toLowerCase()) {
+      case 'true':
+      case '1':
+        return true;
+      case 'false':
+      case '0':
+      case '':
+        return false;
+    }
+  }
   throw FormatException('Cashier print response has an invalid $field value.');
 }
