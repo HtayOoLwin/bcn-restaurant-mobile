@@ -43,8 +43,8 @@ void main() {
       'lib/features/cashier/presentation/cashier_screen.dart',
     ).readAsStringSync();
 
-    expect(source, contains("const creditPaymentType = 'Credit'"));
-    expect(source, contains("label: const Text('Credit')"));
+    expect(source, contains('const creditPaymentType = \'Credit\''));
+    expect(source, contains('label: const Text(\'Credit\')'));
     expect(source, contains("label: 'Credit Outstanding'"));
     expect(source, contains("payments: tenders,"));
     expect(source, contains("label: Text("));
