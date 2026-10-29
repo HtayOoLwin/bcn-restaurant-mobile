@@ -46,6 +46,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   final Set<String> _pendingPrintSalesOrders = {};
   final Map<String, String> _retryPrintRequestIds = {};
   CashierPaymentResult? _lastPaymentResult;
+  bool _lastPaymentWasCredit = false;
   Timer? _autoRefreshTimer;
 
   @override
@@ -136,7 +137,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Payment completed'),
+                            Text(_lastPaymentWasCredit ? 'Credit invoice submitted' : 'Payment completed'),
                             const SizedBox(height: 2),
                             Text(_lastPaymentResult!.salesOrder),
                           ],
@@ -568,15 +569,17 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         label: 'Total Tendered',
                         value: formatMoney(totalTendered, bill.currency),
                       ),
-                      _AmountSummaryRow(
-                        label: 'Remaining',
-                        value: formatMoney(remaining, bill.currency),
-                      ),
-                      _AmountSummaryRow(
-                        label: 'Change',
-                        value: formatMoney(change, bill.currency),
-                        emphasize: change > 0,
-                      ),
+                      if (selectedPaymentType != creditPaymentType) ...[
+                        _AmountSummaryRow(
+                          label: 'Remaining',
+                          value: formatMoney(remaining, bill.currency),
+                        ),
+                        _AmountSummaryRow(
+                          label: 'Change',
+                          value: formatMoney(change, bill.currency),
+                          emphasize: change > 0,
+                        ),
+                      ],
                       if (nonCashOver)
                         const Padding(
                           padding: EdgeInsets.only(top: 8),
@@ -614,6 +617,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                         result.salesOrder,
                                       );
                                       _lastPaymentResult = result;
+                                      _lastPaymentWasCredit = selectedPaymentType == creditPaymentType;
                                     });
                                   }
                                   ref.invalidate(cashierBillingProvider);
@@ -657,7 +661,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.payments),
-                        label: Text(busy ? 'Processing…' : 'Confirm Payment'),
+                        label: Text(
+                          busy
+                              ? 'Processing…'
+                              : selectedPaymentType == creditPaymentType
+                                  ? 'Confirm Credit'
+                                  : 'Confirm Payment',
+                        ),
                       ),
                     ],
                   ),
