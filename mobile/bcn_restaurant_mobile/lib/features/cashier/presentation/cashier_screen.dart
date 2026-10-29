@@ -336,6 +336,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
     bool busy = false;
     String selectedPaymentType = primaryMode?.name ?? '';
+    const creditPaymentType = 'Credit';
     double discountAmount() => _parseTender(discountController.text);
     double amountDue() => (bill.grandTotal - discountAmount()).clamp(0, double.infinity).toDouble();
     bool discountValid() => discountAmount() >= 0 && discountAmount() < bill.grandTotal && !discountController.text.contains('-');
@@ -354,7 +355,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       for (final entry in controllers.entries) {
         if (entry.key != '__discount__') entry.value.clear();
       }
-      final target = type == 'Split'
+      final target = type == creditPaymentType
+          ? null
+          : type == 'Split'
           ? (primaryMode == null ? null : controllers[primaryMode.name])
           : controllers[type];
       if (target != null) {
@@ -438,8 +441,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             final canPay =
                 validDiscount &&
                 payable > 0 &&
-                tenders.isNotEmpty &&
-                remaining <= 0.0001 &&
+                (selectedPaymentType == creditPaymentType ||
+                    (tenders.isNotEmpty && remaining <= 0.0001)) &&
                 !nonCashOver &&
                 !overWithoutCash &&
                 !busy;
@@ -511,6 +514,15 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     ),
                             ),
                           ),
+                          ChoiceChip(
+                            label: const Text('Credit'),
+                            selected: selectedPaymentType == creditPaymentType,
+                            onSelected: busy
+                                ? null
+                                : (_) => setSheetState(
+                                    () => setPaymentType(creditPaymentType),
+                                  ),
+                          ),
                           if (primaryMode != null && secondaryMode != null)
                             ChoiceChip(
                               label: const Text('Split'),
@@ -546,6 +558,12 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           ),
                         ),
                       ),
+                      if (selectedPaymentType == creditPaymentType)
+                        _AmountSummaryRow(
+                          label: 'Credit Outstanding',
+                          value: formatMoney(payable, bill.currency),
+                          emphasize: true,
+                        ),
                       _AmountSummaryRow(
                         label: 'Total Tendered',
                         value: formatMoney(totalTendered, bill.currency),
@@ -586,6 +604,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                         salesOrder: bill.salesOrder,
                                         payments: tenders,
                                         discountAmount: discountAmount(),
+                                        paymentType: selectedPaymentType == creditPaymentType
+                                            ? creditPaymentType
+                                            : 'Paid',
                                       );
                                   if (mounted) {
                                     setState(() {
@@ -611,7 +632,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                         content: Text(
                                           entries.isNotEmpty
                                               ? 'Payment completed · $entries$changeText'
-                                              : 'Payment completed$changeText',
+                                              : selectedPaymentType == creditPaymentType
+                                                  ? 'Credit invoice submitted · Outstanding ${formatMoney(payable, bill.currency)}'
+                                                  : 'Payment completed$changeText',
                                         ),
                                       ),
                                     );
