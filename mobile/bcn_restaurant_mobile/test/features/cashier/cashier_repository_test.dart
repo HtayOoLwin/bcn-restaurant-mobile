@@ -46,8 +46,8 @@ void main() {
     expect(source, contains('const creditPaymentType = \'Credit\''));
     expect(source, contains('label: const Text(\'Credit\')'));
     expect(source, contains("label: 'Credit Outstanding'"));
-    expect(source, contains("payments: tenders,"));
-    expect(source, contains("label: Text("));
+    expect(source, contains('payments: tenders,'));
+    expect(source, contains('label: Text('));
     expect(source, contains("'Confirm Credit'"));
   });
 }
