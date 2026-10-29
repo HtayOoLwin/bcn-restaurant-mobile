@@ -26,4 +26,28 @@ void main() {
     expect(source, contains('Future<CashierPaymentResult> paySplit'));
     expect(source, contains('CashierPaymentResult.fromJson'));
   });
+
+  test('credit payment submits payment type and keeps tender list available', () {
+    final source = File(
+      'lib/features/cashier/data/cashier_repository.dart',
+    ).readAsStringSync();
+
+    expect(source, contains("String paymentType = 'Paid'"));
+    expect(source, contains("'payment_type': paymentType"));
+    expect(source, contains("'discount_amount': discountAmount"));
+    expect(source, contains("'payments': jsonEncode("));
+  });
+
+  test('cashier screen shows a credit option and outstanding summary', () {
+    final source = File(
+      'lib/features/cashier/presentation/cashier_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains("const creditPaymentType = 'Credit'"));
+    expect(source, contains("label: const Text('Credit')"));
+    expect(source, contains("label: 'Credit Outstanding'"));
+    expect(source, contains("payments: tenders,"));
+    expect(source, contains("label: Text("));
+    expect(source, contains("'Confirm Credit'"));
+  });
 }
