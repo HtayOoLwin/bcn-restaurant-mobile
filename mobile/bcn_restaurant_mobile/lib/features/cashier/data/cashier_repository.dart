@@ -28,6 +28,8 @@ class CashierRepository {
     required List<CashierPaymentTender> payments,
     double discountAmount = 0,
     String paymentType = 'Paid',
+    double creditAmount = 0,
+    String creditRemark = '',
   }) async {
     final data = await _apiClient.postMethod(
       'bcn_cashier_billing',
@@ -36,6 +38,8 @@ class CashierRepository {
         'sales_order': salesOrder,
         'discount_amount': discountAmount,
         'payment_type': paymentType,
+        'credit_amount': creditAmount,
+        'credit_remark': creditRemark,
         'payments': jsonEncode(
           payments.map((t) => {
             'mode_of_payment': t.modeOfPayment,
