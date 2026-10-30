@@ -482,31 +482,24 @@ class _ProgressCardState extends State<_ProgressCard> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 4,
                               children: [
                                 Text(item.itemName),
-                                if (item.foc || item.parcel) ...[
-                                  const SizedBox(height: 5),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: [
-                                      if (item.foc)
-                                        const _ProgressItemBadge(
-                                          label: 'FOC',
-                                          color: Color(0xFFC62828),
-                                          background: Color(0xFFFFEBEE),
-                                        ),
-                                      if (item.parcel)
-                                        const _ProgressItemBadge(
-                                          label: 'PARCEL',
-                                          color: Color(0xFF18834B),
-                                          background: Color(0xFFE3F6E9),
-                                        ),
-                                    ],
+                                if (item.foc)
+                                  const _ProgressItemBadge(
+                                    label: 'FOC',
+                                    color: Color(0xFFC62828),
+                                    background: Color(0xFFFFEBEE),
                                   ),
-                                ],
+                                if (item.parcel)
+                                  const _ProgressItemBadge(
+                                    label: 'PARCEL',
+                                    color: Color(0xFF18834B),
+                                    background: Color(0xFFE3F6E9),
+                                  ),
                               ],
                             ),
                           ),
