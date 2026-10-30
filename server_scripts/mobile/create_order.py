@@ -221,6 +221,7 @@ if not is_duplicate:
         if rate is None:
             frappe.throw("No " + PRICE_LIST + " Item Price for " + item_code + " / " + uom)
 
+        selling_rate = rate
         if foc:
             rate = 0.0
 
@@ -249,6 +250,9 @@ if not is_duplicate:
         if matching_row:
             matching_row.qty = frappe.utils.flt(matching_row.qty) + qty
             matching_row.rate = rate
+            matching_row.price_list_rate = selling_rate
+            matching_row.discount_percentage = 100 if foc else 0
+            matching_row.discount_amount = selling_rate if foc else 0
             matching_row.conversion_factor = conversion_factor
             matching_row.custom_kitchen_counter = kitchen_counter
             matching_row.custom_foc = 1 if foc else 0
@@ -268,6 +272,9 @@ if not is_duplicate:
                         "stock_uom": item.stock_uom,
                         "conversion_factor": conversion_factor,
                         "rate": rate,
+                        "price_list_rate": selling_rate,
+                        "discount_percentage": 100 if foc else 0,
+                        "discount_amount": selling_rate if foc else 0,
                         "custom_foc": 1 if foc else 0,
                         "custom_parcel": 1 if parcel else 0,
                         "delivery_date": frappe.utils.getdate(today),
@@ -278,6 +285,17 @@ if not is_duplicate:
                 )
             except Exception as error:
                 frappe.throw("CREATE ORDER NEW ITEM [" + item_code + "]: " + str(error))
+
+    # Re-apply zero-priced FOC rows on every additional order.
+    # ERPNext can recalculate item prices when quantities change.
+    for order_line in sales_order.items:
+        if bool(order_line.get("custom_foc")):
+            order_line.discount_percentage = 100
+            order_line.discount_amount = frappe.utils.flt(order_line.price_list_rate or 0)
+            order_line.rate = 0
+            order_line.amount = 0
+            order_line.net_rate = 0
+            order_line.net_amount = 0
 
     if not sales_order.items:
         frappe.throw("Sales Order has no items.")
@@ -313,6 +331,13 @@ if not is_duplicate:
         sales_order.calculate_taxes_and_totals()
     except Exception as error:
         frappe.throw("CREATE ORDER TOTALS: " + str(error))
+    # Fail rather than silently charge for an FOC row.
+    for order_line in sales_order.items:
+        if bool(order_line.get("custom_foc")) and (
+            abs(frappe.utils.flt(order_line.rate)) > 0.01
+            or abs(frappe.utils.flt(order_line.amount)) > 0.01
+        ):
+            frappe.throw("FOC row must remain 0 MMK: " + order_line.item_code)
     sales_order.custom_client_order_id = client_order_id
     sales_order.custom_restaurant_status = "Open"
     if not sales_order.get("custom_check_in"):
