@@ -628,169 +628,159 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       ],
                       ...visibleModes.map((mode) {
                         final isSplit = selectedPaymentType == 'Split';
-                        final isAutoCash =
-                            isSplit && mode.name == cashMode?.name;
+                        final isCash = isSplit && mode.name == cashMode?.name;
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFFDCE5F2),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        mode.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFD5E0EF)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 92,
+                                        child: Text(
+                                          mode.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    if (isAutoCash)
-                                      const Text(
-                                        'AUTO CALCULATED',
-                                        style: TextStyle(
-                                          color: Color(0xFF52718F),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: controllers[mode.name],
+                                          enabled: !busy,
+                                          readOnly: isCash,
+                                          textAlign: TextAlign.end,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          inputFormatters: const [ThousandsSeparatorInputFormatter()],
+                                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            contentPadding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 14,
+                                            ),
+                                            hintText: '0',
+                                            suffixText: bill.currency,
+                                            filled: true,
+                                            fillColor: isCash
+                                                ? const Color(0xFFF0F5FC)
+                                                : const Color(0xFFFFFFFF),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                              borderSide: const BorderSide(color: Color(0xFFBDCEE5)),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                              borderSide: const BorderSide(color: Color(0xFF1769C2), width: 2),
+                                            ),
+                                          ),
+                                          onChanged: (_) => setSheetState(recalculateCash),
                                         ),
                                       ),
-                                    if (isSplit && !isAutoCash)
-                                      IconButton(
-                                        tooltip: 'Remove ${mode.name}',
-                                        icon: const Icon(
-                                          Icons.delete_outline,
-                                          color: Color(0xFFD32F2F),
-                                        ),
-                                        onPressed: busy
-                                            ? null
-                                            : () => setSheetState(() {
-                                                splitModeNames.remove(mode.name);
-                                                controllers[mode.name]?.clear();
-                                                recalculateCash();
-                                              }),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
-                                TextField(
-                                  controller: controllers[mode.name],
-                                  enabled: !busy,
-                                  readOnly: isAutoCash,
-                                  keyboardType: const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                                  inputFormatters: const [
-                                    ThousandsSeparatorInputFormatter(),
-                                  ],
-                                  style: const TextStyle(
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: isAutoCash
-                                        ? const Color(0xFFEEF4FA)
-                                        : const Color(0xFFFFFFFF),
-                                    hintText: 'Enter amount',
-                                    suffixText: bill.currency,
-                                    suffixIcon: isAutoCash
-                                        ? const Icon(Icons.lock_outline, size: 18)
-                                        : const Icon(Icons.edit_outlined, size: 18),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFFB6CBE2),
-                                        width: 1.4,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF1769C2),
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                  onChanged: (_) =>
-                                      setSheetState(recalculateCash),
+                              ),
+                              if (isSplit && !isCash) ...[
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  tooltip: 'Remove ${mode.name}',
+                                  icon: const Icon(Icons.delete_outline, color: Color(0xFFD32F2F)),
+                                  onPressed: busy ? null : () => setSheetState(() {
+                                    splitModeNames.remove(mode.name);
+                                    controllers[mode.name]?.clear();
+                                    recalculateCash();
+                                  }),
                                 ),
                               ],
-                            ),
+                            ],
                           ),
                         );
                       }),
                       if (selectedPaymentType == 'Split' &&
                           splitModeNames.contains(partialCreditName)) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFDCE5F2)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  const Expanded(
-                                    child: Text(
-                                      'Credit (Outstanding)',
-                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                                    ),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFD5E0EF)),
                                   ),
-                                  IconButton(
-                                    tooltip: 'Remove Credit',
-                                    icon: const Icon(Icons.delete_outline, color: Color(0xFFD32F2F)),
-                                    onPressed: busy ? null : () => setSheetState(() {
-                                      splitModeNames.remove(partialCreditName);
-                                      creditAmountController.clear();
-                                      creditRemarkController.clear();
-                                      recalculateCash();
-                                    }),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              TextField(
-                                controller: creditAmountController,
-                                enabled: !busy,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                inputFormatters: const [ThousandsSeparatorInputFormatter()],
-                                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
-                                decoration: InputDecoration(
-                                  hintText: 'Enter credit amount',
-                                  suffixText: bill.currency,
-                                  suffixIcon: const Icon(Icons.edit_outlined, size: 18),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(color: Color(0xFFB6CBE2), width: 1.4),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(color: Color(0xFF1769C2), width: 2),
+                                  child: Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 92,
+                                        child: Text(
+                                          'Credit',
+                                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: creditAmountController,
+                                          enabled: !busy,
+                                          textAlign: TextAlign.end,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          inputFormatters: const [ThousandsSeparatorInputFormatter()],
+                                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                                          decoration: InputDecoration(
+                                            hintText: '0',
+                                            suffixText: bill.currency,
+                                            isDense: true,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(9)),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                              borderSide: const BorderSide(color: Color(0xFFBDCEE5)),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                              borderSide: const BorderSide(color: Color(0xFF1769C2), width: 2),
+                                            ),
+                                          ),
+                                          onChanged: (_) => setSheetState(recalculateCash),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                onChanged: (_) => setSheetState(recalculateCash),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                tooltip: 'Remove Credit',
+                                icon: const Icon(Icons.delete_outline, color: Color(0xFFD32F2F)),
+                                onPressed: busy ? null : () => setSheetState(() {
+                                  splitModeNames.remove(partialCreditName);
+                                  creditAmountController.clear();
+                                  creditRemarkController.clear();
+                                  recalculateCash();
+                                }),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 12),
                       ],
                       if (creditSelected) ...[
                         const Padding(
