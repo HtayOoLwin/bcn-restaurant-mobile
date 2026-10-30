@@ -311,12 +311,16 @@ class _MenuItemCard extends ConsumerStatefulWidget {
 
 class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
   String? _selectedUom;
+  bool _foc = false;
+  bool _parcel = false;
 
   @override
   void didUpdateWidget(covariant _MenuItemCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.item.itemCode != widget.item.itemCode) {
       _selectedUom = null;
+      _foc = false;
+      _parcel = false;
     }
   }
 
@@ -335,7 +339,7 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
     final quantity = cart.lines
         .where((line) =>
             line.item.itemCode == item.itemCode &&
-            line.item.uom == selected.uom)
+            line.item.uom == selected.uom && line.foc == _foc && line.parcel == _parcel)
         .fold<double>(0, (sum, line) => sum + line.qty);
 
     return Container(
@@ -410,7 +414,7 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
               ),
               const SizedBox(width: 8),
               if (!hasMultipleUoms)
-                _QuantityControl(item: selectedItem, quantity: quantity)
+                _QuantityControl(item: selectedItem, quantity: quantity, foc: _foc, parcel: _parcel)
               else
                 SizedBox(
                   width: 132,
@@ -452,6 +456,22 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
                 ),
             ],
           ),
+          if (item.itemGroup.trim().toLowerCase() != 'room charges') ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              FilterChip(label: const Text('FOC'), selected: _foc,
+                avatar: const Icon(Icons.card_giftcard_outlined, size: 17),
+                onSelected: (value) => setState(() => _foc = value)),
+              const SizedBox(width: 8),
+              FilterChip(label: const Text('Parcel'), selected: _parcel,
+                avatar: const Icon(Icons.shopping_bag_outlined, size: 17),
+                onSelected: (value) => setState(() => _parcel = value)),
+              if (_foc) ...[
+                const SizedBox(width: 8),
+                const Text('0 MMK', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+              ],
+            ]),
+          ],
         ],
       ),
     );
@@ -459,10 +479,12 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
 }
 
 class _QuantityControl extends ConsumerWidget {
-  const _QuantityControl({required this.item, required this.quantity});
+  const _QuantityControl({required this.item, required this.quantity, required this.foc, required this.parcel});
 
   final MenuItemModel item;
   final double quantity;
+  final bool foc;
+  final bool parcel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -475,7 +497,7 @@ class _QuantityControl extends ConsumerWidget {
           backgroundColor: primary,
           foregroundColor: Colors.white,
         ),
-        onPressed: () => ref.read(cartProvider.notifier).add(item),
+        onPressed: () => ref.read(cartProvider.notifier).add(item, foc: foc, parcel: parcel),
         icon: const Icon(Icons.add_rounded),
       );
     }
@@ -487,7 +509,7 @@ class _QuantityControl extends ConsumerWidget {
           visualDensity: VisualDensity.compact,
           tooltip: 'Decrease',
           onPressed: () =>
-              ref.read(cartProvider.notifier).decrement(item.itemCode, uom: item.uom),
+              ref.read(cartProvider.notifier).decrement(item.itemCode, uom: item.uom, foc: foc, parcel: parcel),
           icon: const Icon(Icons.remove_rounded),
         ),
         SizedBox(
@@ -508,7 +530,7 @@ class _QuantityControl extends ConsumerWidget {
             backgroundColor: primary,
             foregroundColor: Colors.white,
           ),
-          onPressed: () => ref.read(cartProvider.notifier).add(item),
+          onPressed: () => ref.read(cartProvider.notifier).add(item, foc: foc, parcel: parcel),
           icon: const Icon(Icons.add_rounded),
         ),
       ],
