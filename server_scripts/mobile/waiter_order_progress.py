@@ -6,7 +6,7 @@
 # - Draft Billing orders stay visible so waiter can re-request an updated bill
 # - this endpoint reads the same active-order state used by the table screen
 
-COMPANY = "Doh Myot Daw BBQ & Restaurant"
+COMPANY = "Doh Myot Taw BBQ & Restaurant"
 
 current_user = frappe.session.user
 if not current_user or current_user == "Guest":
@@ -74,6 +74,8 @@ for order in orders:
             "uom",
             "custom_kitchen_counter",
             "custom_kitchen_note",
+            "custom_foc",
+            "custom_parcel",
         ],
         order_by="idx asc",
         limit_page_length=1000,
@@ -93,6 +95,8 @@ for order in orders:
                 "uom": row.uom,
                 "kitchen_counter": row.custom_kitchen_counter,
                 "kitchen_note": row.custom_kitchen_note,
+                "custom_foc": int(row.custom_foc or 0),
+                "custom_parcel": int(row.custom_parcel or 0),
                 "status": "New",
                 "can_cancel": False,
             }
