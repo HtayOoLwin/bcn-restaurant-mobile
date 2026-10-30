@@ -175,7 +175,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 }
 
 class _CartLineCard extends ConsumerWidget {
-  const _CartLineCard({required this.line});
+  const _CartLineCard({super.key, required this.line});
 
   final CartLine line;
 
