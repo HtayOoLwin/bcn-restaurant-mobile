@@ -323,6 +323,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
     final controllers = <String, TextEditingController>{};
     final discountController = TextEditingController();
+    final creditRemarkController = TextEditingController();
+    final creditAmountController = TextEditingController();
+    controllers['__credit_remark__'] = creditRemarkController;
+    controllers['__credit_amount__'] = creditAmountController;
     controllers['__discount__'] = discountController;
     for (final mode in billing.modes.where((mode) => mode.name.trim().toLowerCase() != 'credit')) {
       controllers[mode.name] = TextEditingController();
@@ -337,11 +341,16 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     final primaryMode = cashMode;
     // Split uses every configured POS Profile tender mode, selected by the cashier.
     final splitModeNames = <String>[];
+    const partialCreditName = '__partial_credit__';
 
     bool busy = false;
     String selectedPaymentType = primaryMode?.name ?? '';
     const creditPaymentType = 'Credit';
     double discountAmount() => _parseTender(discountController.text);
+    double splitCreditAmount() => selectedPaymentType == 'Split' &&
+            splitModeNames.contains(partialCreditName)
+        ? _parseTender(creditAmountController.text)
+        : 0;
     double amountDue() => (bill.grandTotal - discountAmount()).clamp(0, double.infinity).toDouble();
     bool discountValid() => discountAmount() >= 0 && discountAmount() < bill.grandTotal && !discountController.text.contains('-');
 
@@ -380,11 +389,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     void recalculateCash() {
       if (selectedPaymentType != 'Split' || cashMode == null) return;
       final otherTotal = splitModeNames
-          .where((name) => name != cashMode.name)
+          .where((name) => name != cashMode.name && name != partialCreditName)
           .fold<double>(
             0,
             (sum, name) => sum + _parseTender(controllers[name]?.text),
-          );
+          ) + splitCreditAmount();
       setControllerAmount(
         controllers[cashMode.name],
         (amountDue() - otherTotal).clamp(0, double.infinity).toDouble(),
@@ -436,17 +445,29 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             }
 
             final payable = amountDue();
+            final creditAmount = selectedPaymentType == creditPaymentType
+                ? payable
+                : splitCreditAmount();
+            final creditSelected = creditAmount > 0 ||
+                selectedPaymentType == creditPaymentType;
+            final creditRemarkValid = !creditSelected ||
+                creditRemarkController.text.trim().isNotEmpty;
+            final creditValid = creditAmount >= 0 &&
+                creditAmount <= payable + 0.0001 &&
+                (selectedPaymentType != 'Split' ||
+                    !splitModeNames.contains(partialCreditName) ||
+                    (creditAmount > 0.0001 && creditAmount < payable - 0.0001));
             final validDiscount = discountValid();
-            final remaining = totalTendered < payable
-                ? payable - totalTendered
+            final remaining = totalTendered + creditAmount < payable
+                ? payable - totalTendered - creditAmount
                 : 0.0;
-            final change = totalTendered > payable
-                ? totalTendered - payable
+            final change = totalTendered + creditAmount > payable
+                ? totalTendered + creditAmount - payable
                 : 0.0;
-            final nonCashOver = nonCashTotal > payable + 0.0001;
+            final nonCashOver = nonCashTotal + creditAmount > payable + 0.0001;
             final overWithoutCash = change > 0 && cashTendered <= 0;
             final canPay =
-                validDiscount &&
+                validDiscount && creditRemarkValid && creditValid &&
                 payable > 0 &&
                 (selectedPaymentType == creditPaymentType ||
                     (tenders.isNotEmpty && remaining <= 0.0001)) &&
@@ -550,9 +571,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       if (selectedPaymentType == 'Split') ...[
                         OutlinedButton.icon(
                           onPressed: busy ||
-                                  tenderModes.every(
+                                  (tenderModes.every(
                                     (mode) => splitModeNames.contains(mode.name),
-                                  )
+                                  ) && splitModeNames.contains(partialCreditName))
                               ? null
                               : () async {
                                   final available = tenderModes
@@ -567,6 +588,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                       child: ListView(
                                         shrinkWrap: true,
                                         children: [
+                                          if (!splitModeNames.contains(partialCreditName))
+                                            ListTile(
+                                              title: const Text('Credit (Outstanding)'),
+                                              onTap: () => Navigator.pop(context, partialCreditName),
+                                            ),
                                           for (final mode in available)
                                             ListTile(
                                               title: Text(mode.name),
@@ -642,12 +668,53 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             ],
                           ),
                         ),
+                      if (selectedPaymentType == 'Split' &&
+                          splitModeNames.contains(partialCreditName)) ...[
+                        TextField(
+                          controller: creditAmountController,
+                          enabled: !busy,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: const [ThousandsSeparatorInputFormatter()],
+                          decoration: InputDecoration(
+                            labelText: 'Credit Amount (Outstanding)',
+                            suffixText: bill.currency,
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              tooltip: 'Remove Credit',
+                              icon: const Icon(Icons.close),
+                              onPressed: busy ? null : () => setSheetState(() {
+                                splitModeNames.remove(partialCreditName);
+                                creditAmountController.clear();
+                                recalculateCash();
+                              }),
+                            ),
+                          ),
+                          onChanged: (_) => setSheetState(recalculateCash),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (creditSelected) ...[
+                        TextField(
+                          controller: creditRemarkController,
+                          enabled: !busy,
+                          decoration: InputDecoration(
+                            labelText: 'Credit Remark / Customer Name *',
+                            hintText: 'Name of person taking credit',
+                            border: const OutlineInputBorder(),
+                            errorText: creditRemarkValid ? null : 'Credit customer name is required',
+                          ),
+                          onChanged: (_) => setSheetState(() {}),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       if (selectedPaymentType == creditPaymentType)
                         _AmountSummaryRow(
                           label: 'Credit Outstanding',
                           value: formatMoney(payable, bill.currency),
                           emphasize: true,
                         ),
+                      if (selectedPaymentType == 'Split' && creditAmount > 0)
+                        _AmountSummaryRow(label: 'Credit Outstanding', value: formatMoney(creditAmount, bill.currency)),
                       _AmountSummaryRow(
                         label: 'Total Tendered',
                         value: formatMoney(totalTendered, bill.currency),
@@ -692,7 +759,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                         discountAmount: discountAmount(),
                                         paymentType: selectedPaymentType == creditPaymentType
                                             ? creditPaymentType
-                                            : 'Paid',
+                                            : creditAmount > 0 ? 'Partial Credit' : 'Paid',
+                                        creditAmount: creditAmount,
+                                        creditRemark: creditSelected ? creditRemarkController.text.trim() : '',
                                       );
                                   if (mounted) {
                                     setState(() {
@@ -700,7 +769,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                         result.salesOrder,
                                       );
                                       _lastPaymentResult = result;
-                                      _lastPaymentWasCredit = selectedPaymentType == creditPaymentType;
+                                      _lastPaymentWasCredit = creditSelected;
                                     });
                                   }
                                   ref.invalidate(cashierBillingProvider);
@@ -719,8 +788,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                         content: Text(
                                           entries.isNotEmpty
                                               ? 'Payment completed · $entries$changeText'
-                                              : selectedPaymentType == creditPaymentType
-                                                  ? 'Credit invoice submitted · Outstanding ${formatMoney(payable, bill.currency)}'
+                                              : creditSelected
+                                                  ? 'Credit invoice submitted · Outstanding ${formatMoney(creditAmount, bill.currency)}'
                                                   : 'Payment completed$changeText',
                                         ),
                                       ),
