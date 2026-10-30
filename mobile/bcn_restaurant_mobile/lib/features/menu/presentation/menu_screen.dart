@@ -479,13 +479,39 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
           if (item.itemGroup.trim().toLowerCase() != 'room charges') ...[
             const SizedBox(height: 8),
             Row(children: [
-              FilterChip(label: const Text('FOC'), selected: _foc,
-                avatar: const Icon(Icons.card_giftcard_outlined, size: 17),
-                onSelected: (value) => _setVariant(item, foc: value)),
+              FilterChip(
+                label: Text('FOC', style: TextStyle(
+                  color: _foc ? Colors.white : const Color(0xFF3F4853),
+                  fontWeight: FontWeight.w700,
+                )),
+                selected: _foc,
+                showCheckmark: false,
+                selectedColor: const Color(0xFFE53935),
+                backgroundColor: Colors.white,
+                side: BorderSide(
+                  color: _foc ? const Color(0xFFE53935) : const Color(0xFFC9CED6),
+                ),
+                avatar: Icon(Icons.card_giftcard_outlined, size: 17,
+                  color: _foc ? Colors.white : const Color(0xFF38658B)),
+                onSelected: (value) => _setVariant(item, foc: value),
+              ),
               const SizedBox(width: 8),
-              FilterChip(label: const Text('Parcel'), selected: _parcel,
-                avatar: const Icon(Icons.shopping_bag_outlined, size: 17),
-                onSelected: (value) => _setVariant(item, parcel: value)),
+              FilterChip(
+                label: Text('Parcel', style: TextStyle(
+                  color: _parcel ? Colors.white : const Color(0xFF3F4853),
+                  fontWeight: FontWeight.w700,
+                )),
+                selected: _parcel,
+                showCheckmark: false,
+                selectedColor: const Color(0xFF009E58),
+                backgroundColor: Colors.white,
+                side: BorderSide(
+                  color: _parcel ? const Color(0xFF009E58) : const Color(0xFFC9CED6),
+                ),
+                avatar: Icon(Icons.shopping_bag_outlined, size: 17,
+                  color: _parcel ? Colors.white : const Color(0xFF38658B)),
+                onSelected: (value) => _setVariant(item, parcel: value),
+              ),
               if (_foc) ...[
                 const SizedBox(width: 8),
                 const Text('0 MMK', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
