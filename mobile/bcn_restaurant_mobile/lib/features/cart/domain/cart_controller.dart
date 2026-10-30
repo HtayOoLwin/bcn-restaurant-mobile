@@ -120,6 +120,46 @@ class CartController extends Notifier<CartState> {
     state = state.copyWith(lines: lines);
   }
 
+  // Move the selected quantity when FOC/Parcel is toggled after adding.
+  // Other variants of the same item remain separate cart rows.
+  void changeVariant(
+    MenuItemModel item, {
+    required bool fromFoc,
+    required bool fromParcel,
+    required bool toFoc,
+    required bool toParcel,
+  }) {
+    if (fromFoc == toFoc && fromParcel == toParcel) return;
+    if (item.itemCode == state.roomChargeItemCode) return;
+    final lines = [...state.lines];
+    final sourceIndex = lines.indexWhere((line) =>
+        line.item.itemCode == item.itemCode &&
+        line.item.uom == item.uom &&
+        line.foc == fromFoc &&
+        line.parcel == fromParcel);
+    if (sourceIndex < 0) return;
+    final source = lines.removeAt(sourceIndex);
+    final targetIndex = lines.indexWhere((line) =>
+        line.item.itemCode == item.itemCode &&
+        line.item.uom == item.uom &&
+        line.foc == toFoc &&
+        line.parcel == toParcel &&
+        line.kitchenNote == source.kitchenNote);
+    if (targetIndex >= 0) {
+      lines[targetIndex] =
+          lines[targetIndex].copyWith(qty: lines[targetIndex].qty + source.qty);
+    } else {
+      lines.add(CartLine(
+        item: source.item,
+        qty: source.qty,
+        kitchenNote: source.kitchenNote,
+        foc: toFoc,
+        parcel: toParcel,
+      ));
+    }
+    state = state.copyWith(lines: lines);
+  }
+
   void selectRoomCharge(MenuItemModel item) {
     final lines = state.lines.where((line) => line.item.itemCode != state.roomChargeItemCode && line.item.itemCode != item.itemCode).toList();
     lines.add(CartLine(item: item, qty: 1));
