@@ -8,7 +8,7 @@
 # - Sales Order Item stores kitchen note, kitchen counter snapshot, printed qty
 # - this script does not submit the Sales Order and does not print directly
 
-COMPANY = "Doh Myot Daw BBQ & Restaurant"
+COMPANY = "Doh Myot Taw BBQ & Restaurant"
 POS_PROFILE = "DMT"
 PRICE_LIST = "Standard Selling"
 CURRENCY = "MMK"
@@ -157,6 +157,8 @@ if not is_duplicate:
         qty = frappe.utils.flt(payload.get("qty"))
         requested_uom = (payload.get("uom") or "").strip()
         kitchen_note = (payload.get("kitchen_note") or "").strip()
+        foc = str(payload.get("foc") or "0").strip().lower() in ("1", "true", "yes")
+        parcel = str(payload.get("parcel") or "0").strip().lower() in ("1", "true", "yes")
 
         if not item_code:
             frappe.throw("Item Code is required.")
@@ -179,6 +181,8 @@ if not is_duplicate:
             frappe.throw("Item is not allowed in POS Profile DMT: " + item_code)
 
         is_room_charge = bool(item.get("custom_is_room_charge"))
+        if is_room_charge and (foc or parcel):
+            frappe.throw("Room Charges cannot be FOC or Parcel")
         if is_room_charge:
             if item.is_stock_item:
                 frappe.throw("Room charge must be a non-stock Item: " + item_code)
@@ -217,6 +221,9 @@ if not is_duplicate:
         if rate is None:
             frappe.throw("No " + PRICE_LIST + " Item Price for " + item_code + " / " + uom)
 
+        if foc:
+            rate = 0.0
+
         description = item.description or item.item_name or item_code
         matching_row = None
 
@@ -233,6 +240,8 @@ if not is_duplicate:
                 and existing_row.uom == uom
                 and existing_note == kitchen_note
                 and existing_counter == kitchen_counter
+                and bool(existing_row.get("custom_foc")) == foc
+                and bool(existing_row.get("custom_parcel")) == parcel
             ):
                 matching_row = existing_row
                 break
@@ -242,6 +251,8 @@ if not is_duplicate:
             matching_row.rate = rate
             matching_row.conversion_factor = conversion_factor
             matching_row.custom_kitchen_counter = kitchen_counter
+            matching_row.custom_foc = 1 if foc else 0
+            matching_row.custom_parcel = 1 if parcel else 0
         else:
             # Validate and append a NEW row separately; this path differs
             # from increasing the quantity of an existing SO Item.
@@ -257,6 +268,8 @@ if not is_duplicate:
                         "stock_uom": item.stock_uom,
                         "conversion_factor": conversion_factor,
                         "rate": rate,
+                        "custom_foc": 1 if foc else 0,
+                        "custom_parcel": 1 if parcel else 0,
                         "delivery_date": frappe.utils.getdate(today),
                         "custom_kitchen_note": kitchen_note,
                         "custom_kitchen_counter": kitchen_counter,
