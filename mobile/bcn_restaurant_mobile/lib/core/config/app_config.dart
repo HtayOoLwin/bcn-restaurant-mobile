@@ -1,7 +1,7 @@
 class AppConfig {
   const AppConfig._();
 
-  static const baseUrl = 'https://ourcity.s.frappe.cloud';
+  static const baseUrl = 'https://ourcity-testing.s.frappe.cloud';
 
   static Uri resolveAssetUrl(String? path) {
     if (path == null || path.trim().isEmpty) {
