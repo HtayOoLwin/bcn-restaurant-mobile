@@ -698,10 +698,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           controller: creditRemarkController,
                           enabled: !busy,
                           decoration: InputDecoration(
-                            labelText: 'Credit Remark / Customer Name *',
-                            hintText: 'Name of person taking credit',
+                            labelText: 'Credit Remark (Required) *',
+                            hintText: 'Enter the name of the person taking credit',
                             border: const OutlineInputBorder(),
-                            errorText: creditRemarkValid ? null : 'Credit customer name is required',
+                            errorText: creditRemarkValid ? null : 'Credit remark is required',
                           ),
                           onChanged: (_) => setSheetState(() {}),
                         ),
