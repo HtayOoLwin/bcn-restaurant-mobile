@@ -481,7 +481,35 @@ class _ProgressCardState extends State<_ProgressCard> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          Expanded(child: Text(item.itemName)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.itemName),
+                                if (item.foc || item.parcel) ...[
+                                  const SizedBox(height: 5),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: [
+                                      if (item.foc)
+                                        const _ProgressItemBadge(
+                                          label: 'FOC',
+                                          color: Color(0xFFC62828),
+                                          background: Color(0xFFFFEBEE),
+                                        ),
+                                      if (item.parcel)
+                                        const _ProgressItemBadge(
+                                          label: 'PARCEL',
+                                          color: Color(0xFF18834B),
+                                          background: Color(0xFFE3F6E9),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                           if (item.canCancel) ...[
                             const SizedBox(width: 6),
                             TextButton(
@@ -500,6 +528,37 @@ class _ProgressCardState extends State<_ProgressCard> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgressItemBadge extends StatelessWidget {
+  const _ProgressItemBadge({
+    required this.label,
+    required this.color,
+    required this.background,
+  });
+
+  final String label;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
