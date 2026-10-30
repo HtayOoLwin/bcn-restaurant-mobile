@@ -33,6 +33,8 @@ class OrdersRepository {
                 'item_code': line.item.itemCode,
                 'qty': line.qty,
                 'uom': line.item.uom,
+                'foc': line.foc ? 1 : 0,
+                'parcel': line.parcel ? 1 : 0,
                 if (line.kitchenNote.isNotEmpty)
                   'kitchen_note': line.kitchenNote,
               },
