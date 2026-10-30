@@ -639,9 +639,11 @@ elif action == "ConfirmPayment":
             allocations, change_amount = allocate_tenders(tenders, paid_due)
             if change_amount > AMOUNT_TOLERANCE:
                 frappe.throw("Split payment does not allow excess cash")
-            total_allocated = sum(
-                float(row.get("allocated_amount") or 0) for row in allocations
-            )
+            total_allocated = 0.0
+            for allocation_row in allocations:
+                total_allocated += float(
+                    allocation_row.get("allocated_amount") or 0
+                )
             if abs(total_allocated - paid_due) > AMOUNT_TOLERANCE:
                 frappe.throw("Payment total does not match invoice less credit")
 
