@@ -421,7 +421,7 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _QuantityControl(item: selectedItem, quantity: quantity),
+                      _QuantityControl(item: selectedItem, quantity: quantity, foc: _foc, parcel: _parcel),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
                     key: ValueKey('${item.itemCode}-${selected.uom}'),
