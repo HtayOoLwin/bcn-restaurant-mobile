@@ -1288,12 +1288,3 @@ CashierPaymentMode? _findModeByName(
   return null;
 }
 
-CashierPaymentMode? _firstOtherMode(
-  List<CashierPaymentMode> modes,
-  String? excludedName,
-) {
-  for (final mode in modes) {
-    if (mode.name != excludedName) return mode;
-  }
-  return null;
-}
