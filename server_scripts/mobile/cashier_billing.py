@@ -636,7 +636,9 @@ elif action == "ConfirmPayment":
             else:
                 expected_credit = 0.0
             paid_due = grand_total - expected_credit
-            allocations, change_amount = allocate_tenders(tenders, paid_due)
+            allocation_result = allocate_tenders(tenders, paid_due)
+            allocations = allocation_result[0]
+            change_amount = allocation_result[1]
             if change_amount > AMOUNT_TOLERANCE:
                 frappe.throw("Split payment does not allow excess cash")
             total_allocated = 0.0
