@@ -58,15 +58,18 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       ref.invalidate(cashierBillingProvider);
     });
 
-    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
-      if (_pendingPrintSalesOrders.isNotEmpty) return;
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+        if (_pendingPrintSalesOrders.isNotEmpty) return;
 
-      final current = ref.read(cashierBillingProvider);
-      if (current.isLoading) return;
+        final current = ref.read(cashierBillingProvider);
+        if (current.isLoading) return;
 
-      ref.invalidate(cashierBillingProvider);
-    });
+        ref.invalidate(cashierBillingProvider);
+      },
+    );
   }
 
   @override
@@ -134,26 +137,21 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              _lastPaymentWasCredit
-                                  ? 'Credit invoice submitted'
-                                  : 'Payment completed',
-                            ),
+                            Text(_lastPaymentWasCredit ? 'Credit invoice submitted' : 'Payment completed'),
                             const SizedBox(height: 2),
                             Text(_lastPaymentResult!.salesOrder),
                           ],
                         ),
                       ),
                       FilledButton.icon(
-                        onPressed:
-                            _pendingPrintSalesOrders.contains(
-                              _lastPaymentResult!.salesOrder,
-                            )
+                        onPressed: _pendingPrintSalesOrders.contains(
+                          _lastPaymentResult!.salesOrder,
+                        )
                             ? null
                             : () => _printBill(
-                                context: context,
-                                salesOrder: _lastPaymentResult!.salesOrder,
-                              ),
+                                  context: context,
+                                  salesOrder: _lastPaymentResult!.salesOrder,
+                                ),
                         icon: const Icon(Icons.print),
                         label: const Text('Reprint Bill'),
                       ),
@@ -242,7 +240,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     try {
       final result = await ref
           .read(windowsPrintRepositoryProvider)
-          .requestCashierBill(salesOrder: salesOrder, requestId: requestId);
+          .requestCashierBill(
+            salesOrder: salesOrder,
+            requestId: requestId,
+          );
       if (!mounted || !context.mounted) return;
       setState(() => _retryPrintRequestIds.remove(salesOrder));
       ref.invalidate(cashierBillingProvider);
@@ -299,9 +300,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       );
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
       }
     }
   }
@@ -315,9 +316,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     if (bill.restaurantStatus.trim().toLowerCase() != 'billing' &&
         bill.restaurantStatus.trim().toLowerCase() != 'payment pending') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please wait for Request for Bill first.'),
-        ),
+        const SnackBar(content: Text('Please wait for Request for Bill first.')),
       );
       return;
     }
@@ -329,9 +328,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     controllers['__credit_remark__'] = creditRemarkController;
     controllers['__credit_amount__'] = creditAmountController;
     controllers['__discount__'] = discountController;
-    for (final mode in billing.modes.where(
-      (mode) => mode.name.trim().toLowerCase() != 'credit',
-    )) {
+    for (final mode in billing.modes.where((mode) => mode.name.trim().toLowerCase() != 'credit')) {
       controllers[mode.name] = TextEditingController();
     }
 
@@ -350,18 +347,12 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     String selectedPaymentType = primaryMode?.name ?? '';
     const creditPaymentType = 'Credit';
     double discountAmount() => _parseTender(discountController.text);
-    double splitCreditAmount() =>
-        selectedPaymentType == 'Split' &&
+    double splitCreditAmount() => selectedPaymentType == 'Split' &&
             splitModeNames.contains(partialCreditName)
         ? _parseTender(creditAmountController.text)
         : 0;
-    double amountDue() => (bill.grandTotal - discountAmount())
-        .clamp(0, double.infinity)
-        .toDouble();
-    bool discountValid() =>
-        discountAmount() >= 0 &&
-        discountAmount() < bill.grandTotal &&
-        !discountController.text.contains('-');
+    double amountDue() => (bill.grandTotal - discountAmount()).clamp(0, double.infinity).toDouble();
+    bool discountValid() => discountAmount() >= 0 && discountAmount() < bill.grandTotal && !discountController.text.contains('-');
 
     void setControllerAmount(TextEditingController? controller, double amount) {
       if (controller == null) return;
@@ -390,25 +381,19 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       if (target != null) {
         target.value = TextEditingValue(
           text: formatAmount(amountDue()),
-          selection: TextSelection.collapsed(
-            offset: formatAmount(amountDue()).length,
-          ),
+          selection: TextSelection.collapsed(offset: formatAmount(amountDue()).length),
         );
       }
     }
 
     void recalculateCash() {
       if (selectedPaymentType != 'Split' || cashMode == null) return;
-      final otherTotal =
-          splitModeNames
-              .where(
-                (name) => name != cashMode.name && name != partialCreditName,
-              )
-              .fold<double>(
-                0,
-                (sum, name) => sum + _parseTender(controllers[name]?.text),
-              ) +
-          splitCreditAmount();
+      final otherTotal = splitModeNames
+          .where((name) => name != cashMode.name && name != partialCreditName)
+          .fold<double>(
+            0,
+            (sum, name) => sum + _parseTender(controllers[name]?.text),
+          ) + splitCreditAmount();
       setControllerAmount(
         controllers[cashMode.name],
         (amountDue() - otherTotal).clamp(0, double.infinity).toDouble(),
@@ -468,15 +453,12 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             final creditAmount = selectedPaymentType == creditPaymentType
                 ? payable
                 : splitCreditAmount();
-            final creditSelected =
-                selectedPaymentType == creditPaymentType ||
+            final creditSelected = selectedPaymentType == creditPaymentType ||
                 (selectedPaymentType == 'Split' &&
                     splitModeNames.contains(partialCreditName));
-            final creditRemarkValid =
-                !creditSelected ||
+            final creditRemarkValid = !creditSelected ||
                 creditRemarkController.text.trim().isNotEmpty;
-            final creditValid =
-                creditAmount >= 0 &&
+            final creditValid = creditAmount >= 0 &&
                 creditAmount <= payable + 0.0001 &&
                 (selectedPaymentType != 'Split' ||
                     !splitModeNames.contains(partialCreditName) ||
@@ -491,9 +473,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             final nonCashOver = nonCashTotal + creditAmount > payable + 0.0001;
             final overWithoutCash = change > 0 && cashTendered <= 0;
             final canPay =
-                validDiscount &&
-                creditRemarkValid &&
-                creditValid &&
+                validDiscount && creditRemarkValid && creditValid &&
                 payable > 0 &&
                 (selectedPaymentType == creditPaymentType ||
                     (tenders.isNotEmpty && remaining <= 0.0001)) &&
@@ -512,546 +492,431 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 620),
                   child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          '${bill.customerName} · ${bill.salesOrder}',
-                          style: Theme.of(sheetContext).textTheme.titleLarge,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        '${bill.customerName} · ${bill.salesOrder}',
+                        style: Theme.of(sheetContext).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Discount applies to the Draft Sales Invoice only.',
+                        style: Theme.of(sheetContext).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      _AmountSummaryRow(
+                        label: 'Original Total',
+                        value: formatMoney(bill.grandTotal, bill.currency),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: discountController,
+                        enabled: !busy,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: const [ThousandsSeparatorInputFormatter()],
+                        decoration: InputDecoration(
+                          labelText: 'Discount Amount',
+                          hintText: '0',
+                          suffixText: bill.currency,
+                          border: const OutlineInputBorder(),
+                          errorText: validDiscount ? null : 'Discount must be less than Grand Total',
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Discount applies to the Draft Sales Invoice only.',
-                          style: Theme.of(sheetContext).textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 8),
-                        _AmountSummaryRow(
-                          label: 'Original Total',
-                          value: formatMoney(bill.grandTotal, bill.currency),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: discountController,
-                          enabled: !busy,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: const [
-                            ThousandsSeparatorInputFormatter(),
-                          ],
-                          decoration: InputDecoration(
-                            labelText: 'Discount Amount',
-                            hintText: '0',
-                            suffixText: bill.currency,
-                            border: const OutlineInputBorder(),
-                            errorText: validDiscount
-                                ? null
-                                : 'Discount must be less than Grand Total',
-                          ),
-                          onChanged: (_) => setSheetState(() {
-                            if (selectedPaymentType == 'Split') {
-                              recalculateCash();
-                            } else {
-                              setPaymentType(selectedPaymentType);
-                            }
-                          }),
-                        ),
-                        const SizedBox(height: 8),
-                        _AmountSummaryRow(
-                          label: 'Net Payable',
-                          value: formatMoney(payable, bill.currency),
-                          emphasize: true,
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'Payment Type',
-                          style: Theme.of(sheetContext).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ...tenderModes.map(
-                              (mode) => ChoiceChip(
-                                label: Text(mode.name),
-                                selected: selectedPaymentType == mode.name,
-                                onSelected: busy
-                                    ? null
-                                    : (_) => setSheetState(
-                                        () => setPaymentType(mode.name),
-                                      ),
-                              ),
-                            ),
-                            ChoiceChip(
-                              label: const Text('Credit'),
-                              selected:
-                                  selectedPaymentType == creditPaymentType,
+                        onChanged: (_) => setSheetState(() {
+                          if (selectedPaymentType == 'Split') {
+                            recalculateCash();
+                          } else {
+                            setPaymentType(selectedPaymentType);
+                          }
+                        }),
+                      ),
+                      const SizedBox(height: 8),
+                      _AmountSummaryRow(label: 'Net Payable', value: formatMoney(payable, bill.currency), emphasize: true),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Payment Type',
+                        style: Theme.of(sheetContext).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ...tenderModes.map(
+                            (mode) => ChoiceChip(
+                              label: Text(mode.name),
+                              selected: selectedPaymentType == mode.name,
                               onSelected: busy
                                   ? null
                                   : (_) => setSheetState(
-                                      () => setPaymentType(creditPaymentType),
+                                      () => setPaymentType(mode.name),
                                     ),
                             ),
-                            if (cashMode != null && tenderModes.length > 1)
-                              ChoiceChip(
-                                label: const Text('Split'),
-                                selected: selectedPaymentType == 'Split',
-                                onSelected: busy
-                                    ? null
-                                    : (_) => setSheetState(
-                                        () => setPaymentType('Split'),
-                                      ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        if (selectedPaymentType == 'Split') ...[
-                          OutlinedButton.icon(
-                            onPressed:
-                                busy ||
-                                    (tenderModes.every(
-                                          (mode) => splitModeNames.contains(
-                                            mode.name,
-                                          ),
-                                        ) &&
-                                        splitModeNames.contains(
-                                          partialCreditName,
-                                        ))
+                          ),
+                          ChoiceChip(
+                            label: const Text('Credit'),
+                            selected: selectedPaymentType == creditPaymentType,
+                            onSelected: busy
                                 ? null
-                                : () async {
-                                    final available = tenderModes
-                                        .where(
-                                          (mode) => !splitModeNames.contains(
-                                            mode.name,
-                                          ),
-                                        )
-                                        .toList();
-                                    final selected =
-                                        await showModalBottomSheet<String>(
-                                          context: sheetContext,
-                                          builder: (context) => SafeArea(
-                                            child: ListView(
-                                              shrinkWrap: true,
-                                              children: [
-                                                if (!splitModeNames.contains(
-                                                  partialCreditName,
-                                                ))
-                                                  ListTile(
-                                                    title: const Text(
-                                                      'Credit (Outstanding)',
-                                                    ),
-                                                    onTap: () => Navigator.pop(
-                                                      context,
-                                                      partialCreditName,
-                                                    ),
-                                                  ),
-                                                for (final mode in available)
-                                                  ListTile(
-                                                    title: Text(mode.name),
-                                                    onTap: () => Navigator.pop(
-                                                      context,
-                                                      mode.name,
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                    if (selected == null ||
-                                        !sheetContext.mounted) {
-                                      return;
-                                    }
-                                    setSheetState(() {
-                                      splitModeNames.add(selected);
-                                      recalculateCash();
-                                    });
-                                  },
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Payment Method'),
+                                : (_) => setSheetState(
+                                    () => setPaymentType(creditPaymentType),
+                                  ),
                           ),
-                          const SizedBox(height: 12),
-                        ],
-                        ...visibleModes.map((mode) {
-                          final isSplit = selectedPaymentType == 'Split';
-                          final isCash = isSplit && mode.name == cashMode?.name;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xFFD5E0EF),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        SizedBox(
-                                          width: 92,
-                                          child: Text(
-                                            mode.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: TextField(
-                                            controller: controllers[mode.name],
-                                            enabled: !busy,
-                                            readOnly: isCash,
-                                            textAlign: TextAlign.end,
-                                            keyboardType:
-                                                const TextInputType.numberWithOptions(
-                                                  decimal: true,
-                                                ),
-                                            inputFormatters: const [
-                                              ThousandsSeparatorInputFormatter(),
-                                            ],
-                                            style: const TextStyle(
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            decoration: InputDecoration(
-                                              isDense: true,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 14,
-                                                  ),
-                                              hintText: '0',
-                                              suffixText: bill.currency,
-                                              filled: true,
-                                              fillColor: isCash
-                                                  ? const Color(0xFFF0F5FC)
-                                                  : const Color(0xFFFFFFFF),
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(9),
-                                              ),
-                                              enabledBorder: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(9),
-                                                borderSide: const BorderSide(
-                                                  color: Color(0xFFBDCEE5),
-                                                ),
-                                              ),
-                                              focusedBorder: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(9),
-                                                borderSide: const BorderSide(
-                                                  color: Color(0xFF1769C2),
-                                                  width: 2,
-                                                ),
-                                              ),
-                                            ),
-                                            onChanged: (_) =>
-                                                setSheetState(recalculateCash),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (isSplit && !isCash) ...[
-                                  const SizedBox(width: 6),
-                                  IconButton(
-                                    tooltip: 'Remove ${mode.name}',
-                                    icon: const Icon(
-                                      Icons.delete_outline,
-                                      color: Color(0xFFD32F2F),
-                                    ),
-                                    onPressed: busy
-                                        ? null
-                                        : () => setSheetState(() {
-                                            splitModeNames.remove(mode.name);
-                                            controllers[mode.name]?.clear();
-                                            recalculateCash();
-                                          }),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          );
-                        }),
-                        if (selectedPaymentType == 'Split' &&
-                            splitModeNames.contains(partialCreditName)) ...[
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xFFD5E0EF),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const SizedBox(
-                                          width: 92,
-                                          child: Text(
-                                            'Credit',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: TextField(
-                                            controller: creditAmountController,
-                                            enabled: !busy,
-                                            textAlign: TextAlign.end,
-                                            keyboardType:
-                                                const TextInputType.numberWithOptions(
-                                                  decimal: true,
-                                                ),
-                                            inputFormatters: const [
-                                              ThousandsSeparatorInputFormatter(),
-                                            ],
-                                            style: const TextStyle(
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            decoration: InputDecoration(
-                                              hintText: '0',
-                                              suffixText: bill.currency,
-                                              isDense: true,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 14,
-                                                  ),
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(9),
-                                              ),
-                                              enabledBorder: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(9),
-                                                borderSide: const BorderSide(
-                                                  color: Color(0xFFBDCEE5),
-                                                ),
-                                              ),
-                                              focusedBorder: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(9),
-                                                borderSide: const BorderSide(
-                                                  color: Color(0xFF1769C2),
-                                                  width: 2,
-                                                ),
-                                              ),
-                                            ),
-                                            onChanged: (_) =>
-                                                setSheetState(recalculateCash),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                IconButton(
-                                  tooltip: 'Remove Credit',
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Color(0xFFD32F2F),
-                                  ),
-                                  onPressed: busy
-                                      ? null
-                                      : () => setSheetState(() {
-                                          splitModeNames.remove(
-                                            partialCreditName,
-                                          );
-                                          creditAmountController.clear();
-                                          creditRemarkController.clear();
-                                          recalculateCash();
-                                        }),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        if (creditSelected) ...[
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              'Credit customer name / remark *',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          TextField(
-                            controller: creditRemarkController,
-                            enabled: !busy,
-                            decoration: InputDecoration(
-                              labelText: 'Credit Remark (Required) *',
-                              hintText:
-                                  'Enter the name of the person taking credit',
-                              border: const OutlineInputBorder(),
-                              errorText: creditRemarkValid
+                          if (cashMode != null && tenderModes.length > 1)
+                            ChoiceChip(
+                              label: const Text('Split'),
+                              selected: selectedPaymentType == 'Split',
+                              onSelected: busy
                                   ? null
-                                  : 'Credit remark is required',
+                                  : (_) => setSheetState(
+                                      () => setPaymentType('Split'),
+                                    ),
                             ),
-                            onChanged: (_) => setSheetState(() {}),
-                          ),
-                          const SizedBox(height: 12),
                         ],
-                        if (selectedPaymentType == creditPaymentType)
-                          _AmountSummaryRow(
-                            label: 'Credit Outstanding',
-                            value: formatMoney(payable, bill.currency),
-                            emphasize: true,
-                          ),
-                        if (selectedPaymentType == 'Split' && creditAmount > 0)
-                          _AmountSummaryRow(
-                            label: 'Credit Outstanding',
-                            value: formatMoney(creditAmount, bill.currency),
-                          ),
-                        _AmountSummaryRow(
-                          label: 'Total Tendered',
-                          value: formatMoney(totalTendered, bill.currency),
-                        ),
-                        if (selectedPaymentType != creditPaymentType) ...[
-                          _AmountSummaryRow(
-                            label: 'Remaining',
-                            value: formatMoney(remaining, bill.currency),
-                          ),
-                          _AmountSummaryRow(
-                            label: 'Change',
-                            value: formatMoney(change, bill.currency),
-                            emphasize: change > 0,
-                          ),
-                        ],
-                        if (nonCashOver)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 8),
-                            child: Text(
-                              'Non-cash payment cannot exceed the outstanding amount.',
-                            ),
-                          ),
-                        if (overWithoutCash)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 8),
-                            child: Text(
-                              'Only Cash can include an amount that will be returned as change.',
-                            ),
-                          ),
-                        const SizedBox(height: 20),
-                        FilledButton.icon(
-                          onPressed: !canPay
+                      ),
+                      const SizedBox(height: 16),
+                      if (selectedPaymentType == 'Split') ...[
+                        OutlinedButton.icon(
+                          onPressed: busy ||
+                                  (tenderModes.every(
+                                    (mode) => splitModeNames.contains(mode.name),
+                                  ) && splitModeNames.contains(partialCreditName))
                               ? null
                               : () async {
-                                  setSheetState(() => busy = true);
-                                  try {
-                                    final result = await ref
-                                        .read(cashierRepositoryProvider)
-                                        .confirmPayment(
-                                          salesOrder: bill.salesOrder,
-                                          payments: tenders,
-                                          discountAmount: discountAmount(),
-                                          paymentType:
-                                              selectedPaymentType ==
-                                                  creditPaymentType
-                                              ? creditPaymentType
-                                              : creditAmount > 0
-                                              ? 'Partial Credit'
-                                              : 'Paid',
-                                          creditAmount: creditAmount,
-                                          creditRemark: creditSelected
-                                              ? creditRemarkController.text
-                                                    .trim()
-                                              : '',
-                                        );
-                                    if (mounted) {
-                                      setState(() {
-                                        _retryPrintRequestIds.remove(
-                                          result.salesOrder,
-                                        );
-                                        _lastPaymentResult = result;
-                                        _lastPaymentWasCredit = creditSelected;
-                                      });
-                                    }
-                                    ref.invalidate(cashierBillingProvider);
-                                    ref.invalidate(tablesProvider('dine_in'));
-                                    ref.invalidate(tablesProvider('takeaway'));
-                                    if (sheetContext.mounted) {
-                                      Navigator.of(sheetContext).pop();
-                                    }
-                                    if (context.mounted) {
-                                      final entries = result.paymentEntries
-                                          .join(', ');
-                                      final changeText = result.changeAmount > 0
-                                          ? ' · Change ${formatMoney(result.changeAmount, bill.currency)}'
-                                          : '';
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            entries.isNotEmpty
-                                                ? 'Payment completed · $entries$changeText'
-                                                : creditSelected
-                                                ? 'Credit invoice submitted · Outstanding ${formatMoney(creditAmount, bill.currency)}'
-                                                : 'Payment completed$changeText',
+                                  final available = tenderModes
+                                      .where(
+                                        (mode) =>
+                                            !splitModeNames.contains(mode.name),
+                                      )
+                                      .toList();
+                                  final selected = await showModalBottomSheet<String>(
+                                    context: sheetContext,
+                                    builder: (context) => SafeArea(
+                                      child: ListView(
+                                        shrinkWrap: true,
+                                        children: [
+                                          if (!splitModeNames.contains(partialCreditName))
+                                            ListTile(
+                                              title: const Text('Credit (Outstanding)'),
+                                              onTap: () => Navigator.pop(context, partialCreditName),
+                                            ),
+                                          for (final mode in available)
+                                            ListTile(
+                                              title: Text(mode.name),
+                                              onTap: () => Navigator.pop(
+                                                context,
+                                                mode.name,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                  if (selected == null || !sheetContext.mounted) {
+                                    return;
+                                  }
+                                  setSheetState(() {
+                                    splitModeNames.add(selected);
+                                    recalculateCash();
+                                  });
+                                },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Payment Method'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      ...visibleModes.map((mode) {
+                        final isSplit = selectedPaymentType == 'Split';
+                        final isCash = isSplit && mode.name == cashMode?.name;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFD5E0EF)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 92,
+                                        child: Text(
+                                          mode.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
                                           ),
                                         ),
-                                      );
-                                    }
-                                  } catch (error) {
-                                    if (sheetContext.mounted) {
-                                      setSheetState(() => busy = false);
-                                      ScaffoldMessenger.of(
-                                        sheetContext,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(error.toString()),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: controllers[mode.name],
+                                          enabled: !busy,
+                                          readOnly: isCash,
+                                          textAlign: TextAlign.end,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          inputFormatters: const [ThousandsSeparatorInputFormatter()],
+                                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            contentPadding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 14,
+                                            ),
+                                            hintText: '0',
+                                            suffixText: bill.currency,
+                                            filled: true,
+                                            fillColor: isCash
+                                                ? const Color(0xFFF0F5FC)
+                                                : const Color(0xFFFFFFFF),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                              borderSide: const BorderSide(color: Color(0xFFBDCEE5)),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                              borderSide: const BorderSide(color: Color(0xFF1769C2), width: 2),
+                                            ),
+                                          ),
+                                          onChanged: (_) => setSheetState(recalculateCash),
                                         ),
-                                      );
-                                    }
-                                  }
-                                },
-                          icon: busy
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                                      ),
+                                    ],
                                   ),
-                                )
-                              : const Icon(Icons.payments),
-                          label: Text(
-                            busy
-                                ? 'Processing…'
-                                : selectedPaymentType == creditPaymentType
-                                ? 'Confirm Credit'
-                                : 'Confirm Payment',
+                                ),
+                              ),
+                              if (isSplit && !isCash) ...[
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  tooltip: 'Remove ${mode.name}',
+                                  icon: const Icon(Icons.delete_outline, color: Color(0xFFD32F2F)),
+                                  onPressed: busy ? null : () => setSheetState(() {
+                                    splitModeNames.remove(mode.name);
+                                    controllers[mode.name]?.clear();
+                                    recalculateCash();
+                                  }),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }),
+                      if (selectedPaymentType == 'Split' &&
+                          splitModeNames.contains(partialCreditName)) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFD5E0EF)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 92,
+                                        child: Text(
+                                          'Credit',
+                                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: creditAmountController,
+                                          enabled: !busy,
+                                          textAlign: TextAlign.end,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          inputFormatters: const [ThousandsSeparatorInputFormatter()],
+                                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                                          decoration: InputDecoration(
+                                            hintText: '0',
+                                            suffixText: bill.currency,
+                                            isDense: true,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(9)),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                              borderSide: const BorderSide(color: Color(0xFFBDCEE5)),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(9),
+                                              borderSide: const BorderSide(color: Color(0xFF1769C2), width: 2),
+                                            ),
+                                          ),
+                                          onChanged: (_) => setSheetState(recalculateCash),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                tooltip: 'Remove Credit',
+                                icon: const Icon(Icons.delete_outline, color: Color(0xFFD32F2F)),
+                                onPressed: busy ? null : () => setSheetState(() {
+                                  splitModeNames.remove(partialCreditName);
+                                  creditAmountController.clear();
+                                  creditRemarkController.clear();
+                                  recalculateCash();
+                                }),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
+                      if (creditSelected) ...[
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 6),
+                          child: Text('Credit customer name / remark *',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                        TextField(
+                          controller: creditRemarkController,
+                          enabled: !busy,
+                          decoration: InputDecoration(
+                            labelText: 'Credit Remark (Required) *',
+                            hintText: 'Enter the name of the person taking credit',
+                            border: const OutlineInputBorder(),
+                          ),
+                          onChanged: (_) => setSheetState(() {}),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (selectedPaymentType == creditPaymentType)
+                        _AmountSummaryRow(
+                          label: 'Credit Outstanding',
+                          value: formatMoney(payable, bill.currency),
+                          emphasize: true,
+                        ),
+                      if (selectedPaymentType == 'Split' && creditAmount > 0)
+                        _AmountSummaryRow(label: 'Credit Outstanding', value: formatMoney(creditAmount, bill.currency)),
+                      _AmountSummaryRow(
+                        label: 'Total Tendered',
+                        value: formatMoney(totalTendered, bill.currency),
+                      ),
+                      if (selectedPaymentType != creditPaymentType) ...[
+                        _AmountSummaryRow(
+                          label: 'Remaining',
+                          value: formatMoney(remaining, bill.currency),
+                        ),
+                        _AmountSummaryRow(
+                          label: 'Change',
+                          value: formatMoney(change, bill.currency),
+                          emphasize: change > 0,
+                        ),
+                      ],
+                      if (nonCashOver)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Non-cash payment cannot exceed the outstanding amount.',
+                          ),
+                        ),
+                      if (overWithoutCash)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Only Cash can include an amount that will be returned as change.',
+                          ),
+                        ),
+                      const SizedBox(height: 20),
+                      FilledButton.icon(
+                        onPressed: !canPay
+                            ? null
+                            : () async {
+                                setSheetState(() => busy = true);
+                                try {
+                                  final result = await ref
+                                      .read(cashierRepositoryProvider)
+                                      .confirmPayment(
+                                        salesOrder: bill.salesOrder,
+                                        payments: tenders,
+                                        discountAmount: discountAmount(),
+                                        paymentType: selectedPaymentType == creditPaymentType
+                                            ? creditPaymentType
+                                            : creditAmount > 0 ? 'Partial Credit' : 'Paid',
+                                        creditAmount: creditAmount,
+                                        creditRemark: creditSelected ? creditRemarkController.text.trim() : '',
+                                      );
+                                  if (mounted) {
+                                    setState(() {
+                                      _retryPrintRequestIds.remove(
+                                        result.salesOrder,
+                                      );
+                                      _lastPaymentResult = result;
+                                      _lastPaymentWasCredit = creditSelected;
+                                    });
+                                  }
+                                  ref.invalidate(cashierBillingProvider);
+                                  ref.invalidate(tablesProvider('dine_in'));
+                                  ref.invalidate(tablesProvider('takeaway'));
+                                  if (sheetContext.mounted) {
+                                    Navigator.of(sheetContext).pop();
+                                  }
+                                  if (context.mounted) {
+                                    final entries = result.paymentEntries.join(', ');
+                                    final changeText = result.changeAmount > 0
+                                        ? ' · Change ${formatMoney(result.changeAmount, bill.currency)}'
+                                        : '';
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          entries.isNotEmpty
+                                              ? 'Payment completed · $entries$changeText'
+                                              : creditSelected
+                                                  ? 'Credit invoice submitted · Outstanding ${formatMoney(creditAmount, bill.currency)}'
+                                                  : 'Payment completed$changeText',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (error) {
+                                  if (sheetContext.mounted) {
+                                    setSheetState(() => busy = false);
+                                    ScaffoldMessenger.of(
+                                      sheetContext,
+                                    ).showSnackBar(
+                                      SnackBar(content: Text(error.toString())),
+                                    );
+                                  }
+                                }
+                              },
+                        icon: busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.payments),
+                        label: Text(
+                          busy
+                              ? 'Processing…'
+                              : selectedPaymentType == creditPaymentType
+                                  ? 'Confirm Credit'
+                                  : 'Confirm Payment',
+                        ),
+                      ),
+                    ],
                   ),
+                ),
                 ),
               ),
             );
@@ -1072,8 +937,7 @@ class _PaymentControllerOwner extends StatefulWidget {
   final Widget child;
 
   @override
-  State<_PaymentControllerOwner> createState() =>
-      _PaymentControllerOwnerState();
+  State<_PaymentControllerOwner> createState() => _PaymentControllerOwnerState();
 }
 
 class _PaymentControllerOwnerState extends State<_PaymentControllerOwner> {
@@ -1152,16 +1016,13 @@ class _BillCardState extends State<_BillCard> {
   @override
   Widget build(BuildContext context) {
     final bill = widget.bill;
-    final isBilling =
-        bill.restaurantStatus.trim().toLowerCase() == 'billing' ||
+    final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'billing' ||
         bill.restaurantStatus.trim().toLowerCase() == 'payment pending';
     final cardColor = isBilling ? _billingCardColor : _openCardColor;
-    final statusBackground = isBilling
-        ? _billingStatusBackground
-        : _openStatusBackground;
-    final statusForeground = isBilling
-        ? _billingStatusForeground
-        : _openStatusForeground;
+    final statusBackground =
+        isBilling ? _billingStatusBackground : _openStatusBackground;
+    final statusForeground =
+        isBilling ? _billingStatusForeground : _openStatusForeground;
 
     final orderDetails = InkWell(
       borderRadius: BorderRadius.circular(10),
@@ -1195,10 +1056,7 @@ class _BillCardState extends State<_BillCard> {
             Tooltip(
               message: bill.salesOrder,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE3EFFC),
                   borderRadius: BorderRadius.circular(10),
@@ -1231,7 +1089,10 @@ class _BillCardState extends State<_BillCard> {
         bill.restaurantStatus,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: statusForeground, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: statusForeground,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       backgroundColor: statusBackground,
       side: BorderSide(color: statusForeground.withValues(alpha: 0.35)),
@@ -1374,7 +1235,9 @@ class _BillCardState extends State<_BillCard> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.print),
-            label: Text(widget.printPending ? 'Sending…' : 'Reprint Bill'),
+            label: Text(
+              widget.printPending ? 'Sending…' : 'Reprint Bill',
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -1413,3 +1276,4 @@ CashierPaymentMode? _findModeByName(
   }
   return null;
 }
+

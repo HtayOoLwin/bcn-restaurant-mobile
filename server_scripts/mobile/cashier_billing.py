@@ -15,13 +15,13 @@
 #
 # No manual commit/rollback is used.
 
-COMPANY = "Doh Myot Daw BBQ & Restaurant"
+COMPANY = "Doh Myot Taw BBQ & Restaurant"
 POS_PROFILE = "DMT"
 CURRENCY = "MMK"
 AMOUNT_TOLERANCE = 0.01
 
 
-def get_mode_details(profile, mode_name):
+def get_mode_details(profile, mode_name, COMPANY=COMPANY, CURRENCY=CURRENCY):
     allowed_modes = []
     for payment in profile.payments:
         allowed_name = (payment.mode_of_payment or "").strip()
@@ -83,7 +83,7 @@ def get_mode_details(profile, mode_name):
     }
 
 
-def parse_tenders(raw_payments, profile, allow_empty=False):
+def parse_tenders(raw_payments, profile, allow_empty=False, get_mode_details=get_mode_details):
     if isinstance(raw_payments, str):
         rows = json.loads(raw_payments) if raw_payments else []
     elif isinstance(raw_payments, (list, tuple)):
@@ -117,7 +117,7 @@ def parse_tenders(raw_payments, profile, allow_empty=False):
     return tenders
 
 
-def allocate_tenders(tenders, amount_due):
+def allocate_tenders(tenders, amount_due, AMOUNT_TOLERANCE=AMOUNT_TOLERANCE):
     remaining = float(amount_due or 0)
     if remaining <= AMOUNT_TOLERANCE:
         frappe.throw("Sales Invoice has no payable amount")
@@ -247,7 +247,7 @@ def get_linked_payment_entry_names(sales_invoice_name):
     return names
 
 
-def validate_invoice_totals(sales_invoice, frozen_net, frozen_taxes, frozen_grand):
+def validate_invoice_totals(sales_invoice, frozen_net, frozen_taxes, frozen_grand, AMOUNT_TOLERANCE=AMOUNT_TOLERANCE):
     if abs(float(sales_invoice.net_total or 0) - frozen_net) > AMOUNT_TOLERANCE:
         frappe.throw("Sales Invoice net total does not match the frozen bill")
     if (
@@ -259,7 +259,7 @@ def validate_invoice_totals(sales_invoice, frozen_net, frozen_taxes, frozen_gran
         frappe.throw("Sales Invoice grand total does not match the frozen bill")
 
 
-def make_payment_entry(sales_invoice, allocation, sequence):
+def make_payment_entry(sales_invoice, allocation, sequence, COMPANY=COMPANY, CURRENCY=CURRENCY, AMOUNT_TOLERANCE=AMOUNT_TOLERANCE):
     outstanding = float(
         frappe.db.get_value(
             "Sales Invoice",
@@ -349,7 +349,7 @@ def make_payment_entry(sales_invoice, allocation, sequence):
     return pe.name
 
 
-def build_bill_row(order, has_print_job_doctype):
+def build_bill_row(order, has_print_job_doctype, get_linked_draft_sales_invoice_names=get_linked_draft_sales_invoice_names):
     sales_order = frappe.get_doc("Sales Order", order.name)
 
     item_rows = []
@@ -636,7 +636,9 @@ elif action == "ConfirmPayment":
             else:
                 expected_credit = 0.0
             paid_due = grand_total - expected_credit
-            allocations, change_amount = allocate_tenders(tenders, paid_due)
+            allocation_result = allocate_tenders(tenders, paid_due)
+            allocations = allocation_result[0]
+            change_amount = allocation_result[1]
             if change_amount > AMOUNT_TOLERANCE:
                 frappe.throw("Split payment does not allow excess cash")
             total_allocated = 0.0
