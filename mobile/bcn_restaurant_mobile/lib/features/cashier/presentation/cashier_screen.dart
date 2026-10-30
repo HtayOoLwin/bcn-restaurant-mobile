@@ -334,11 +334,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         .where((mode) => mode.name.trim().toLowerCase() != 'credit')
         .toList();
     final cashMode = _findModeByName(tenderModes, 'Cash');
-    final kpayMode = _findModeByName(tenderModes, 'Kpay');
-    final primaryMode =
-        cashMode ?? (tenderModes.isNotEmpty ? tenderModes.first : null);
-    final secondaryMode =
-        kpayMode ?? _firstOtherMode(tenderModes, primaryMode?.name);
+    final primaryMode = cashMode;
+    // Split uses every configured POS Profile tender mode, selected by the cashier.
+    final splitModeNames = <String>[];
 
     bool busy = false;
     String selectedPaymentType = primaryMode?.name ?? '';
@@ -361,10 +359,15 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       for (final entry in controllers.entries) {
         if (entry.key != '__discount__') entry.value.clear();
       }
+      if (type == 'Split') {
+        splitModeNames
+          ..clear()
+          ..addAll([if (cashMode != null) cashMode.name]);
+      }
       final target = type == creditPaymentType
           ? null
           : type == 'Split'
-          ? (primaryMode == null ? null : controllers[primaryMode.name])
+          ? (cashMode == null ? null : controllers[cashMode.name])
           : controllers[type];
       if (target != null) {
         target.value = TextEditingValue(
@@ -374,19 +377,18 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       }
     }
 
-    void onTenderChanged(String changedMode) {
-      if (selectedPaymentType != 'Split' ||
-          primaryMode == null ||
-          secondaryMode == null ||
-          changedMode != secondaryMode.name) {
-        return;
-      }
-
-      final secondAmount = _parseTender(controllers[secondaryMode.name]?.text);
-      final balance = (amountDue() - secondAmount)
-          .clamp(0, double.infinity)
-          .toDouble();
-      setControllerAmount(controllers[primaryMode.name], balance);
+    void recalculateCash() {
+      if (selectedPaymentType != 'Split' || cashMode == null) return;
+      final otherTotal = splitModeNames
+          .where((name) => name != cashMode.name)
+          .fold<double>(
+            0,
+            (sum, name) => sum + _parseTender(controllers[name]?.text),
+          );
+      setControllerAmount(
+        controllers[cashMode.name],
+        (amountDue() - otherTotal).clamp(0, double.infinity).toDouble(),
+      );
     }
 
     if (selectedPaymentType.isNotEmpty) {
@@ -402,10 +404,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           builder: (sheetContext, setSheetState) {
             final visibleModes = <CashierPaymentMode>[];
             if (selectedPaymentType == 'Split') {
-              if (primaryMode != null) visibleModes.add(primaryMode);
-              if (secondaryMode != null &&
-                  secondaryMode.name != primaryMode?.name) {
-                visibleModes.add(secondaryMode);
+              for (final name in splitModeNames) {
+                final mode = _findModeByName(tenderModes, name);
+                if (mode != null) visibleModes.add(mode);
               }
             } else {
               final selectedMode = _findModeByName(
@@ -494,7 +495,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           errorText: validDiscount ? null : 'Discount must be less than Grand Total',
                         ),
                         onChanged: (_) => setSheetState(() {
-                          setPaymentType(selectedPaymentType);
+                          if (selectedPaymentType == 'Split') {
+                            recalculateCash();
+                          } else {
+                            setPaymentType(selectedPaymentType);
+                          }
                         }),
                       ),
                       const SizedBox(height: 8),
@@ -529,7 +534,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     () => setPaymentType(creditPaymentType),
                                   ),
                           ),
-                          if (primaryMode != null && secondaryMode != null)
+                          if (cashMode != null && tenderModes.length > 1)
                             ChoiceChip(
                               label: const Text('Split'),
                               selected: selectedPaymentType == 'Split',
@@ -542,12 +547,63 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+                      if (selectedPaymentType == 'Split') ...[
+                        OutlinedButton.icon(
+                          onPressed: busy ||
+                                  tenderModes.every(
+                                    (mode) => splitModeNames.contains(mode.name),
+                                  )
+                              ? null
+                              : () async {
+                                  final available = tenderModes
+                                      .where(
+                                        (mode) =>
+                                            !splitModeNames.contains(mode.name),
+                                      )
+                                      .toList();
+                                  final selected = await showModalBottomSheet<String>(
+                                    context: sheetContext,
+                                    builder: (context) => SafeArea(
+                                      child: ListView(
+                                        shrinkWrap: true,
+                                        children: [
+                                          for (final mode in available)
+                                            ListTile(
+                                              title: Text(mode.name),
+                                              onTap: () => Navigator.pop(
+                                                context,
+                                                mode.name,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                  if (selected == null || !sheetContext.mounted) {
+                                    return;
+                                  }
+                                  setSheetState(() {
+                                    splitModeNames.add(selected);
+                                    recalculateCash();
+                                  });
+                                },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Payment Method'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       ...visibleModes.map(
                         (mode) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: TextField(
                             controller: controllers[mode.name],
-                            enabled: !busy,
+                            enabled: !busy &&
+                                !(selectedPaymentType == 'Split' &&
+                                    cashMode != null &&
+                                    mode.name == cashMode.name),
+                            readOnly: selectedPaymentType == 'Split' &&
+                                cashMode != null &&
+                                mode.name == cashMode.name,
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
@@ -560,10 +616,32 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                               border: const OutlineInputBorder(),
                             ),
                             onChanged: (_) =>
-                                setSheetState(() => onTenderChanged(mode.name)),
+                                setSheetState(() => recalculateCash()),
                           ),
                         ),
                       ),
+                      if (selectedPaymentType == 'Split' &&
+                          visibleModes.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              for (final mode in visibleModes)
+                                if (mode.name != cashMode?.name)
+                                  InputChip(
+                                    label: Text(mode.name),
+                                    onDeleted: busy
+                                        ? null
+                                        : () => setSheetState(() {
+                                            splitModeNames.remove(mode.name);
+                                            controllers[mode.name]?.clear();
+                                            recalculateCash();
+                                          }),
+                                  ),
+                            ],
+                          ),
+                        ),
                       if (selectedPaymentType == creditPaymentType)
                         _AmountSummaryRow(
                           label: 'Credit Outstanding',
