@@ -123,7 +123,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
               children: [
                 for (final line in cart.lines) ...[
-                  _CartLineCard(line: line),
+                  _CartLineCard(key: ValueKey('${line.item.itemCode}-${line.item.uom}-${line.foc}-${line.parcel}'), line: line),
                   const SizedBox(height: 10),
                 ],
                 const SizedBox(height: 2),
@@ -233,9 +233,13 @@ class _CartLineCard extends ConsumerWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (line.foc || line.parcel) ...[
+                      const SizedBox(height: 4),
+                      Text([if (line.foc) 'FOC', if (line.parcel) 'PARCEL'].join(' · '), style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF187C65))),
+                    ],
                     const SizedBox(height: 4),
                     Text(
-                      '${formatMoney(line.item.rate, line.item.currency)} / ${line.item.uom}',
+                      '${formatMoney(line.foc ? 0 : line.item.rate, line.item.currency)} / ${line.item.uom}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF315F8E),
                         fontWeight: FontWeight.w600,
@@ -261,7 +265,7 @@ class _CartLineCard extends ConsumerWidget {
                     tooltip: 'Decrease',
                     onPressed: () => ref
                         .read(cartProvider.notifier)
-                        .decrement(line.item.itemCode, uom: line.item.uom),
+                        .decrement(line.item.itemCode, uom: line.item.uom, foc: line.foc, parcel: line.parcel),
                     icon: const Icon(Icons.remove_rounded),
                   ),
                   SizedBox(
@@ -283,7 +287,7 @@ class _CartLineCard extends ConsumerWidget {
                       foregroundColor: Colors.white,
                     ),
                     onPressed: () =>
-                        ref.read(cartProvider.notifier).add(line.item),
+                        ref.read(cartProvider.notifier).add(line.item, foc: line.foc, parcel: line.parcel),
                     icon: const Icon(Icons.add_rounded),
                   ),
                 ],
@@ -292,7 +296,7 @@ class _CartLineCard extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           TextFormField(
-            key: ValueKey('note-${line.item.itemCode}-${line.item.uom}'),
+            key: ValueKey('note-${line.item.itemCode}-${line.item.uom}-${line.foc}-${line.parcel}'),
             initialValue: line.kitchenNote,
             decoration: const InputDecoration(
               labelText: 'Kitchen note',
@@ -301,7 +305,7 @@ class _CartLineCard extends ConsumerWidget {
             ),
             onChanged: (value) => ref
                 .read(cartProvider.notifier)
-                .setKitchenNote(line.item.itemCode, value, uom: line.item.uom),
+                .setKitchenNote(line.item.itemCode, value, uom: line.item.uom, foc: line.foc, parcel: line.parcel),
           ),
         ],
       ),
