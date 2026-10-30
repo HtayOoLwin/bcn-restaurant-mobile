@@ -314,6 +314,26 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
   bool _foc = false;
   bool _parcel = false;
 
+  void _setVariant(MenuItemModel item, {bool? foc, bool? parcel}) {
+    final nextFoc = foc ?? _foc;
+    final nextParcel = parcel ?? _parcel;
+    final selected = item.availableUoms.firstWhere(
+      (option) => option.uom == (_selectedUom ?? item.uom),
+      orElse: () => item.availableUoms.first,
+    );
+    ref.read(cartProvider.notifier).changeVariant(
+      item.withUom(selected),
+      fromFoc: _foc,
+      fromParcel: _parcel,
+      toFoc: nextFoc,
+      toParcel: nextParcel,
+    );
+    setState(() {
+      _foc = nextFoc;
+      _parcel = nextParcel;
+    });
+  }
+
   @override
   void didUpdateWidget(covariant _MenuItemCard oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -461,11 +481,11 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
             Row(children: [
               FilterChip(label: const Text('FOC'), selected: _foc,
                 avatar: const Icon(Icons.card_giftcard_outlined, size: 17),
-                onSelected: (value) => setState(() => _foc = value)),
+                onSelected: (value) => _setVariant(item, foc: value)),
               const SizedBox(width: 8),
               FilterChip(label: const Text('Parcel'), selected: _parcel,
                 avatar: const Icon(Icons.shopping_bag_outlined, size: 17),
-                onSelected: (value) => setState(() => _parcel = value)),
+                onSelected: (value) => _setVariant(item, parcel: value)),
               if (_foc) ...[
                 const SizedBox(width: 8),
                 const Text('0 MMK', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
