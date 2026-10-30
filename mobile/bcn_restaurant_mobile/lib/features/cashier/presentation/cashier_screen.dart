@@ -324,16 +324,21 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     final controllers = <String, TextEditingController>{};
     final discountController = TextEditingController();
     controllers['__discount__'] = discountController;
-    for (final mode in billing.modes) {
+    for (final mode in billing.modes.where((mode) => mode.name.trim().toLowerCase() != 'credit')) {
       controllers[mode.name] = TextEditingController();
     }
 
-    final cashMode = _findModeByName(billing.modes, 'Cash');
-    final kpayMode = _findModeByName(billing.modes, 'Kpay');
+    // Credit is an unpaid invoice action, not a tender mode.
+    // ERPNext may also return a Mode of Payment named Credit.
+    final tenderModes = billing.modes
+        .where((mode) => mode.name.trim().toLowerCase() != 'credit')
+        .toList();
+    final cashMode = _findModeByName(tenderModes, 'Cash');
+    final kpayMode = _findModeByName(tenderModes, 'Kpay');
     final primaryMode =
-        cashMode ?? (billing.modes.isNotEmpty ? billing.modes.first : null);
+        cashMode ?? (tenderModes.isNotEmpty ? tenderModes.first : null);
     final secondaryMode =
-        kpayMode ?? _firstOtherMode(billing.modes, primaryMode?.name);
+        kpayMode ?? _firstOtherMode(tenderModes, primaryMode?.name);
 
     bool busy = false;
     String selectedPaymentType = primaryMode?.name ?? '';
@@ -404,7 +409,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               }
             } else {
               final selectedMode = _findModeByName(
-                billing.modes,
+                tenderModes,
                 selectedPaymentType,
               );
               if (selectedMode != null) visibleModes.add(selectedMode);
@@ -504,7 +509,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          ...billing.modes.map(
+                          ...tenderModes.map(
                             (mode) => ChoiceChip(
                               label: Text(mode.name),
                               selected: selectedPaymentType == mode.name,
