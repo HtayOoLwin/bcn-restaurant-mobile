@@ -8,19 +8,25 @@ class CartLine {
     required this.item,
     required this.qty,
     this.kitchenNote = '',
+    this.foc = false,
+    this.parcel = false,
   });
 
   final MenuItemModel item;
   final double qty;
   final String kitchenNote;
+  final bool foc;
+  final bool parcel;
 
-  double get amount => item.rate * qty;
+  double get amount => (foc ? 0 : item.rate) * qty;
 
   CartLine copyWith({double? qty, String? kitchenNote}) {
     return CartLine(
       item: item,
       qty: qty ?? this.qty,
       kitchenNote: kitchenNote ?? this.kitchenNote,
+      foc: foc,
+      parcel: parcel,
     );
   }
 }
@@ -101,13 +107,13 @@ class CartController extends Notifier<CartState> {
     );
   }
 
-  void add(MenuItemModel item) {
+  void add(MenuItemModel item, {bool foc = false, bool parcel = false}) {
     final lines = [...state.lines];
     final index = lines.indexWhere(
-      (line) => line.item.itemCode == item.itemCode && line.item.uom == item.uom,
+      (line) => line.item.itemCode == item.itemCode && line.item.uom == item.uom && line.foc == foc && line.parcel == parcel,
     );
     if (index == -1) {
-      lines.add(CartLine(item: item, qty: 1));
+      lines.add(CartLine(item: item, qty: 1, foc: foc, parcel: parcel));
     } else {
       lines[index] = lines[index].copyWith(qty: lines[index].qty + 1);
     }
@@ -120,10 +126,10 @@ class CartController extends Notifier<CartState> {
     state = state.copyWith(lines: lines, roomChargeItemCode: item.itemCode);
   }
 
-  void decrement(String itemCode, {String? uom}) {
+  void decrement(String itemCode, {String? uom, bool foc = false, bool parcel = false}) {
     if (itemCode == state.roomChargeItemCode) return;
     final lines = [...state.lines];
-    final index = lines.indexWhere((line) => line.item.itemCode == itemCode && (uom == null || line.item.uom == uom));
+    final index = lines.indexWhere((line) => line.item.itemCode == itemCode && (uom == null || line.item.uom == uom) && line.foc == foc && line.parcel == parcel);
     if (index == -1) return;
     final nextQty = lines[index].qty - 1;
     if (nextQty <= 0) {
@@ -143,11 +149,11 @@ class CartController extends Notifier<CartState> {
     );
   }
 
-  void setKitchenNote(String itemCode, String note, {String? uom}) {
+  void setKitchenNote(String itemCode, String note, {String? uom, bool foc = false, bool parcel = false}) {
     state = state.copyWith(
       lines: state.lines
           .map(
-            (line) => line.item.itemCode == itemCode && (uom == null || line.item.uom == uom)
+            (line) => line.item.itemCode == itemCode && (uom == null || line.item.uom == uom) && line.foc == foc && line.parcel == parcel
                 ? line.copyWith(kitchenNote: note.trim())
                 : line,
           )
