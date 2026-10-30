@@ -83,7 +83,7 @@ def get_mode_details(profile, mode_name):
     }
 
 
-def parse_tenders(raw_payments, profile):
+def parse_tenders(raw_payments, profile, allow_empty=False):
     if isinstance(raw_payments, str):
         rows = json.loads(raw_payments) if raw_payments else []
     elif isinstance(raw_payments, (list, tuple)):
@@ -91,7 +91,7 @@ def parse_tenders(raw_payments, profile):
     else:
         rows = []
 
-    if not rows:
+    if not rows and not allow_empty:
         frappe.throw("At least one payment is required")
 
     tenders = []
@@ -111,7 +111,7 @@ def parse_tenders(raw_payments, profile):
         mode_details["amount"] = amount
         tenders.append(mode_details)
 
-    if not tenders:
+    if not tenders and not allow_empty:
         frappe.throw("At least one positive payment is required")
 
     return tenders
@@ -514,6 +514,17 @@ if action == "Pay":
 elif action == "ConfirmPayment":
     sales_order_name = (frappe.form_dict.get("sales_order") or "").strip()
     raw_payments = frappe.form_dict.get("payments")
+    payment_type = (frappe.form_dict.get("payment_type") or "Paid").strip()
+    credit_amount = float(frappe.form_dict.get("credit_amount") or 0)
+    credit_remark = (frappe.form_dict.get("credit_remark") or "").strip()
+    if payment_type not in ("Paid", "Credit", "Partial Credit"):
+        frappe.throw("Invalid cashier payment_type")
+    if credit_amount < 0:
+        frappe.throw("Credit amount cannot be negative")
+    if payment_type in ("Credit", "Partial Credit") and not credit_remark:
+        frappe.throw("Credit customer name is required in Remark")
+    if payment_type == "Paid" and credit_amount > AMOUNT_TOLERANCE:
+        frappe.throw("Paid transaction cannot include credit amount")
 
     if not sales_order_name:
         frappe.throw("sales_order is required")
@@ -533,7 +544,7 @@ elif action == "ConfirmPayment":
         frappe.throw("Restaurant checkout requires MMK Sales Order currency")
 
     profile = frappe.get_doc("POS Profile", POS_PROFILE)
-    tenders = parse_tenders(raw_payments, profile)
+    tenders = parse_tenders(raw_payments, profile, allow_empty=payment_type == "Credit")
     restaurant_status = (
         sales_order.get("custom_restaurant_status") or ""
     ).strip()
@@ -550,21 +561,27 @@ elif action == "ConfirmPayment":
             )
 
         sales_invoice = frappe.get_doc("Sales Invoice", linked_invoices[0])
-        allocations, change_amount = allocate_tenders(
-            tenders,
-            float(sales_invoice.grand_total or 0),
-        )
         payment_entries = get_linked_payment_entry_names(sales_invoice.name)
         final_outstanding = float(
             frappe.db.get_value(
                 "Sales Invoice",
                 sales_invoice.name,
                 "outstanding_amount",
-            )
-            or 0
+            ) or 0
         )
-        if abs(final_outstanding) > AMOUNT_TOLERANCE:
-            frappe.throw("Existing Sales Invoice is not fully paid")
+        # Idempotent retry: closed orders may legally remain Unpaid or Partly Paid.
+        # Do not re-create Payment Entries or replace the original credit remark.
+        expected_outstanding = (
+            float(sales_invoice.grand_total or 0)
+            if payment_type == "Credit" else credit_amount
+        )
+        if abs(final_outstanding - expected_outstanding) > AMOUNT_TOLERANCE:
+            frappe.throw("Closed invoice outstanding does not match this retry")
+        if payment_type in ("Credit", "Partial Credit") and (
+            (sales_invoice.remarks or "").strip() != credit_remark
+        ):
+            frappe.throw("Closed invoice credit remark does not match this retry")
+        change_amount = 0.0
 
         frappe.response["message"] = {
             "sales_order": sales_order.name,
@@ -602,12 +619,39 @@ elif action == "ConfirmPayment":
             frozen_grand,
         )
 
-        allocations, change_amount = allocate_tenders(
-            tenders,
-            float(sales_invoice.grand_total or 0),
-        )
+        grand_total = float(sales_invoice.grand_total or 0)
+        if payment_type == "Credit":
+            if tenders:
+                frappe.throw("Full Credit must not include payment tenders")
+            if credit_amount > AMOUNT_TOLERANCE and abs(credit_amount - grand_total) > AMOUNT_TOLERANCE:
+                frappe.throw("Full Credit must equal invoice total")
+            expected_credit = grand_total
+            allocations = []
+            change_amount = 0.0
+        else:
+            if payment_type == "Partial Credit":
+                if credit_amount <= AMOUNT_TOLERANCE or credit_amount >= grand_total - AMOUNT_TOLERANCE:
+                    frappe.throw("Partial Credit must be between zero and invoice total")
+                expected_credit = credit_amount
+            else:
+                expected_credit = 0.0
+            paid_due = grand_total - expected_credit
+            allocations, change_amount = allocate_tenders(tenders, paid_due)
+            if change_amount > AMOUNT_TOLERANCE:
+                frappe.throw("Split payment does not allow excess cash")
+            total_allocated = sum(
+                float(row.get("allocated_amount") or 0) for row in allocations
+            )
+            if abs(total_allocated - paid_due) > AMOUNT_TOLERANCE:
+                frappe.throw("Payment total does not match invoice less credit")
 
+        sales_invoice.is_pos = 0
+        sales_invoice.set("payments", [])
+        sales_invoice.paid_amount = 0
+        if payment_type in ("Credit", "Partial Credit"):
+            sales_invoice.remarks = credit_remark
         sales_invoice.flags.ignore_permissions = True
+        sales_invoice.save(ignore_permissions=True)
         sales_invoice.submit()
 
         payment_entries = []
@@ -630,9 +674,10 @@ elif action == "ConfirmPayment":
             )
             or 0
         )
-        if abs(final_outstanding) > AMOUNT_TOLERANCE:
+        if abs(final_outstanding - expected_credit) > AMOUNT_TOLERANCE:
             frappe.throw(
-                "Sales Invoice outstanding amount is not zero after payment"
+                "Sales Invoice outstanding does not match credit amount: "
+                + str(final_outstanding)
             )
 
         frappe.db.set_value(
@@ -648,6 +693,7 @@ elif action == "ConfirmPayment":
             "sales_invoice": sales_invoice.name,
             "payment_entries": payment_entries,
             "change_amount": float(change_amount),
+            "outstanding_amount": float(final_outstanding),
             "duplicate": False,
         }
 
