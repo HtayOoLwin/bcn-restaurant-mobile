@@ -6,6 +6,8 @@ class WaiterProgressItem {
     required this.uom,
     required this.status,
     required this.canCancel,
+    this.foc = false,
+    this.parcel = false,
     this.kitchenCounter,
     this.kitchenNote,
   });
@@ -19,6 +21,8 @@ class WaiterProgressItem {
       uom: json['uom']?.toString() ?? '',
       status: json['status']?.toString() ?? 'New',
       canCancel: json['can_cancel'] == true,
+      foc: json['custom_foc'] == true || json['custom_foc'] == 1 || json['custom_foc'] == '1',
+      parcel: json['custom_parcel'] == true || json['custom_parcel'] == 1 || json['custom_parcel'] == '1',
       kitchenCounter: json['kitchen_counter']?.toString(),
       kitchenNote: json['kitchen_note']?.toString(),
     );
@@ -30,6 +34,8 @@ class WaiterProgressItem {
   final String uom;
   final String status;
   final bool canCancel;
+  final bool foc;
+  final bool parcel;
   final String? kitchenCounter;
   final String? kitchenNote;
 }
