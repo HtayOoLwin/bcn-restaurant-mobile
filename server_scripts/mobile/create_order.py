@@ -157,8 +157,10 @@ if not is_duplicate:
         qty = frappe.utils.flt(payload.get("qty"))
         requested_uom = (payload.get("uom") or "").strip()
         kitchen_note = (payload.get("kitchen_note") or "").strip()
-        foc = str(payload.get("foc") or "0").strip().lower() in ("1", "true", "yes")
-        parcel = str(payload.get("parcel") or "0").strip().lower() in ("1", "true", "yes")
+        foc_value = payload.get("foc", payload.get("custom_foc", 0))
+        parcel_value = payload.get("parcel", payload.get("custom_parcel", 0))
+        foc = str(foc_value or "0").strip().lower() in ("1", "true", "yes")
+        parcel = str(parcel_value or "0").strip().lower() in ("1", "true", "yes")
 
         if not item_code:
             frappe.throw("Item Code is required.")
@@ -286,6 +288,14 @@ if not is_duplicate:
             except Exception as error:
                 frappe.throw("CREATE ORDER NEW ITEM [" + item_code + "]: " + str(error))
 
+    # Both flags must be persisted per line, never on the Sales Order header.
+    # Detect missing/misnamed child custom fields instead of silently losing Parcel.
+    for order_line in sales_order.items:
+        if not order_line.meta.has_field("custom_foc"):
+            frappe.throw("Sales Order Item is missing custom_foc Check field")
+        if not order_line.meta.has_field("custom_parcel"):
+            frappe.throw("Sales Order Item is missing custom_parcel Check field")
+
     # Re-apply zero-priced FOC rows on every additional order.
     # ERPNext can recalculate item prices when quantities change.
     for order_line in sales_order.items:
@@ -351,6 +361,26 @@ if not is_duplicate:
             sales_order.save(ignore_permissions=True)
     except Exception as error:
         frappe.throw("CREATE ORDER SAVE: " + str(error))
+
+    # Confirm that FOC and Parcel checkboxes survived ERPNext validation/save.
+    saved_rows = frappe.get_all(
+        "Sales Order Item",
+        filters={"parent": sales_order.name, "parenttype": "Sales Order"},
+        fields=["name", "item_code", "custom_foc", "custom_parcel"],
+        limit_page_length=500,
+    )
+    for order_line in sales_order.items:
+        found = False
+        for saved_line in saved_rows:
+            if saved_line.name == order_line.name:
+                found = True
+                if bool(saved_line.custom_foc) != bool(order_line.get("custom_foc")):
+                    frappe.throw("FOC checkbox not saved for " + order_line.item_code)
+                if bool(saved_line.custom_parcel) != bool(order_line.get("custom_parcel")):
+                    frappe.throw("Parcel checkbox not saved for " + order_line.item_code)
+                break
+        if not found:
+            frappe.throw("Sales Order Item row missing after save: " + order_line.item_code)
 
 frappe.response["message"] = {
     "sales_order": sales_order.name,
