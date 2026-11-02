@@ -202,13 +202,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             final bill = filteredBills[index];
                             return _BillCard(
                               bill: bill,
-                              printPending: _pendingPrintSalesOrders.contains(
-                                bill.salesOrder,
-                              ),
-                              onPrint: () => _printBill(
-                                context: context,
-                                salesOrder: bill.salesOrder,
-                              ),
+
                               onPayment: () => _prepareAndOpenPayment(
                                 context: context,
                                 billing: data,
@@ -358,9 +352,12 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     }
     try {
       String? creditCustomer;
-      if (creditFlow && (status == 'open' || status == 'billing')) {
+      if (creditFlow) {
         creditCustomer = await _chooseCreditCustomer(context);
         if (creditCustomer == null || !mounted || !context.mounted) return;
+      }
+      if (creditFlow && status == 'payment pending') {
+        throw StateError('Customer cannot be changed after Sales Order submission. Complete the existing checkout first.');
       }
       if (status == 'open' || status == 'billing') {
         final prepared = await ref
@@ -1095,15 +1092,11 @@ const _disabledForeground = Color(0xFF94A3B8);
 class _BillCard extends StatefulWidget {
   const _BillCard({
     required this.bill,
-    required this.printPending,
-    required this.onPrint,
     required this.onPayment,
     required this.onCredit,
   });
 
   final CashierBill bill;
-  final bool printPending;
-  final VoidCallback onPrint;
   final VoidCallback onPayment;
   final VoidCallback onCredit;
 
@@ -1121,10 +1114,7 @@ class _BillCardState extends State<_BillCard> {
         bill.restaurantStatus.trim().toLowerCase() == 'billing' ||
         bill.restaurantStatus.trim().toLowerCase() == 'payment pending';
     final cardColor = isBilling ? _billingCardColor : _openCardColor;
-    final statusBackground =
-        isBilling ? _billingStatusBackground : _openStatusBackground;
-    final statusForeground =
-        isBilling ? _billingStatusForeground : _openStatusForeground;
+    const statusForeground = Color(0xFF0B6B3A);
 
     final orderDetails = InkWell(
       borderRadius: BorderRadius.circular(10),
@@ -1179,25 +1169,6 @@ class _BillCardState extends State<_BillCard> {
           ],
         ),
       ),
-    );
-
-    final statusChip = Chip(
-      avatar: Icon(
-        isBilling ? Icons.receipt_long : Icons.schedule,
-        size: 18,
-        color: statusForeground,
-      ),
-      label: Text(
-        bill.restaurantStatus,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: statusForeground,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      backgroundColor: statusBackground,
-      side: BorderSide(color: statusForeground.withValues(alpha: 0.35)),
     );
 
     return Card(
@@ -1321,33 +1292,6 @@ class _BillCardState extends State<_BillCard> {
         Expanded(
           child: FilledButton.icon(
             style: FilledButton.styleFrom(
-              backgroundColor: _reprintBlue,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: _disabledBackground,
-              disabledForegroundColor: _disabledForeground,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            onPressed: isBilling &&
-                    widget.bill.restaurantStatus.trim().toLowerCase() != 'open' &&
-                    !widget.printPending
-                ? widget.onPrint
-                : null,
-            icon: widget.printPending
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.print),
-            label: Text(
-              widget.printPending ? 'Sending…' : 'Reprint Bill',
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: FilledButton.icon(
-            style: FilledButton.styleFrom(
               backgroundColor: _paymentGreen,
               foregroundColor: Colors.white,
               disabledBackgroundColor: _disabledBackground,
@@ -1363,7 +1307,7 @@ class _BillCardState extends State<_BillCard> {
         Expanded(
           child: FilledButton.icon(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF285D9D),
+              backgroundColor: const Color(0xFFC62828),
               foregroundColor: Colors.white,
               disabledBackgroundColor: _disabledBackground,
               disabledForegroundColor: _disabledForeground,
