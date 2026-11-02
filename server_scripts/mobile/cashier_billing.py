@@ -454,7 +454,26 @@ if not allowed_user:
 
 action = (frappe.form_dict.get("action") or "").strip()
 
-if action == "Pay":
+if action == "Customers":
+    search_text = (frappe.form_dict.get("search") or "").strip()
+    filters = {"disabled": 0, "customer_type": "Individual"}
+    if search_text:
+        filters["customer_name"] = ["like", "%" + search_text + "%"]
+    customers = frappe.get_all(
+        "Customer",
+        filters=filters,
+        fields=["name", "customer_name"],
+        order_by="customer_name asc",
+        limit_page_length=60,
+    )
+    frappe.response["message"] = {
+        "customers": [
+            {"name": row.name, "customer_name": row.customer_name or row.name}
+            for row in customers
+        ]
+    }
+
+elif action == "Pay":
     sales_order_name = (frappe.form_dict.get("sales_order") or "").strip()
     if not sales_order_name:
         frappe.throw("sales_order is required")
@@ -482,6 +501,30 @@ if action == "Pay":
             "restaurant_status": state, "duplicate": True,
         }
     elif so.docstatus == 0 and state == "Billing":
+        selected_customer = (frappe.form_dict.get("credit_customer") or "").strip()
+        if selected_customer:
+            customer = frappe.db.get_value(
+                "Customer", selected_customer,
+                ["name", "customer_name", "disabled"],
+                as_dict=True,
+            )
+            if not customer or customer.disabled:
+                frappe.throw("Select a valid active Credit Customer")
+            # Do not lose the original table identity when assigning credit.
+            if not so.meta.has_field("custom_restaurant_table"):
+                frappe.throw(
+                    "Sales Order requires custom_restaurant_table Data field "
+                    "before credit checkout can be enabled"
+                )
+            if not (so.get("custom_restaurant_table") or "").strip():
+                so.custom_restaurant_table = so.customer
+            original_grand = float(so.grand_total or 0)
+            original_net = float(so.net_total or 0)
+            original_tax = float(so.total_taxes_and_charges or 0)
+            so.customer = customer.name
+            so.customer_name = customer.customer_name or customer.name
+            so.save(ignore_permissions=True)
+            validate_invoice_totals(so, original_net, original_tax, original_grand)
         if not int(so.get("custom_bill_revision") or 0):
             frappe.throw("Please request bill before Pay")
         print_id = "bill-request|" + so.name + "|" + str(int(so.custom_bill_revision))
