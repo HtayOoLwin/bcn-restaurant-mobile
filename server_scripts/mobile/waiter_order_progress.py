@@ -109,6 +109,27 @@ for order in orders:
             }
         )
 
+    tax_data = frappe.get_all(
+        "Sales Taxes and Charges",
+        filters={"parent": order.name, "parenttype": "Sales Order"},
+        fields=["account_head", "description", "tax_amount"],
+        limit_page_length=100,
+    )
+    tax_details = []
+    for tax in tax_data:
+        amount = float(tax.tax_amount or 0)
+        if abs(amount) <= 0.00001:
+            continue
+        account = (tax.account_head or "").lower()
+        desc = (tax.description or "").lower()
+        if "service charg" in account or "service charg" in desc:
+            label = "Service Charges"
+        elif "commercial tax" in account or "vat" in account or "commercial tax" in desc:
+            label = "Commercial Tax"
+        else:
+            label = tax.description or tax.account_head or "Tax"
+        tax_details.append({"label": label, "amount": amount})
+
     result.append(
         {
             "name": order.name,
@@ -119,6 +140,7 @@ for order in orders:
             "net_total": float(order.net_total or 0),
             "total_taxes_and_charges": float(order.total_taxes_and_charges or 0),
             "currency": order.currency or "MMK",
+            "taxes": tax_details,
             "total_qty": float(total_qty),
             "active_qty": float(total_qty),
             "new_qty": float(total_qty),
