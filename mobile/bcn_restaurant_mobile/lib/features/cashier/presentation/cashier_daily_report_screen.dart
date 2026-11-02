@@ -175,24 +175,51 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                       ),
                     for (final raw in invoices)
                       if (raw is Map)
-                        Card(
-                          child: ListTile(
-                            title: Text(raw['name']?.toString() ?? ''),
-                            subtitle: Text(raw['customer']?.toString() ?? ''),
-                            trailing: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(formatMoney((raw['grand_total'] as num?) ?? 0, currency),
+                        Builder(builder: (context) {
+                          final grand = (raw['grand_total'] as num?) ?? 0;
+                          final due = (raw['outstanding'] as num?) ?? 0;
+                          final methods = raw['payment_methods'] as List? ?? const [];
+                          final fullCredit = due > 0.01 && (grand - due).abs() < 0.01;
+                          final partialCredit = due > 0.01 && !fullCredit;
+                          final status = fullCredit ? 'Full Credit' :
+                              partialCredit ? 'Partial Credit' :
+                              methods.length > 1 ? 'Split' :
+                              methods.isNotEmpty && methods.first is Map
+                                ? (methods.first as Map)['name']?.toString() ?? 'Paid'
+                                : 'Paid';
+                          final statusColor = due > 0.01
+                              ? const Color(0xFFB6292F)
+                              : const Color(0xFF14683E);
+                          return Card(
+                            color: Colors.white,
+                            child: ExpansionTile(
+                              leading: const Icon(Icons.receipt_long, color: Color(0xFF205F91)),
+                              title: Row(children: [
+                                Expanded(child: Text(raw['name']?.toString() ?? '',
+                                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.bold))),
+                                Text(status, style: TextStyle(fontSize: 11,
+                                    fontWeight: FontWeight.bold, color: statusColor)),
+                              ]),
+                              subtitle: Row(children: [
+                                Expanded(child: Text(raw['customer']?.toString() ?? '',
+                                    maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                Text(formatMoney(grand, currency),
                                     style: const TextStyle(fontWeight: FontWeight.bold)),
-                                if (((raw['outstanding'] as num?) ?? 0) != 0)
-                                  Text('Due: ${formatMoney((raw['outstanding'] as num?) ?? 0, currency)}',
-                                      style: const TextStyle(fontSize: 12)),
+                              ]),
+                              childrenPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              children: [
+                                if (!fullCredit)
+                                  for (final method in methods)
+                                    if (method is Map)
+                                      _line(method['name']?.toString() ?? 'Other',
+                                        (method['amount'] as num?) ?? 0, currency),
+                                if (due > 0.01)
+                                  _line('Outstanding', due, currency),
                               ],
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                   ],
                 );
               },
