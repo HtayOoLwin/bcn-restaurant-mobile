@@ -15,10 +15,26 @@ class CashierRepository {
     );
   }
 
-  Future<Map<String, dynamic>> preparePayment(String salesOrder) async {
+  Future<List<Map<String, dynamic>>> searchCreditCustomers(String query) async {
+    final data = await _apiClient.getMethod(
+      'bcn_cashier_billing',
+      queryParameters: {'action': 'Customers', 'search': query},
+    );
+    final rows = (data as Map)['customers'] as List? ?? const [];
+    return rows.map((row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> preparePayment(
+    String salesOrder, {
+    String? creditCustomer,
+  }) async {
     final data = await _apiClient.postMethod(
       'bcn_cashier_billing',
-      data: {'action': 'Pay', 'sales_order': salesOrder},
+      data: {
+        'action': 'Pay',
+        'sales_order': salesOrder,
+        if (creditCustomer != null) 'credit_customer': creditCustomer,
+      },
     );
     return Map<String, dynamic>.from(data as Map);
   }
