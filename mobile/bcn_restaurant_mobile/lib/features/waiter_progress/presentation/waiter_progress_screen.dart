@@ -118,10 +118,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                           itemBuilder: (context, index) => _ProgressCard(
                             order: filteredOrders[index],
                             busyRow: _busyRow,
-                            busyOrder: _busyOrder,
                             onCancel: _cancelItem,
-                            onRequestBill: _requestBill,
-                            onPay: _pay,
                           ),
                         ),
                 );
