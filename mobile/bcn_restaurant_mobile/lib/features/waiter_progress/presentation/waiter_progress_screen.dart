@@ -196,10 +196,10 @@ class _ProgressCardState extends State<_ProgressCard> {
   Widget build(BuildContext context) {
 
     final cardColors = <Color>[
-      const Color(0xFFE9F2FF),
-      const Color(0xFFE8F7ED),
-      const Color(0xFFFFF2E5),
-      const Color(0xFFF3EAFE),
+      const Color(0xFFB9D5F8),
+      const Color(0xFFB7E3C7),
+      const Color(0xFFF5D1A5),
+      const Color(0xFFD9C3F3),
     ];
     final cardIndex = widget.order.name.codeUnits.fold<int>(0, (sum, code) => sum + code) % cardColors.length;
     final orderDetails = InkWell(
