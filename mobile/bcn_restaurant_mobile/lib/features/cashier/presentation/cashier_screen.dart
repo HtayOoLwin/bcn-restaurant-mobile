@@ -350,19 +350,19 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required bool creditFlow,
   }) async {
     final status = bill.restaurantStatus.trim().toLowerCase();
-    if (status != 'billing' && status != 'payment pending') {
+    if (status != 'open' && status != 'billing' && status != 'payment pending') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Waiter must Request for Bill first.')),
+        const SnackBar(content: Text('Order is not ready for cashier checkout.')),
       );
       return;
     }
     try {
       String? creditCustomer;
-      if (creditFlow && status == 'billing') {
+      if (creditFlow && (status == 'open' || status == 'billing')) {
         creditCustomer = await _chooseCreditCustomer(context);
         if (creditCustomer == null || !mounted || !context.mounted) return;
       }
-      if (status == 'billing') {
+      if (status == 'open' || status == 'billing') {
         final prepared = await ref
             .read(cashierRepositoryProvider)
             .preparePayment(bill.salesOrder, creditCustomer: creditCustomer);
@@ -398,10 +398,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required CashierBill bill,
     required bool creditFlow,
   }) async {
-    if (bill.restaurantStatus.trim().toLowerCase() != 'billing' &&
+    if (bill.restaurantStatus.trim().toLowerCase() != 'open' &&
+        bill.restaurantStatus.trim().toLowerCase() != 'billing' &&
         bill.restaurantStatus.trim().toLowerCase() != 'payment pending') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please wait for Request for Bill first.')),
+        const SnackBar(content: Text('Order is not ready for cashier checkout.')),
       );
       return;
     }
@@ -1103,7 +1104,8 @@ class _BillCardState extends State<_BillCard> {
   @override
   Widget build(BuildContext context) {
     final bill = widget.bill;
-    final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'billing' ||
+    final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'open' ||
+        bill.restaurantStatus.trim().toLowerCase() == 'billing' ||
         bill.restaurantStatus.trim().toLowerCase() == 'payment pending';
     final cardColor = isBilling ? _billingCardColor : _openCardColor;
     final statusBackground =
