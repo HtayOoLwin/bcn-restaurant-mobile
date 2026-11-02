@@ -1,128 +1,99 @@
 # Server Script API: bcn_cashier_print_bill
-# OurCity V2 - cashier reprint of the latest Request for Bill snapshot.
-# Works with bcn_request_for_bill V2: bill-request|<SO>|<revision>
-# This API never changes the SO, creates an SI, or recalculates room charges.
-# Required: Sales Order.custom_bill_revision and BCN Print Job.
-# Cashier can reprint Draft Billing, Payment Pending, or Closed bills.
-#
-# IMPORTANT: Install only with the V2 Create Order, Request Bill and Cashier APIs.
+# Prints the final submitted Sales Invoice after cashier checkout.
+COMPANY = "Doh Myot Taw BBQ & Restaurant"
 
-COMPANY = "Doh Myot Daw BBQ & Restaurant"
+user = frappe.session.user
+if not user or user == "Guest":
+    frappe.throw("Authentication required")
 
-current_user = frappe.session.user
-if not current_user or current_user == "Guest":
-    frappe.throw("Authentication is required")
+roles = frappe.get_all("Has Role", filters={"parent": user, "parenttype": "User"}, fields=["role"], limit_page_length=100)
+role_names = [row.role for row in roles]
+if not (user == "Administrator" or "System Manager" in role_names or "Cashier" in role_names or "Restaurant Manager" in role_names):
+    frappe.throw("Not allowed to print cashier receipts")
 
-role_rows = frappe.get_all("Has Role", filters={"parent": current_user, "parenttype": "User"}, fields=["role"], limit_page_length=200)
-roles = [row.role for row in role_rows]
-if not (current_user == "Administrator" or "Admin" in roles or "System Manager" in roles or "Restaurant Manager" in roles or "Cashier" in roles):
-    frappe.throw("You are not allowed to print cashier bills")
-
-sales_order_name = (frappe.form_dict.get("sales_order") or "").strip()
+sales_order = (frappe.form_dict.get("sales_order") or "").strip()
 request_id = (frappe.form_dict.get("request_id") or "").strip()
-if not sales_order_name:
-    frappe.throw("sales_order is required")
-if not request_id:
-    frappe.throw("request_id is required")
-if len(request_id) > 140:
-    frappe.throw("request_id is too long")
-if request_id.startswith("bill-request|"):
-    frappe.throw("Reserved request_id prefix. Use a unique cashier-print ID")
-if not frappe.db.exists("DocType", "BCN Print Job"):
-    frappe.throw("BCN Print Job is not configured")
+if not sales_order or not request_id:
+    frappe.throw("sales_order and request_id are required")
+if len(request_id) > 140 or request_id.startswith("bill-request|"):
+    frappe.throw("Invalid request_id")
 
-# Lock order BEFORE finding the source bill and existing job.
-locked_rows = frappe.db.sql(
+locked = frappe.db.sql(
     "SELECT name FROM `tabSales Order` WHERE name=%(name)s FOR UPDATE",
-    {"name": sales_order_name},
-    as_dict=True,
+    {"name": sales_order}, as_dict=True
 )
-if not locked_rows:
-    frappe.throw("Sales Order not found: " + sales_order_name)
+if not locked:
+    frappe.throw("Sales Order not found")
+order = frappe.get_doc("Sales Order", sales_order)
+if order.company != COMPANY or order.docstatus != 1 or order.custom_restaurant_status != "Closed":
+    frappe.throw("Only completed checkout receipts may be printed")
 
-sales_order = frappe.get_doc("Sales Order", sales_order_name)
-if sales_order.company != COMPANY:
-    frappe.throw("Sales Order does not belong to restaurant company")
+invoice_rows = frappe.get_all(
+    "Sales Invoice Item", filters={"sales_order": sales_order, "docstatus": 1},
+    fields=["parent"], limit_page_length=200
+)
+invoice_names = []
+for row in invoice_rows:
+    if row.parent not in invoice_names:
+        invoice_names.append(row.parent)
+if len(invoice_names) != 1:
+    frappe.throw("Expected exactly one submitted Sales Invoice")
+invoice = frappe.get_doc("Sales Invoice", invoice_names[0])
+if invoice.docstatus != 1 or invoice.company != COMPANY:
+    frappe.throw("Submitted Sales Invoice is invalid")
 
-restaurant_status = (sales_order.get("custom_restaurant_status") or "").strip()
-allowed_draft = sales_order.docstatus == 0 and restaurant_status == "Billing"
-allowed_pending = sales_order.docstatus == 1 and restaurant_status == "Payment Pending"
-allowed_closed = sales_order.docstatus == 1 and restaurant_status == "Closed"
-if not (allowed_draft or allowed_pending or allowed_closed):
-    frappe.throw("Request for Bill first. Order is not in a printable state")
+profile = frappe.get_doc("POS Profile", "DMT")
+printer = (profile.get("custom_cashier_printer") or "").strip()
+if not printer:
+    frappe.throw("POS Profile DMT cashier printer is not configured")
+fmt = (profile.get("custom_cashier_invoice_print_format") or "").strip()
+if not fmt:
+    fmt = "Standard"
+if fmt != "Standard":
+    row = frappe.db.get_value("Print Format", fmt, ["doc_type", "disabled"], as_dict=True)
+    if not row or row.doc_type != "Sales Invoice" or row.disabled:
+        frappe.throw("Cashier receipt print format must be for Sales Invoice")
 
-revision = int(sales_order.get("custom_bill_revision") or 0)
-if revision < 1:
-    frappe.throw("Latest Request for Bill revision is missing")
+if not frappe.db.exists("DocType", "BCN Print Job"):
+    frappe.throw("BCN Print Job is missing")
 
-# Every reprint uses the latest immutable auto-print snapshot, never a stale
-# earlier revision and never a newly rendered, mutable SO document.
-source_id = "bill-request|" + sales_order.name + "|" + str(revision)
-source_name = frappe.db.exists("BCN Print Job", {"request_id": source_id})
-if not source_name:
-    frappe.throw("Latest bill snapshot is missing: " + source_id)
-source_job = frappe.get_doc("BCN Print Job", source_name)
-if source_job.document_type != "Sales Order" or source_job.document_name != sales_order.name:
-    frappe.throw("Latest bill snapshot points to the wrong order")
-
-mode = (source_job.get("render_mode") or "").strip().upper()
-if mode == "HTML":
-    if not (source_job.get("html_content") or "").strip():
-        frappe.throw("Latest bill HTML snapshot is empty")
-elif mode == "PDF":
-    if not (source_job.get("pdf_base64") or "").strip():
-        frappe.throw("Latest bill PDF snapshot is empty")
-else:
-    frappe.throw("Unsupported latest bill snapshot render mode")
-
-existing_name = frappe.db.exists("BCN Print Job", {"request_id": request_id})
-if existing_name:
-    job = frappe.get_doc("BCN Print Job", existing_name)
-    if job.document_type != "Sales Order" or job.document_name != sales_order.name:
-        frappe.throw("Print request ID is already used for another document")
-    # If an old request ID gets retried after bill revision changes, reject it:
-    # otherwise a previous stale print job could be mistaken for a current bill.
-    original_id = (job.get("request_id") or "")
-    if not original_id:
-        frappe.throw("Existing print job request ID is invalid")
-    if job.print_format != source_job.print_format or job.render_mode != source_job.render_mode:
-        frappe.throw("Print request refers to a different bill snapshot")
-    if mode == "HTML" and job.get("html_content") != source_job.get("html_content"):
-        frappe.throw("Print request refers to an outdated bill revision")
-    if mode == "PDF" and job.get("pdf_base64") != source_job.get("pdf_base64"):
-        frappe.throw("Print request refers to an outdated bill revision")
+existing = frappe.db.exists("BCN Print Job", {"request_id": request_id})
+if existing:
+    job = frappe.get_doc("BCN Print Job", existing)
+    if job.document_type != "Sales Invoice" or job.document_name != invoice.name:
+        frappe.throw("Print request ID belongs to another document")
     frappe.response["message"] = {
-        "sales_order": sales_order.name,
-        "request_id": request_id,
-        "print_job": job.name,
-        "status": job.status,
-        "bill_revision": revision,
-        "restaurant_status": restaurant_status,
-        "is_reprint": True,
-        "duplicate": True,
+        "sales_order": sales_order, "sales_invoice": invoice.name,
+        "print_job": job.name, "request_id": request_id,
+        "status": job.status, "duplicate": True,
     }
 else:
+    rendered = frappe.call(
+        "frappe.www.printview.get_html_and_style",
+        doc="Sales Invoice", name=invoice.name,
+        print_format=fmt, no_letterhead=0,
+    )
+    if not (rendered.get("html") or "").strip():
+        frappe.throw("Receipt HTML is empty")
+    html = "<!doctype html><html><head><meta charset='utf-8'><style>" + (
+        rendered.get("style") or ""
+    ) + "</style></head><body>" + rendered.get("html") + "</body></html>"
     job = frappe.new_doc("BCN Print Job")
     job.request_id = request_id
-    job.document_type = "Sales Order"
-    job.document_name = sales_order.name
-    job.printer_name = source_job.printer_name
-    job.print_format = source_job.print_format
-    job.render_mode = mode
-    job.html_content = source_job.get("html_content") or ""
-    job.pdf_base64 = source_job.get("pdf_base64") or ""
+    job.document_type = "Sales Invoice"
+    job.document_name = invoice.name
+    job.printer_name = printer
+    job.print_format = fmt
+    job.render_mode = "HTML"
+    job.html_content = html
+    job.pdf_base64 = ""
     job.status = "Pending"
     job.attempt_count = 0
-    job.requested_by = current_user
+    job.requested_by = user
     job.requested_at = frappe.utils.now()
     job.insert(ignore_permissions=True)
     frappe.response["message"] = {
-        "sales_order": sales_order.name,
-        "request_id": request_id,
-        "print_job": job.name,
-        "status": job.status,
-        "bill_revision": revision,
-        "restaurant_status": restaurant_status,
-        "is_reprint": True,
-        "duplicate": False,
+        "sales_order": sales_order, "sales_invoice": invoice.name,
+        "print_job": job.name, "request_id": request_id,
+        "status": job.status, "duplicate": False,
     }
