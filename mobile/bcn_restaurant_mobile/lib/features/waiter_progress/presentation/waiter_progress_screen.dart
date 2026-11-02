@@ -335,8 +335,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                           if (item.canCancel) ...[
                             const SizedBox(width: 6),
                             TextButton(
-                              onPressed: requesting ||
-                                      widget.busyRow == item.rowName
+                              onPressed: widget.busyRow == item.rowName
                                   ? null
                                   : () => widget.onCancel(item),
                               child: const Text('Cancel'),
