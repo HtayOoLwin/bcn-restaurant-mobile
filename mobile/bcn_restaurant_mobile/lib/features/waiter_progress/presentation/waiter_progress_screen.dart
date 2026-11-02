@@ -253,6 +253,7 @@ class _ProgressCardState extends State<_ProgressCard> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
+      color: _expanded ? const Color(0xFFF7FAFF) : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: LayoutBuilder(
@@ -270,7 +271,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECF3FA),
+                      color: const Color(0xFFDDEBFA),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -354,37 +355,56 @@ class _ProgressCardState extends State<_ProgressCard> {
                   ),
                 ],
                 const Divider(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Subtotal'),
-                    Text(formatMoney(widget.order.netTotal, widget.order.currency)),
-                  ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF3FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Subtotal', style: TextStyle(color: Color(0xFF21558B), fontWeight: FontWeight.w600)),
+                      Text(formatMoney(widget.order.netTotal, widget.order.currency),
+                        style: const TextStyle(color: Color(0xFF21558B), fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 5),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Taxes / Service Charges'),
-                    Text(formatMoney(widget.order.taxesTotal, widget.order.currency)),
-                  ],
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4E3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Taxes / Service Charges', style: TextStyle(color: Color(0xFF9B6010), fontWeight: FontWeight.w600)),
+                      Text(formatMoney(widget.order.taxesTotal, widget.order.currency),
+                        style: const TextStyle(color: Color(0xFF9B6010), fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text(
-                      formatMoney(widget.order.grandTotal, widget.order.currency),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-                    ),
-                  ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F6E9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Grand Total', style: TextStyle(color: Color(0xFF126B3E), fontWeight: FontWeight.bold)),
+                      Text(
+                        formatMoney(widget.order.grandTotal, widget.order.currency),
+                        style: const TextStyle(color: Color(0xFF126B3E), fontWeight: FontWeight.bold, fontSize: 17),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Draft amount · Room charges may change at cashier checkout.',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                ),
+
               ],
             );
           },
