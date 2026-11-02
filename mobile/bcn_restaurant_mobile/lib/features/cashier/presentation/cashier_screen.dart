@@ -628,7 +628,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          ...tenderModes.map(
+                          if (!creditFlow) ...tenderModes.map(
                             (mode) => ChoiceChip(
                               label: Text(mode.name),
                               selected: selectedPaymentType == mode.name,
@@ -639,8 +639,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     ),
                             ),
                           ),
-                          ChoiceChip(
-                            label: const Text('Credit'),
+                          if (creditFlow) ChoiceChip(
+                            label: const Text('Full Credit'),
                             selected: selectedPaymentType == creditPaymentType,
                             onSelected: busy
                                 ? null
@@ -648,9 +648,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     () => setPaymentType(creditPaymentType),
                                   ),
                           ),
-                          if (cashMode != null && tenderModes.length > 1)
+                          if (cashMode != null && (creditFlow || tenderModes.length > 1))
                             ChoiceChip(
-                              label: const Text('Split'),
+                              label: Text(creditFlow ? 'Partial Credit' : 'Split'),
                               selected: selectedPaymentType == 'Split',
                               onSelected: busy
                                   ? null
@@ -681,7 +681,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                       child: ListView(
                                         shrinkWrap: true,
                                         children: [
-                                          if (!splitModeNames.contains(partialCreditName))
+                                          if (creditFlow && !splitModeNames.contains(partialCreditName))
                                             ListTile(
                                               title: const Text('Credit (Outstanding)'),
                                               onTap: () => Navigator.pop(context, partialCreditName),
