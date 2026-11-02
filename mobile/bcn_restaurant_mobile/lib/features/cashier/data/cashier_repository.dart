@@ -28,13 +28,16 @@ class CashierRepository {
     String salesOrder, {
     String? creditCustomer,
   }) async {
+    final requestData = <String, dynamic>{
+      'action': 'Pay',
+      'sales_order': salesOrder,
+    };
+    if (creditCustomer != null) {
+      requestData['credit_customer'] = creditCustomer;
+    }
     final data = await _apiClient.postMethod(
       'bcn_cashier_billing',
-      data: {
-        'action': 'Pay',
-        'sales_order': salesOrder,
-        ? 'credit_customer': creditCustomer,
-      },
+      data: requestData,
     );
     return Map<String, dynamic>.from(data as Map);
   }
