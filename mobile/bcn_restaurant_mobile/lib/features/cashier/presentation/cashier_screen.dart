@@ -1089,8 +1089,6 @@ class _AmountSummaryRow extends StatelessWidget {
 
 const _billingCardColor = Color(0xFFE9F8EF);
 const _openCardColor = Colors.white;
-const _openStatusBackground = Color(0xFFF1F5F9);
-const _openStatusForeground = Color(0xFF475569);
 const _paymentGreen = Color(0xFF0B6B3A);
 const _disabledBackground = Color(0xFFE2E8F0);
 const _disabledForeground = Color(0xFF94A3B8);
