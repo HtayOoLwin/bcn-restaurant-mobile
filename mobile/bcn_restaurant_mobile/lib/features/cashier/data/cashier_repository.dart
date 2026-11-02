@@ -33,7 +33,7 @@ class CashierRepository {
       data: {
         'action': 'Pay',
         'sales_order': salesOrder,
-        if (creditCustomer != null) 'credit_customer': creditCustomer,
+        ? 'credit_customer': creditCustomer,
       },
     );
     return Map<String, dynamic>.from(data as Map);
