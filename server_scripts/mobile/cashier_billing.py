@@ -585,6 +585,12 @@ elif action == "ConfirmPayment":
         frappe.throw("Sales Order does not belong to the restaurant company")
     if sales_order.currency != CURRENCY:
         frappe.throw("Restaurant checkout requires MMK Sales Order currency")
+    if payment_type in ("Credit", "Partial Credit"):
+        if not (sales_order.get("custom_restaurant_table") or "").strip():
+            frappe.throw(
+                "Select a Credit Customer before preparing the invoice. "
+                "Use Credit on a Draft Billing order."
+            )
 
     profile = frappe.get_doc("POS Profile", POS_PROFILE)
     tenders = parse_tenders(raw_payments, profile, allow_empty=payment_type == "Credit")
