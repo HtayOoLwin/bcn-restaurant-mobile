@@ -48,12 +48,16 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
-      child: Row(children: [
-        Icon(icon, color: fg, size: 20),
-        const SizedBox(width: 6),
-        Expanded(child: Text(title, style: TextStyle(color: fg, fontSize: 12))),
-        Flexible(child: Text(formatAmount(amount), textAlign: TextAlign.right,
-          style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: 16))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Icon(icon, color: fg, size: 20),
+          const SizedBox(width: 6),
+          Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600))),
+        ]),
+        const SizedBox(height: 9),
+        Text(formatAmount(amount), textAlign: TextAlign.right,
+          style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: 19)),
       ]),
     );
   }
@@ -91,12 +95,6 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
               borderRadius: BorderRadius.circular(18),
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const Row(children: [
-                Expanded(child: Text('Daily Sales Report',
-                  style: TextStyle(color: Colors.white, fontSize: 19,
-                    fontWeight: FontWeight.bold))),
-                Icon(Icons.calendar_month, color: Colors.white),
-              ]),
               const SizedBox(height: 12),
               Material(color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
