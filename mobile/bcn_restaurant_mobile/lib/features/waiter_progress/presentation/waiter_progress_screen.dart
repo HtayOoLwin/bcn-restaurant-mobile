@@ -361,43 +361,6 @@ class _ProgressCardState extends State<_ProgressCard> {
       ),
     );
 
-    final payButton = widget.order.billRevision > 0
-        ? FilledButton.icon(
-            onPressed: requesting ? null : () => widget.onPay(widget.order),
-            style: FilledButton.styleFrom(
-              backgroundColor: payGreen,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            ),
-            icon: const Icon(Icons.payments_outlined, size: 18),
-            label: const Text('Pay', maxLines: 1),
-          )
-        : null;
-
-    final billButton = FilledButton.icon(
-      onPressed: requesting ? null : () => widget.onRequestBill(widget.order),
-      style: FilledButton.styleFrom(
-        backgroundColor: billBlue,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-      icon: requesting
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : const Icon(Icons.receipt_long, size: 18),
-      label: Text(
-        requesting ? 'Requesting…' : 'Request for Bill',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
@@ -406,31 +369,14 @@ class _ProgressCardState extends State<_ProgressCard> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 570;
-            final actions = Row(
-              children: [
-                if (payButton != null) ...[
-                  Expanded(flex: 2, child: payButton),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(flex: 3, child: billButton),
-              ],
-            );
-
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (compact) ...[
                   orderDetails,
-                  const SizedBox(height: 10),
-                  actions,
+
                 ] else
-                  Row(
-                    children: [
-                      Expanded(child: orderDetails),
-                      const SizedBox(width: 16),
-                      SizedBox(width: payButton == null ? 190 : 320, child: actions),
-                    ],
-                  ),
+                  orderDetails,
                 if (_expanded) ...[
                   const Divider(height: 24),
                   Container(
