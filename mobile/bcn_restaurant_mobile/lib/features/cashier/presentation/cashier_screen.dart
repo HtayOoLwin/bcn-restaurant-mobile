@@ -345,7 +345,12 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         if (creditCustomer == null || !mounted || !context.mounted) return;
       }
       if (creditFlow && status == 'payment pending') {
-        throw StateError('Customer cannot be changed after Sales Order submission. Complete the existing checkout first.');
+        // Validate the selected customer against the submitted Sales Order.
+        // A different customer cannot be assigned after submission.
+        await ref.read(cashierRepositoryProvider).preparePayment(
+          bill.salesOrder,
+          creditCustomer: creditCustomer,
+        );
       }
       if (status == 'open' || status == 'billing') {
         final prepared = await ref
@@ -1084,11 +1089,8 @@ class _AmountSummaryRow extends StatelessWidget {
 
 const _billingCardColor = Color(0xFFE9F8EF);
 const _openCardColor = Colors.white;
-const _billingStatusBackground = Color(0xFFDDF5E7);
-const _billingStatusForeground = Color(0xFF0B6B3A);
 const _openStatusBackground = Color(0xFFF1F5F9);
 const _openStatusForeground = Color(0xFF475569);
-const _reprintBlue = Color(0xFF0D47A1);
 const _paymentGreen = Color(0xFF0B6B3A);
 const _disabledBackground = Color(0xFFE2E8F0);
 const _disabledForeground = Color(0xFF94A3B8);
