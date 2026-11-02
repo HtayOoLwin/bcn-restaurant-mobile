@@ -61,6 +61,7 @@ class WaiterProgressOrder {
     required this.taxesTotal,
     required this.grandTotal,
     required this.currency,
+    required this.taxes,
   });
 
   factory WaiterProgressOrder.fromJson(Map<String, dynamic> json) {
@@ -88,6 +89,7 @@ class WaiterProgressOrder {
       taxesTotal: number('total_taxes_and_charges'),
       grandTotal: number('grand_total'),
       currency: json['currency']?.toString() ?? 'MMK',
+      taxes: json['taxes'] as List? ?? const [],
     );
   }
 
@@ -100,6 +102,7 @@ class WaiterProgressOrder {
   final double readyQty;
   final double servedQty;
   final int billRevision;
+  final List<dynamic> taxes;
   final double netTotal;
   final double taxesTotal;
   final double grandTotal;
