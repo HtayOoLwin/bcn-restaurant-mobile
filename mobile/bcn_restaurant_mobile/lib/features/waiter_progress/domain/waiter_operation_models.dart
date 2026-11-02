@@ -4,6 +4,8 @@ class WaiterProgressItem {
     required this.itemName,
     required this.qty,
     required this.uom,
+    required this.rate,
+    required this.amount,
     required this.status,
     required this.canCancel,
     this.foc = false,
@@ -19,6 +21,8 @@ class WaiterProgressItem {
           json['item_name']?.toString() ?? json['item_code']?.toString() ?? '',
       qty: (json['qty'] as num?)?.toDouble() ?? 0,
       uom: json['uom']?.toString() ?? '',
+      rate: (json['rate'] as num?)?.toDouble() ?? 0,
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
       status: json['status']?.toString() ?? 'New',
       canCancel: json['can_cancel'] == true,
       foc: json['custom_foc'] == true || json['custom_foc'] == 1 || json['custom_foc'] == '1',
@@ -32,6 +36,8 @@ class WaiterProgressItem {
   final String itemName;
   final double qty;
   final String uom;
+  final double rate;
+  final double amount;
   final String status;
   final bool canCancel;
   final bool foc;
@@ -51,6 +57,10 @@ class WaiterProgressOrder {
     required this.readyQty,
     required this.servedQty,
     required this.billRevision,
+    required this.netTotal,
+    required this.taxesTotal,
+    required this.grandTotal,
+    required this.currency,
   });
 
   factory WaiterProgressOrder.fromJson(Map<String, dynamic> json) {
@@ -74,6 +84,10 @@ class WaiterProgressOrder {
       readyQty: number('ready_qty'),
       servedQty: number('served_qty'),
       billRevision: (json['bill_revision'] as num?)?.toInt() ?? 0,
+      netTotal: number('net_total'),
+      taxesTotal: number('total_taxes_and_charges'),
+      grandTotal: number('grand_total'),
+      currency: json['currency']?.toString() ?? 'MMK',
     );
   }
 
@@ -86,6 +100,10 @@ class WaiterProgressOrder {
   final double readyQty;
   final double servedQty;
   final int billRevision;
+  final double netTotal;
+  final double taxesTotal;
+  final double grandTotal;
+  final String currency;
 }
 
 class WaiterProgressResponse {
