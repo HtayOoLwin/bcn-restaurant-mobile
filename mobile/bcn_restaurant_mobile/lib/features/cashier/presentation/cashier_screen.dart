@@ -273,6 +273,76 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     }
   }
 
+  Future<String?> _chooseCreditCustomer(BuildContext context) async {
+    final repository = ref.read(cashierRepositoryProvider);
+    String query = '';
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, refresh) => AlertDialog(
+          title: const Text('Select Credit Customer'),
+          content: SizedBox(
+            width: 420,
+            height: 360,
+            child: Column(
+              children: [
+                TextField(
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Search Customer',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) => refresh(() => query = value.trim()),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    key: ValueKey(query),
+                    future: repository.searchCreditCustomers(query),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Customer lookup failed: ${snapshot.error}'));
+                      }
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final customers = snapshot.data!;
+                      if (customers.isEmpty) {
+                        return const Center(child: Text('No customers found.'));
+                      }
+                      return ListView.builder(
+                        itemCount: customers.length,
+                        itemBuilder: (context, index) {
+                          final customer = customers[index];
+                          final name = customer['name']?.toString() ?? '';
+                          final display = customer['customer_name']?.toString() ?? name;
+                          return ListTile(
+                            title: Text(display),
+                            subtitle: name == display ? null : Text(name),
+                            onTap: name.isEmpty
+                                ? null
+                                : () => Navigator.pop(dialogContext, name),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _prepareAndOpenPayment({
     required BuildContext context,
     required CashierBillingResponse billing,
@@ -287,10 +357,15 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       return;
     }
     try {
+      String? creditCustomer;
+      if (creditFlow && status == 'billing') {
+        creditCustomer = await _chooseCreditCustomer(context);
+        if (creditCustomer == null || !mounted || !context.mounted) return;
+      }
       if (status == 'billing') {
         final prepared = await ref
             .read(cashierRepositoryProvider)
-            .preparePayment(bill.salesOrder);
+            .preparePayment(bill.salesOrder, creditCustomer: creditCustomer);
         final draftInvoice = prepared['sales_invoice']?.toString() ?? '';
         if (draftInvoice.isEmpty) {
           throw StateError(
