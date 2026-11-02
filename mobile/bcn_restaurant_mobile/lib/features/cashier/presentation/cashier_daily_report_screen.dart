@@ -83,13 +83,33 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: OutlinedButton.icon(
-              onPressed: _chooseDate,
-              icon: const Icon(Icons.calendar_month),
-              label: Text('Date: ${_dateText(_selectedDate)}'),
+          Container(
+            margin: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF205F91),
+              borderRadius: BorderRadius.circular(18),
             ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Row(children: [
+                Expanded(child: Text('Daily Sales Report',
+                  style: TextStyle(color: Colors.white, fontSize: 19,
+                    fontWeight: FontWeight.bold))),
+                Icon(Icons.calendar_month, color: Colors.white),
+              ]),
+              const SizedBox(height: 12),
+              Material(color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(onTap: _chooseDate,
+                  child: Padding(padding: const EdgeInsets.all(13),
+                    child: Row(children: [
+                      const Icon(Icons.calendar_today_outlined),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(_dateText(_selectedDate))),
+                      const Icon(Icons.keyboard_arrow_down),
+                    ]))),
+              ),
+            ]),
           ),
           Expanded(
             child: FutureBuilder<Map<String, dynamic>>(
