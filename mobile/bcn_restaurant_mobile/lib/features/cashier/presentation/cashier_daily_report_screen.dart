@@ -126,9 +126,11 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                 final currency = data['currency']?.toString() ?? 'MMK';
                 num amount(String key) => (data[key] as num?) ?? 0;
                 final invoices = (data['invoices'] as List? ?? const []);
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-                  children: [
+                return Column(children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+
                     LayoutBuilder(builder: (context, constraints) {
                       final width = (constraints.maxWidth - 10) / 2;
                       return Wrap(spacing: 10, runSpacing: 10, children: [
@@ -157,6 +159,10 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                         children: [
                           const Text('Payment Method Summary',
                             style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                          if ((data['payment_method_summary'] as List? ?? const []).isEmpty)
+                            const Padding(padding: EdgeInsets.only(top: 8),
+                              child: Text('No linked payment entries found for these invoices.',
+                                style: TextStyle(fontSize: 12, color: Colors.grey))),
                           for (final raw in (data['payment_method_summary'] as List? ?? const []))
                             if (raw is Map)
                               _line(raw['name']?.toString() ?? 'Other',
@@ -164,6 +170,11 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                         ]),
                     )),
                     const SizedBox(height: 12),
+                    ]),
+                  ),
+                  Expanded(child: ListView(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                    children: [
                     const Text('Sales Invoice List',
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                     if (invoices.isEmpty)
@@ -218,8 +229,9 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                             ),
                           );
                         }),
-                  ],
-                );
+                    ],
+                  )),
+                ]);
               },
             ),
           ),
