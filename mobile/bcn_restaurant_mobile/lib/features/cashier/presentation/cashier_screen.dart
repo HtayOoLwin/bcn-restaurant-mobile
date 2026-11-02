@@ -213,6 +213,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                 context: context,
                                 billing: data,
                                 bill: bill,
+                                creditFlow: false,
+                              ),
+                              onCredit: () => _prepareAndOpenPayment(
+                                context: context,
+                                billing: data,
+                                bill: bill,
+                                creditFlow: true,
                               ),
                             );
                           },
@@ -270,6 +277,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required BuildContext context,
     required CashierBillingResponse billing,
     required CashierBill bill,
+    required bool creditFlow,
   }) async {
     final status = bill.restaurantStatus.trim().toLowerCase();
     if (status != 'billing' && status != 'payment pending') {
@@ -297,6 +305,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         ref: ref,
         billing: billing,
         bill: bill,
+        creditFlow: creditFlow,
       );
     } catch (error) {
       if (context.mounted) {
@@ -312,6 +321,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required WidgetRef ref,
     required CashierBillingResponse billing,
     required CashierBill bill,
+    required bool creditFlow,
   }) async {
     if (bill.restaurantStatus.trim().toLowerCase() != 'billing' &&
         bill.restaurantStatus.trim().toLowerCase() != 'payment pending') {
@@ -344,7 +354,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     const partialCreditName = '__partial_credit__';
 
     bool busy = false;
-    String selectedPaymentType = primaryMode?.name ?? '';
+    String selectedPaymentType = creditFlow ? 'Credit' : (primaryMode?.name ?? '');
     const creditPaymentType = 'Credit';
     double discountAmount() => _parseTender(discountController.text);
     double splitCreditAmount() => selectedPaymentType == 'Split' &&
@@ -999,12 +1009,14 @@ class _BillCard extends StatefulWidget {
     required this.printPending,
     required this.onPrint,
     required this.onPayment,
+    required this.onCredit,
   });
 
   final CashierBill bill;
   final bool printPending;
   final VoidCallback onPrint;
   final VoidCallback onPayment;
+  final VoidCallback onCredit;
 
   @override
   State<_BillCard> createState() => _BillCardState();
@@ -1252,7 +1264,22 @@ class _BillCardState extends State<_BillCard> {
             ),
             onPressed: isBilling ? widget.onPayment : null,
             icon: const Icon(Icons.point_of_sale),
-            label: const Text('Payment'),
+            label: const Text('Pay'),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF285D9D),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _disabledBackground,
+              disabledForegroundColor: _disabledForeground,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: isBilling ? widget.onCredit : null,
+            icon: const Icon(Icons.credit_score),
+            label: const Text('Credit'),
           ),
         ),
       ],
