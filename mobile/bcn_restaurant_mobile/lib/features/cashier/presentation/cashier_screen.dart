@@ -411,7 +411,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required CashierBill bill,
     required bool creditFlow,
   }) async {
-    if (widget.bill.restaurantStatus.trim().toLowerCase() != 'open' &&
+    if (bill.restaurantStatus.trim().toLowerCase() != 'open' &&
         bill.restaurantStatus.trim().toLowerCase() != 'billing' &&
         bill.restaurantStatus.trim().toLowerCase() != 'payment pending') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1328,7 +1328,7 @@ class _BillCardState extends State<_BillCard> {
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             onPressed: isBilling &&
-                    bill.restaurantStatus.trim().toLowerCase() != 'open' &&
+                    widget.bill.restaurantStatus.trim().toLowerCase() != 'open' &&
                     !widget.printPending
                 ? widget.onPrint
                 : null,
