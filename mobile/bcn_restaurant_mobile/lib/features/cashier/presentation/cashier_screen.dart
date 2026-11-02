@@ -375,11 +375,24 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         ref.invalidate(cashierBillingProvider);
       }
       if (!mounted || !context.mounted) return;
+      // Refresh totals after checkout preparation (including room charges).
+      final currentBilling = await ref.read(cashierRepositoryProvider).getBilling();
+      CashierBill? preparedBill;
+      for (final candidate in currentBilling.bills) {
+        if (candidate.salesOrder == bill.salesOrder) {
+          preparedBill = candidate;
+          break;
+        }
+      }
+      if (preparedBill == null) {
+        throw StateError('Prepared Sales Order is not available for payment.');
+      }
+      if (!mounted || !context.mounted) return;
       await _openPaymentSheet(
         context: context,
         ref: ref,
-        billing: billing,
-        bill: bill,
+        billing: currentBilling,
+        bill: preparedBill,
         creditFlow: creditFlow,
       );
     } catch (error) {
