@@ -407,7 +407,7 @@ def build_bill_row(order, has_print_job_doctype, get_linked_draft_sales_invoice_
         "sales_order": order.name,
         "sales_invoice": draft_invoice,
         "customer": order.customer,
-        "customer_name": order.customer_name or order.customer,
+        "customer_name": sales_order.get("custom_restaurant_table") or order.customer_name or order.customer,
         "creation": str(order.creation),
         "net_total": float(order.net_total or 0),
         "total_taxes_and_charges": float(order.total_taxes_and_charges or 0),
@@ -456,7 +456,7 @@ action = (frappe.form_dict.get("action") or "").strip()
 
 if action == "Customers":
     search_text = (frappe.form_dict.get("search") or "").strip()
-    filters = {"disabled": 0, "customer_type": "Individual"}
+    filters = {"disabled": 0}
     if search_text:
         filters["customer_name"] = ["like", "%" + search_text + "%"]
     customers = frappe.get_all(
