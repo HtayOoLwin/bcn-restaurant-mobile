@@ -15,6 +15,7 @@ import '../../printing/data/windows_print_repository.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
+import 'cashier_daily_report_screen.dart';
 
 final cashierRepositoryProvider = Provider<CashierRepository>(
   (ref) => CashierRepository(ref.watch(apiClientProvider)),
@@ -45,8 +46,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   String _searchQuery = '';
   final Set<String> _pendingPrintSalesOrders = {};
   final Map<String, String> _retryPrintRequestIds = {};
-  CashierPaymentResult? _lastPaymentResult;
-  bool _lastPaymentWasCredit = false;
   Timer? _autoRefreshTimer;
 
   @override
@@ -98,6 +97,17 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               icon: const Icon(Icons.table_restaurant),
             ),
           IconButton(
+            tooltip: 'Daily Sales Report',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => CashierDailyReportScreen(
+                  repository: ref.read(cashierRepositoryProvider),
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.assessment_outlined),
+          ),
+          IconButton(
             tooltip: 'Refresh',
             onPressed: () => ref.invalidate(cashierBillingProvider),
             icon: const Icon(Icons.refresh),
@@ -125,29 +135,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               onChanged: (value) => setState(() => _searchQuery = value),
             ),
           ),
-          if (_lastPaymentResult != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(_lastPaymentWasCredit ? 'Credit invoice submitted' : 'Payment completed'),
-                            const SizedBox(height: 2),
-                            Text(_lastPaymentResult!.salesOrder),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           Expanded(
             child: billing.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -950,8 +937,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                       _retryPrintRequestIds.remove(
                                         result.salesOrder,
                                       );
-                                      _lastPaymentResult = result;
-                                      _lastPaymentWasCredit = creditSelected;
                                     });
                                   }
                                   ref.invalidate(cashierBillingProvider);
