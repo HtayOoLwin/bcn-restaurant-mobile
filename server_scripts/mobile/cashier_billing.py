@@ -473,6 +473,69 @@ if action == "Customers":
         ]
     }
 
+elif action == "DailyReport":
+    report_date = (frappe.form_dict.get("date") or "").strip()
+    if not report_date or len(report_date) != 10:
+        frappe.throw("date is required in YYYY-MM-DD format")
+    try:
+        parsed_date = frappe.utils.getdate(report_date)
+    except Exception:
+        frappe.throw("Invalid report date")
+    if str(parsed_date) != report_date:
+        frappe.throw("Invalid report date")
+
+    # Page through all invoices rather than silently truncating daily totals.
+    invoice_rows = []
+    page_start = 0
+    page_size = 500
+    while True:
+        page = frappe.get_all(
+            "Sales Invoice",
+            filters={
+                "company": COMPANY,
+                "docstatus": 1,
+                "posting_date": report_date,
+                "is_return": 0,
+            },
+            fields=[
+                "name", "customer_name", "customer", "posting_time",
+                "grand_total", "outstanding_amount", "currency"
+            ],
+            order_by="posting_time asc, name asc",
+            start=page_start,
+            page_length=page_size,
+        )
+        invoice_rows.extend(page)
+        if len(page) < page_size:
+            break
+        page_start += page_size
+
+    total_sales = 0.0
+    total_outstanding = 0.0
+    invoices = []
+    for row in invoice_rows:
+        grand = float(row.grand_total or 0)
+        outstanding = float(row.outstanding_amount or 0)
+        total_sales += grand
+        total_outstanding += outstanding
+        invoices.append({
+            "name": row.name,
+            "customer": row.customer_name or row.customer,
+            "time": str(row.posting_time or ""),
+            "grand_total": grand,
+            "outstanding": outstanding,
+            "paid": grand - outstanding,
+        })
+    frappe.response["message"] = {
+        "date": report_date,
+        "currency": CURRENCY,
+        "invoice_count": len(invoices),
+        "total_sales": total_sales,
+        "total_paid": total_sales - total_outstanding,
+        "total_outstanding": total_outstanding,
+        "invoices": invoices,
+    }
+
 elif action == "Pay":
     sales_order_name = (frappe.form_dict.get("sales_order") or "").strip()
     if not sales_order_name:
