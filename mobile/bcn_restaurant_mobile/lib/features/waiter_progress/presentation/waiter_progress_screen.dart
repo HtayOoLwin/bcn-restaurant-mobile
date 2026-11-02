@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/search/order_search.dart';
+import '../../../core/formatters/amount_format.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
@@ -332,6 +333,12 @@ class _ProgressCardState extends State<_ProgressCard> {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Text(
+                            formatMoney(item.amount, widget.order.currency),
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                           if (item.canCancel) ...[
                             const SizedBox(width: 6),
                             TextButton(
@@ -346,6 +353,38 @@ class _ProgressCardState extends State<_ProgressCard> {
                     ),
                   ),
                 ],
+                const Divider(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Subtotal'),
+                    Text(formatMoney(widget.order.netTotal, widget.order.currency)),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Taxes / Service Charges'),
+                    Text(formatMoney(widget.order.taxesTotal, widget.order.currency)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      formatMoney(widget.order.grandTotal, widget.order.currency),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Draft amount · Room charges may change at cashier checkout.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                ),
               ],
             );
           },
