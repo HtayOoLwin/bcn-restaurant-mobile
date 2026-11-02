@@ -411,7 +411,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required CashierBill bill,
     required bool creditFlow,
   }) async {
-    if (bill.restaurantStatus.trim().toLowerCase() != 'open' &&
+    if (widget.bill.restaurantStatus.trim().toLowerCase() != 'open' &&
         bill.restaurantStatus.trim().toLowerCase() != 'billing' &&
         bill.restaurantStatus.trim().toLowerCase() != 'payment pending') {
       ScaffoldMessenger.of(context).showSnackBar(
