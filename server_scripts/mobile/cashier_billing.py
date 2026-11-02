@@ -500,7 +500,37 @@ elif action == "Pay":
             "sales_order": so.name, "sales_invoice": invoices[0],
             "restaurant_status": state, "duplicate": True,
         }
-    elif so.docstatus == 0 and state == "Billing":
+    elif so.docstatus == 0 and state in ["Open", "Billing"]:
+        if state == "Open":
+            if not so.items:
+                frappe.throw("Sales Order has no items")
+            check_in = frappe.utils.get_datetime(
+                so.get("custom_check_in") or so.creation
+            )
+            now = frappe.utils.now_datetime()
+            elapsed = (now - check_in).total_seconds()
+            if elapsed < 0:
+                frappe.throw("Check-out cannot be before check-in")
+            half_hours = max(2, int((elapsed + 1799.999999) // 1800))
+            billable = half_hours / 2.0
+            room_rows = [
+                row for row in so.items
+                if frappe.db.get_value("Item", row.item_code, "custom_is_room_charge")
+            ]
+            if len(room_rows) > 1:
+                frappe.throw("Only one Room Charges item is allowed")
+            if room_rows:
+                if room_rows[0].uom != "Hour":
+                    frappe.throw("Room Charges UOM must be Hour")
+                room_rows[0].qty = billable
+            so.custom_check_in = check_in
+            so.custom_check_out = now
+            so.custom_duration = elapsed / 3600.0
+            so.custom_billable_hours = billable if room_rows else 0
+            so.custom_bill_revision = int(so.get("custom_bill_revision") or 0) + 1
+            so.custom_restaurant_status = "Billing"
+            so.calculate_taxes_and_totals()
+            so.save(ignore_permissions=True)
         selected_customer = (frappe.form_dict.get("credit_customer") or "").strip()
         if selected_customer:
             customer = frappe.db.get_value(
@@ -519,9 +549,6 @@ elif action == "Pay":
             validate_invoice_totals(so, original_net, original_tax, original_grand)
         if not int(so.get("custom_bill_revision") or 0):
             frappe.throw("Please request bill before Pay")
-        print_id = "bill-request|" + so.name + "|" + str(int(so.custom_bill_revision))
-        if not frappe.db.exists("BCN Print Job", {"request_id": print_id}):
-            frappe.throw("Latest bill print snapshot missing. Request bill again")
         if get_linked_draft_sales_invoice_names(so.name):
             frappe.throw("Unexpected Draft Invoice exists before Pay")
         so.custom_restaurant_status = "Payment Pending"
