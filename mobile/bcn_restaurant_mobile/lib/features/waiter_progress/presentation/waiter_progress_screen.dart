@@ -195,6 +195,13 @@ class _ProgressCardState extends State<_ProgressCard> {
   @override
   Widget build(BuildContext context) {
 
+    final cardColors = <Color>[
+      const Color(0xFFE9F2FF),
+      const Color(0xFFE8F7ED),
+      const Color(0xFFFFF2E5),
+      const Color(0xFFF3EAFE),
+    ];
+    final cardIndex = widget.order.name.codeUnits.fold<int>(0, (sum, code) => sum + code) % cardColors.length;
     final orderDetails = InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: () => setState(() => _expanded = !_expanded),
@@ -253,7 +260,7 @@ class _ProgressCardState extends State<_ProgressCard> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
-      color: _expanded ? const Color(0xFFF7FAFF) : Colors.white,
+      color: cardColors[cardIndex],
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: LayoutBuilder(
@@ -353,58 +360,36 @@ class _ProgressCardState extends State<_ProgressCard> {
                       ),
                     ),
                   ),
-                ],
                 const Divider(height: 20),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF3FF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Subtotal', style: TextStyle(color: Color(0xFF21558B), fontWeight: FontWeight.w600)),
-                      Text(formatMoney(widget.order.netTotal, widget.order.currency),
-                        style: const TextStyle(color: Color(0xFF21558B), fontWeight: FontWeight.w700)),
-                    ],
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Subtotal'),
+                    Text(formatMoney(widget.order.netTotal, widget.order.currency)),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF4E3),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Taxes / Service Charges', style: TextStyle(color: Color(0xFF9B6010), fontWeight: FontWeight.w600)),
-                      Text(formatMoney(widget.order.taxesTotal, widget.order.currency),
-                        style: const TextStyle(color: Color(0xFF9B6010), fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0F6E9),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Grand Total', style: TextStyle(color: Color(0xFF126B3E), fontWeight: FontWeight.bold)),
-                      Text(
-                        formatMoney(widget.order.grandTotal, widget.order.currency),
-                        style: const TextStyle(color: Color(0xFF126B3E), fontWeight: FontWeight.bold, fontSize: 17),
+                for (final rawTax in widget.order.taxes)
+                  if (rawTax is Map && ((rawTax['amount'] as num?) ?? 0).abs() > 0.00001)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(rawTax['label']?.toString() ?? 'Tax'),
+                          Text(formatMoney((rawTax['amount'] as num?) ?? 0, widget.order.currency)),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                const Divider(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(formatMoney(widget.order.grandTotal, widget.order.currency),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                  ],
                 ),
-
+              ],
               ],
             );
           },
