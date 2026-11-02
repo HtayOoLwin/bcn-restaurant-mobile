@@ -510,6 +510,51 @@ elif action == "DailyReport":
             break
         page_start += page_size
 
+    # Submitted Payment Entries allocated to these Sales Invoices.
+    # This is the current allocated breakdown, not daily cash collection.
+    payment_by_invoice = {}
+    payment_totals = {}
+    invoice_names = [row.name for row in invoice_rows]
+    for chunk_start in range(0, len(invoice_names), 100):
+        names = invoice_names[chunk_start:chunk_start + 100]
+        references = frappe.get_all(
+            "Payment Entry Reference",
+            filters={
+                "reference_doctype": "Sales Invoice",
+                "reference_name": ["in", names],
+                "docstatus": 1,
+            },
+            fields=["parent", "reference_name", "allocated_amount"],
+            limit_page_length=10000,
+        )
+        payment_names = []
+        for ref in references:
+            if ref.parent not in payment_names:
+                payment_names.append(ref.parent)
+        modes = {}
+        if payment_names:
+            entries = frappe.get_all(
+                "Payment Entry",
+                filters={"name": ["in", payment_names], "docstatus": 1},
+                fields=["name", "mode_of_payment", "payment_type"],
+                limit_page_length=10000,
+            )
+            for entry in entries:
+                modes[entry.name] = entry
+        for ref in references:
+            entry = modes.get(ref.parent)
+            if not entry:
+                continue
+            mode = (entry.mode_of_payment or "Other").strip()
+            allocated = float(ref.allocated_amount or 0)
+            if entry.payment_type == "Pay":
+                allocated = -allocated
+            if abs(allocated) < 0.00001:
+                continue
+            details = payment_by_invoice.setdefault(ref.reference_name, {})
+            details[mode] = details.get(mode, 0.0) + allocated
+            payment_totals[mode] = payment_totals.get(mode, 0.0) + allocated
+
     total_sales = 0.0
     total_outstanding = 0.0
     invoices = []
@@ -525,6 +570,11 @@ elif action == "DailyReport":
             "grand_total": grand,
             "outstanding": outstanding,
             "paid": grand - outstanding,
+            "payment_methods": [
+                {"name": mode, "amount": value}
+                for mode, value in payment_by_invoice.get(row.name, {}).items()
+                if abs(value) > 0.00001
+            ],
         })
     frappe.response["message"] = {
         "date": report_date,
@@ -534,6 +584,11 @@ elif action == "DailyReport":
         "total_paid": total_sales - total_outstanding,
         "total_outstanding": total_outstanding,
         "invoices": invoices,
+        "payment_method_summary": [
+            {"name": mode, "amount": value}
+            for mode, value in sorted(payment_totals.items())
+            if abs(value) > 0.00001
+        ],
     }
 
 elif action == "Pay":
