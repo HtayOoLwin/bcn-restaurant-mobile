@@ -489,6 +489,12 @@ elif action == "Pay":
 
     state = (so.get("custom_restaurant_status") or "").strip()
     if so.docstatus == 1 and state in ["Payment Pending", "Closed"]:
+        requested_credit_customer = (frappe.form_dict.get("credit_customer") or "").strip()
+        if requested_credit_customer and requested_credit_customer != so.customer:
+            frappe.throw(
+                "Credit Customer cannot be changed after Sales Order submission. "
+                "Finish the existing checkout or ask an administrator to correct it."
+            )
         invoices = (
             get_linked_draft_sales_invoice_names(so.name)
             if state == "Payment Pending"
