@@ -143,18 +143,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           ],
                         ),
                       ),
-                      FilledButton.icon(
-                        onPressed: _pendingPrintSalesOrders.contains(
-                          _lastPaymentResult!.salesOrder,
-                        )
-                            ? null
-                            : () => _printBill(
-                                  context: context,
-                                  salesOrder: _lastPaymentResult!.salesOrder,
-                                ),
-                        icon: const Icon(Icons.print),
-                        label: const Text('Reprint Bill'),
-                      ),
                     ],
                   ),
                 ),
@@ -1214,10 +1202,6 @@ class _BillCardState extends State<_BillCard> {
                   _actionButtons(isBilling),
                 ],
                 if (_expanded) ...[
-                  if (bill.lastPrintStatus?.isNotEmpty == true) ...[
-                    const SizedBox(height: 6),
-                    Text('Last Print: ${bill.lastPrintStatus}'),
-                  ],
                   const Divider(height: 24),
                   Container(
                     padding: const EdgeInsets.symmetric(
