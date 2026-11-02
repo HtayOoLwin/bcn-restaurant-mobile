@@ -19,6 +19,9 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
   String _dateText(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
+  String _displayDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
   @override
   void initState() {
     super.initState();
@@ -103,7 +106,7 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                     child: Row(children: [
                       const Icon(Icons.calendar_today_outlined),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(_dateText(_selectedDate))),
+                      Expanded(child: Text(_displayDate(_selectedDate))),
                       const Icon(Icons.keyboard_arrow_down),
                     ]))),
               ),
@@ -153,7 +156,10 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                       ]);
                     }),
                     const SizedBox(height: 12),
-                    Card(child: Padding(
+                    Card(
+                      color: const Color(0xFFDDEBFA),
+                      surfaceTintColor: Colors.transparent,
+                      child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
