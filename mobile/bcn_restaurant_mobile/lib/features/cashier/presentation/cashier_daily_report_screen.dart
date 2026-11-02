@@ -131,24 +131,40 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
                   children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Submitted Invoices: ${data['invoice_count'] ?? 0}',
-                                style: const TextStyle(fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 14),
-                            _metric('Total Sales', amount('total_sales'), currency),
-                            const Divider(height: 24),
-                            _metric('Paid', amount('total_paid'), currency),
-                            const Divider(height: 24),
-                            _metric('Outstanding', amount('total_outstanding'), currency),
-                          ],
-                        ),
-                      ),
-                    ),
+                    LayoutBuilder(builder: (context, constraints) {
+                      final width = (constraints.maxWidth - 10) / 2;
+                      return Wrap(spacing: 10, runSpacing: 10, children: [
+                        SizedBox(width: width, child: _metric(
+                          'Total Sales', amount('total_sales'), currency,
+                          const Color(0xFFD8EDFF), const Color(0xFF155B98),
+                          Icons.bar_chart)),
+                        SizedBox(width: width, child: _metric(
+                          'Paid Amount', amount('total_paid'), currency,
+                          const Color(0xFFDDF3E6), const Color(0xFF14683E),
+                          Icons.account_balance_wallet_outlined)),
+                        SizedBox(width: width, child: _metric(
+                          'Outstanding', amount('total_outstanding'), currency,
+                          const Color(0xFFFCE7E8), const Color(0xFFAC262C),
+                          Icons.error_outline)),
+                        SizedBox(width: width, child: _metric(
+                          'Invoices', (data['invoice_count'] as num?) ?? 0, currency,
+                          const Color(0xFFEAE3FA), const Color(0xFF61499B),
+                          Icons.description_outlined)),
+                      ]);
+                    }),
+                    const SizedBox(height: 12),
+                    Card(child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text('Payment Method Summary',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                          for (final raw in (data['payment_method_summary'] as List? ?? const []))
+                            if (raw is Map)
+                              _line(raw['name']?.toString() ?? 'Other',
+                                (raw['amount'] as num?) ?? 0, currency),
+                        ]),
+                    )),
                     const SizedBox(height: 12),
                     const Text('Sales Invoice List',
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
