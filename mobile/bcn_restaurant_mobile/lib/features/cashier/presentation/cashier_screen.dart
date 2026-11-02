@@ -1327,7 +1327,9 @@ class _BillCardState extends State<_BillCard> {
               disabledForegroundColor: _disabledForeground,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            onPressed: isBilling && !widget.printPending
+            onPressed: isBilling &&
+                    bill.restaurantStatus.trim().toLowerCase() != 'open' &&
+                    !widget.printPending
                 ? widget.onPrint
                 : null,
             icon: widget.printPending
