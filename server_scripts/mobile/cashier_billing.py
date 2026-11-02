@@ -407,7 +407,7 @@ def build_bill_row(order, has_print_job_doctype, get_linked_draft_sales_invoice_
         "sales_order": order.name,
         "sales_invoice": draft_invoice,
         "customer": order.customer,
-        "customer_name": sales_order.get("custom_restaurant_table") or order.customer_name or order.customer,
+        "customer_name": order.customer_name or order.customer,
         "creation": str(order.creation),
         "net_total": float(order.net_total or 0),
         "total_taxes_and_charges": float(order.total_taxes_and_charges or 0),
@@ -510,14 +510,6 @@ elif action == "Pay":
             )
             if not customer or customer.disabled:
                 frappe.throw("Select a valid active Credit Customer")
-            # Do not lose the original table identity when assigning credit.
-            if not so.meta.has_field("custom_restaurant_table"):
-                frappe.throw(
-                    "Sales Order requires custom_restaurant_table Data field "
-                    "before credit checkout can be enabled"
-                )
-            if not (so.get("custom_restaurant_table") or "").strip():
-                so.custom_restaurant_table = so.customer
             original_grand = float(so.grand_total or 0)
             original_net = float(so.net_total or 0)
             original_tax = float(so.total_taxes_and_charges or 0)
@@ -585,13 +577,6 @@ elif action == "ConfirmPayment":
         frappe.throw("Sales Order does not belong to the restaurant company")
     if sales_order.currency != CURRENCY:
         frappe.throw("Restaurant checkout requires MMK Sales Order currency")
-    if payment_type in ("Credit", "Partial Credit"):
-        if not (sales_order.get("custom_restaurant_table") or "").strip():
-            frappe.throw(
-                "Select a Credit Customer before preparing the invoice. "
-                "Use Credit on a Draft Billing order."
-            )
-
     profile = frappe.get_doc("POS Profile", POS_PROFILE)
     tenders = parse_tenders(raw_payments, profile, allow_empty=payment_type == "Credit")
     restaurant_status = (
