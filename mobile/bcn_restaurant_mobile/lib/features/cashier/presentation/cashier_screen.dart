@@ -968,6 +968,22 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     Navigator.of(sheetContext).pop();
                                   }
                                   if (context.mounted) {
+                                    final printReceipt = await showDialog<bool>(
+                                      context: context,
+                                      builder: (dialogContext) => AlertDialog(
+                                        title: const Text('Print receipt?'),
+                                        content: const Text('Print the final receipt now?'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('No')),
+                                          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Yes, Print')),
+                                        ],
+                                      ),
+                                    );
+                                    if (printReceipt == true && context.mounted) {
+                                      await _printBill(context: context, salesOrder: result.salesOrder);
+                                    }
+                                  }
+                                  if (context.mounted) {
                                     final entries = result.paymentEntries.join(', ');
                                     final changeText = result.changeAmount > 0
                                         ? ' · Change ${formatMoney(result.changeAmount, bill.currency)}'
@@ -1186,13 +1202,11 @@ class _BillCardState extends State<_BillCard> {
               children: [
                 if (compact) ...[
                   orderDetails,
-                  Align(alignment: Alignment.centerLeft, child: statusChip),
                 ] else
                   Row(
                     children: [
                       Expanded(child: orderDetails),
                       const SizedBox(width: 12),
-                      statusChip,
                     ],
                   ),
                 if (isBilling && !_expanded) ...[
