@@ -43,19 +43,30 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
     });
   }
 
-  Widget _metric(String title, num amount, String currency) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontSize: 13)),
-        const SizedBox(height: 5),
-        Text(
-          formatMoney(amount, currency),
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-      ],
+  Widget _metric(String title, num amount, String currency,
+      Color bg, Color fg, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        Icon(icon, color: fg, size: 20),
+        const SizedBox(width: 6),
+        Expanded(child: Text(title, style: TextStyle(color: fg, fontSize: 12))),
+        Flexible(child: Text(formatAmount(amount), textAlign: TextAlign.right,
+          style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: 16))),
+      ]),
     );
   }
+
+  Widget _line(String label, num amount, String currency) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 7),
+    child: Row(children: [
+      Expanded(child: Text(label)),
+      Text(formatMoney(amount, currency),
+          textAlign: TextAlign.right,
+          style: const TextStyle(fontWeight: FontWeight.w600)),
+    ]),
+  );
 
   @override
   Widget build(BuildContext context) {
