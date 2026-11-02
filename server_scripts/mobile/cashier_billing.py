@@ -414,7 +414,7 @@ def build_bill_row(order, has_print_job_doctype, get_linked_draft_sales_invoice_
         "grand_total": float(order.grand_total or 0),
         "currency": order.currency,
         "restaurant_status": order.custom_restaurant_status,
-        "payment_enabled": bool(draft_invoice) or (order.docstatus == 0 and order.custom_restaurant_status == "Billing"),
+        "payment_enabled": bool(draft_invoice) or (order.docstatus == 0 and order.custom_restaurant_status in ["Open", "Billing"]),
         "last_print_status": last_print_status,
         "last_print_job": last_print_job,
         "items": item_rows,
