@@ -1,6 +1,10 @@
 # Server Script API: bcn_cashier_print_bill
 # Prints the final submitted Sales Invoice after cashier checkout.
-COMPANY = "Doh Myot Taw BBQ & Restaurant"
+POS_PROFILE = "DMT"
+profile = frappe.get_doc("POS Profile", POS_PROFILE)
+COMPANY = (profile.company or "").strip()
+if not COMPANY:
+    frappe.throw("POS Profile DMT must have a Company")
 
 user = frappe.session.user
 if not user or user == "Guest":
@@ -25,8 +29,17 @@ locked = frappe.db.sql(
 if not locked:
     frappe.throw("Sales Order not found")
 order = frappe.get_doc("Sales Order", sales_order)
-if order.company != COMPANY or order.docstatus != 1 or order.custom_restaurant_status != "Closed":
-    frappe.throw("Only completed checkout receipts may be printed")
+if order.company != COMPANY:
+    frappe.throw(
+        "Sales Order Company (" + str(order.company)
+        + ") does not match POS Profile DMT Company (" + COMPANY + ")"
+    )
+if order.docstatus != 1 or order.custom_restaurant_status != "Closed":
+    frappe.throw(
+        "Only completed checkout receipts may be printed. "
+        + "Sales Order docstatus=" + str(order.docstatus)
+        + ", restaurant_status=" + str(order.custom_restaurant_status or "")
+    )
 
 invoice_rows = frappe.get_all(
     "Sales Invoice Item", filters={"sales_order": sales_order, "docstatus": 1},
@@ -42,7 +55,6 @@ invoice = frappe.get_doc("Sales Invoice", invoice_names[0])
 if invoice.docstatus != 1 or invoice.company != COMPANY:
     frappe.throw("Submitted Sales Invoice is invalid")
 
-profile = frappe.get_doc("POS Profile", "DMT")
 printer = (profile.get("custom_cashier_printer") or "").strip()
 if not printer:
     frappe.throw("POS Profile DMT cashier printer is not configured")
