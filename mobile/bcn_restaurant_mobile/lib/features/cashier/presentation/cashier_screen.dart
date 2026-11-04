@@ -789,7 +789,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                               borderSide: const BorderSide(color: Color(0xFF1769C2), width: 2),
                                             ),
                                           ),
-                                          onChanged: (_) => setSheetState(recalculateCash),
+                                          onChanged: (_) => setSheetState(recalculateSplit),
                                         ),
                                       ),
                                     ],
@@ -839,7 +839,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                       Expanded(
                                         child: TextField(
                                           controller: creditAmountController,
-                                          enabled: !busy,
+                                          enabled: true,
+                                           readOnly: true,
                                           textAlign: TextAlign.end,
                                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                           inputFormatters: const [ThousandsSeparatorInputFormatter()],
@@ -859,24 +860,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                               borderSide: const BorderSide(color: Color(0xFF1769C2), width: 2),
                                             ),
                                           ),
-                                          onChanged: (_) => setSheetState(recalculateCash),
+                                          
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              IconButton(
-                                tooltip: 'Remove Credit',
-                                icon: const Icon(Icons.delete_outline, color: Color(0xFFD32F2F)),
-                                onPressed: busy ? null : () => setSheetState(() {
-                                  splitModeNames.remove(partialCreditName);
-                                  creditAmountController.clear();
-                                  creditRemarkController.clear();
-                                  recalculateCash();
-                                }),
-                              ),
+
                             ],
                           ),
                         ),
