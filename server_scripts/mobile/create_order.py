@@ -43,6 +43,10 @@ allowed_user = (
 if not allowed_user:
     frappe.throw("You are not allowed to create restaurant orders.")
 
+profile = frappe.get_doc("POS Profile", POS_PROFILE)
+COMPANY = (profile.company or "").strip()
+if not COMPANY:
+    frappe.throw("POS Profile DMT must have a Company.")
 customer = (frappe.form_dict.get("customer") or "").strip()
 client_order_id = (frappe.form_dict.get("client_order_id") or "").strip()
 raw_items = frappe.form_dict.get("items")
@@ -116,13 +120,18 @@ if is_new_order:
 else:
     sales_order = frappe.get_doc("Sales Order", open_draft_orders[0].name)
 
+if not is_new_order and sales_order.company != COMPANY:
+    frappe.throw(
+        "Existing Sales Order Company does not match POS Profile DMT: "
+        + str(sales_order.company) + " / " + COMPANY
+    )
+
 existing_client_order_id = (
     sales_order.get("custom_client_order_id") or ""
 ).strip()
 is_duplicate = (not is_new_order) and existing_client_order_id == client_order_id
 
 if not is_duplicate:
-    profile = frappe.get_doc("POS Profile", POS_PROFILE)
     today = frappe.utils.nowdate()
 
     if is_new_order:
@@ -322,7 +331,7 @@ if not is_duplicate:
             sales_order.taxes_and_charges,
         )
         if tax_template.company and tax_template.company != COMPANY:
-            frappe.throw("Sales Tax Template company does not match")
+            frappe.throw("Sales Tax Template Company (" + tax_template.company + ") does not match POS Profile Company (" + COMPANY + "). Check POS Profile DMT Taxes and Charges.")
 
         for template_row in tax_template.taxes:
             tax_values = {
