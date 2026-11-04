@@ -456,7 +456,7 @@ action = (frappe.form_dict.get("action") or "").strip()
 
 if action == "Customers":
     search_text = (frappe.form_dict.get("search") or "").strip()
-    filters = {"disabled": 0}
+    filters = {"disabled": 0, "customer_group": "Credit"}
     if search_text:
         filters["customer_name"] = ["like", "%" + search_text + "%"]
     customers = frappe.get_all(
@@ -668,6 +668,8 @@ elif action == "Pay":
             )
             if not customer or customer.disabled:
                 frappe.throw("Select a valid active Credit Customer")
+            if frappe.db.get_value("Customer", customer.name, "customer_group") != "Credit":
+                frappe.throw("Selected customer must belong to Credit Customer Group")
             original_grand = float(so.grand_total or 0)
             original_net = float(so.net_total or 0)
             original_tax = float(so.total_taxes_and_charges or 0)
