@@ -67,7 +67,7 @@ for customer_row in enabled_customer_rows:
 
 customer_groups = []
 for group_row in leaf_group_rows:
-    if group_row.name in groups_with_customers:
+    if group_row.name != "Credit" and group_row.name in groups_with_customers:
         customer_groups.append(group_row.name)
 
 if not requested_customer_group:
@@ -174,6 +174,7 @@ elif customer_group == "Takeaway":
 
 frappe.response["message"] = {
     "service_type": service_type,
+    "company_name": frappe.db.get_value("POS Profile", "DMT", "company") or COMPANY,
     "customer_group": customer_group,
     "customer_groups": customer_groups,
     "tables": result,
