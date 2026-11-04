@@ -357,6 +357,19 @@ if not is_duplicate:
             or abs(frappe.utils.flt(order_line.amount)) > 0.01
         ):
             frappe.throw("FOC row must remain 0 MMK: " + order_line.item_code)
+    # Store the waiter and timestamp for this order submission (including
+    # additions to an existing Draft Sales Order). Never overwrite these
+    # values on an idempotent duplicate request.
+    # The matching Custom Fields are required on Sales Order:
+    # custom_last_ordered_by (Link -> User)
+    # custom_last_ordered_at (Datetime)
+    if not sales_order.meta.has_field("custom_last_ordered_by"):
+        frappe.throw("Sales Order custom_last_ordered_by field is required")
+    if not sales_order.meta.has_field("custom_last_ordered_at"):
+        frappe.throw("Sales Order custom_last_ordered_at field is required")
+    sales_order.custom_last_ordered_by = current_user
+    sales_order.custom_last_ordered_at = frappe.utils.now_datetime()
+
     sales_order.custom_client_order_id = client_order_id
     sales_order.custom_restaurant_status = "Open"
     if not sales_order.get("custom_check_in"):
