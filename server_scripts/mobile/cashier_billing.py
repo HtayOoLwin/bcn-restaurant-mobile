@@ -15,10 +15,16 @@
 #
 # No manual commit/rollback is used.
 
-COMPANY = "Doh Myot Taw BBQ & Restaurant"
 POS_PROFILE = "DMT"
 CURRENCY = "MMK"
 AMOUNT_TOLERANCE = 0.01
+
+# Use the same Company as bcn_mobile_create_order, waiter progress and tables.
+# Resolve it before helper definitions so their default COMPANY arguments match.
+profile_settings = frappe.get_doc("POS Profile", POS_PROFILE)
+COMPANY = (profile_settings.company or "").strip()
+if not COMPANY:
+    frappe.throw("POS Profile DMT must have a Company.")
 
 
 def get_mode_details(profile, mode_name, COMPANY=COMPANY, CURRENCY=CURRENCY):
