@@ -36,7 +36,7 @@ class RestaurantTableModel {
 class TablesResponse {
   const TablesResponse({
     required this.serviceType,
-    required this.companyName,
+    this.companyName = '',
     required this.customerGroup,
     this.customerGroups = const [],
     required this.tables,
