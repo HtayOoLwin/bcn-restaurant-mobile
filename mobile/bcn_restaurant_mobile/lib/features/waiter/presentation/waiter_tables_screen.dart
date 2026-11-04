@@ -85,9 +85,13 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'BCN Restaurant',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+            Text(
+              response?.companyName.isNotEmpty == true
+                  ? response!.companyName
+                  : 'Restaurant',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
             ),
             const SizedBox(height: 2),
             Text(
