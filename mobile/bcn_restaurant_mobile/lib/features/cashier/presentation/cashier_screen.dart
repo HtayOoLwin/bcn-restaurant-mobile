@@ -249,18 +249,44 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, refresh) => AlertDialog(
-          title: const Text('Select Credit Customer'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          contentPadding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+          actionsPadding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+          title: const Row(
+            children: [
+              Icon(Icons.people_outline, color: Color(0xFF27699B), size: 26),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Select Credit Customer',
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
           content: SizedBox(
             width: 420,
-            height: 360,
+            height: 330,
             child: Column(
               children: [
                 TextField(
                   autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Search Customer',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    hintText: 'Search Customer...',
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
+                    filled: true,
+                    fillColor: const Color(0xFFF7F9FC),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 13,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onChanged: (value) => refresh(() => query = value.trim()),
                 ),
@@ -271,7 +297,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                     future: repository.searchCreditCustomers(query),
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
-                        return Center(child: Text('Customer lookup failed: ${snapshot.error}'));
+                        return Center(
+                          child: Text('Customer lookup failed: ${snapshot.error}'),
+                        );
                       }
                       if (!snapshot.hasData) {
                         return const Center(child: CircularProgressIndicator());
@@ -280,18 +308,44 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       if (customers.isEmpty) {
                         return const Center(child: Text('No customers found.'));
                       }
-                      return ListView.builder(
+                      return ListView.separated(
                         itemCount: customers.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 4),
                         itemBuilder: (context, index) {
                           final customer = customers[index];
                           final name = customer['name']?.toString() ?? '';
-                          final display = customer['customer_name']?.toString() ?? name;
-                          return ListTile(
-                            title: Text(display),
-                            subtitle: name == display ? null : Text(name),
-                            onTap: name.isEmpty
-                                ? null
-                                : () => Navigator.pop(dialogContext, name),
+                          final display =
+                              customer['customer_name']?.toString() ?? name;
+                          return Material(
+                            color: index.isEven
+                                ? const Color(0xFFF1F5FA)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            child: ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              leading: const Icon(
+                                Icons.person_outline,
+                                color: Color(0xFF27699B),
+                              ),
+                              title: Text(
+                                display,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: name == display ? null : Text(name),
+                              onTap: name.isEmpty
+                                  ? null
+                                  : () => Navigator.pop(dialogContext, name),
+                            ),
                           );
                         },
                       );
