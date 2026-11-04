@@ -447,7 +447,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       if (type == 'Split') {
         splitModeNames
           ..clear()
-          ..addAll([if (cashMode != null) cashMode.name]);
+          ..addAll([
+            if (creditFlow) partialCreditName,
+            if (!creditFlow && cashMode != null) cashMode.name,
+          ]);
       }
       final target = type == creditPaymentType
           ? null
