@@ -5,6 +5,11 @@ COMPANY = "Doh Myot Daw BBQ & Restaurant"
 PRICE_LIST = "Standard Selling"
 CURRENCY = "MMK"
 
+profile = frappe.get_doc("POS Profile", "DMT")
+COMPANY = (profile.company or "").strip()
+if not COMPANY:
+    frappe.throw("POS Profile DMT must have a Company.")
+
 current_user = frappe.session.user
 if not current_user or current_user == "Guest":
     frappe.throw("Authentication is required.")
@@ -101,8 +106,9 @@ if customer_group:
 active_orders = frappe.get_all(
     "Sales Order",
     filters={
+        "company": COMPANY,
         "docstatus": ["in", [0, 1]],
-        "custom_restaurant_status": ["in", ["Open", "Billing"]],
+        "custom_restaurant_status": ["in", ["Open", "Billing", "Payment Pending"]],
     },
     fields=[
         "name",
@@ -117,20 +123,21 @@ active_orders = frappe.get_all(
 
 order_by_customer = {}
 for row in active_orders:
-    valid_open = (
+    valid_draft = (
         row.docstatus == 0
-        and row.custom_restaurant_status == "Open"
+        and row.custom_restaurant_status in ("Open", "Billing")
     )
-    valid_billing = (
-        row.docstatus == 1 and row.custom_restaurant_status == "Billing"
+    valid_submitted = (
+        row.docstatus == 1
+        and row.custom_restaurant_status in ("Billing", "Payment Pending")
     )
-    if not valid_open and not valid_billing:
+    if not valid_draft and not valid_submitted:
         continue
 
     existing = order_by_customer.get(row.customer)
     if not existing:
         order_by_customer[row.customer] = row
-    elif row.custom_restaurant_status == "Billing":
+    elif row.docstatus == 1:
         # A submitted Billing order must win over any stale Draft Open row so
         # the table cannot appear Available/Occupied for new ordering.
         order_by_customer[row.customer] = row
@@ -148,7 +155,7 @@ for customer in customers:
         is_open = True
         sales_order = order.name
         opened_at = order.creation
-        if order.custom_restaurant_status == "Billing":
+        if order.custom_restaurant_status in ("Billing", "Payment Pending"):
             table_status = "Billing"
         else:
             table_status = "Occupied"
@@ -174,7 +181,7 @@ elif customer_group == "Takeaway":
 
 frappe.response["message"] = {
     "service_type": service_type,
-    "company_name": frappe.db.get_value("POS Profile", "DMT", "company") or COMPANY,
+    "company_name": COMPANY,
     "customer_group": customer_group,
     "customer_groups": customer_groups,
     "tables": result,
