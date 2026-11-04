@@ -8,6 +8,11 @@
 
 COMPANY = "Doh Myot Taw BBQ & Restaurant"
 
+profile = frappe.get_doc("POS Profile", "DMT")
+COMPANY = (profile.company or "").strip()
+if not COMPANY:
+    frappe.throw("POS Profile DMT must have a Company.")
+
 current_user = frappe.session.user
 if not current_user or current_user == "Guest":
     frappe.throw("Authentication is required.")
