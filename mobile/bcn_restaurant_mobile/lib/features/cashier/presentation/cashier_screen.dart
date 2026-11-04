@@ -468,7 +468,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     }
 
     void recalculateCash() {
-      if (selectedPaymentType != 'Split' || cashMode == null) return;
+      if (selectedPaymentType != 'Split' || cashMode == null || creditFlow) return;
       final otherTotal = splitModeNames
           .where((name) => name != cashMode.name && name != partialCreditName)
           .fold<double>(
@@ -479,6 +479,28 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         controllers[cashMode.name],
         (amountDue() - otherTotal).clamp(0, double.infinity).toDouble(),
       );
+    }
+
+    void recalculateCredit() {
+      if (!creditFlow || selectedPaymentType != 'Split') return;
+      final paid = splitModeNames
+          .where((name) => name != partialCreditName)
+          .fold<double>(
+            0,
+            (sum, name) => sum + _parseTender(controllers[name]?.text),
+          );
+      setControllerAmount(
+        creditAmountController,
+        (amountDue() - paid).clamp(0, double.infinity).toDouble(),
+      );
+    }
+
+    void recalculateSplit() {
+      if (creditFlow) {
+        recalculateCredit();
+      } else {
+        recalculateCash();
+      }
     }
 
     if (selectedPaymentType.isNotEmpty) {
@@ -606,7 +628,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         ),
                         onChanged: (_) => setSheetState(() {
                           if (selectedPaymentType == 'Split') {
-                            recalculateCash();
+                            recalculateSplit();
                           } else {
                             setPaymentType(selectedPaymentType);
                           }
@@ -650,9 +672,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                               selected: selectedPaymentType == 'Split',
                               onSelected: busy
                                   ? null
-                                  : (_) => setSheetState(
-                                      () => setPaymentType('Split'),
-                                    ),
+                                  : (_) => setSheetState(() {
+                                      setPaymentType('Split');
+                                      recalculateCredit();
+                                    }),
                             ),
                         ],
                       ),
@@ -677,11 +700,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                       child: ListView(
                                         shrinkWrap: true,
                                         children: [
-                                          if (creditFlow && !splitModeNames.contains(partialCreditName))
-                                            ListTile(
-                                              title: const Text('Credit (Outstanding)'),
-                                              onTap: () => Navigator.pop(context, partialCreditName),
-                                            ),
                                           for (final mode in available)
                                             ListTile(
                                               title: Text(mode.name),
@@ -699,7 +717,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                   }
                                   setSheetState(() {
                                     splitModeNames.add(selected);
-                                    recalculateCash();
+                                    recalculateSplit();
                                   });
                                 },
                           icon: const Icon(Icons.add),
@@ -709,7 +727,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       ],
                       ...visibleModes.map((mode) {
                         final isSplit = selectedPaymentType == 'Split';
-                        final isCash = isSplit && mode.name == cashMode?.name;
+                        final isCash = isSplit && !creditFlow && mode.name == cashMode?.name;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
@@ -786,7 +804,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                   onPressed: busy ? null : () => setSheetState(() {
                                     splitModeNames.remove(mode.name);
                                     controllers[mode.name]?.clear();
-                                    recalculateCash();
+                                    recalculateSplit();
                                   }),
                                 ),
                               ],
