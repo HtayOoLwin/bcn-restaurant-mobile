@@ -455,7 +455,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       final target = type == creditPaymentType
           ? null
           : type == 'Split'
-          ? (cashMode == null ? null : controllers[cashMode.name])
+          ? (cashMode != null && splitModeNames.contains(cashMode.name)
+              ? controllers[cashMode.name]
+              : null)
           : controllers[type];
       if (target != null) {
         target.value = TextEditingValue(
