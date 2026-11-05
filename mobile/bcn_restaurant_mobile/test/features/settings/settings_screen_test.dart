@@ -1,6 +1,10 @@
 import 'dart:async';
 
 import 'package:bcn_restaurant_mobile/core/network/api_exception.dart';
+import 'package:bcn_restaurant_mobile/core/network/api_client.dart';
+import 'package:bcn_restaurant_mobile/core/storage/session_storage.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:bcn_restaurant_mobile/core/router/app_router.dart';
 import 'package:bcn_restaurant_mobile/features/auth/domain/auth_state.dart';
 import 'package:bcn_restaurant_mobile/features/auth/presentation/auth_controller.dart';
@@ -70,48 +74,37 @@ void main() {
     expect(loggedOut, isTrue);
   });
 
-  testWidgets(
-    'cashier sends one Sales Order print request while preventing double taps',
-    (tester) async {
-      final request = Completer<CashierBillPrintResult>();
-      final repository = _FakeAndroidPrintGateway(request: request.future);
+  testWidgets('cashier payment queues one Android print job', (tester) async {
+    final request = Completer<CashierBillPrintResult>();
+    final printer = _FakeAndroidPrintGateway(request: request.future);
 
-      await tester.pumpWidget(_cashierHarness(repository));
-      await tester.pumpAndSettle();
-      await _expandCashierBill(tester);
+    await tester.pumpWidget(_cashierHarness(printer));
+    await tester.pumpAndSettle();
+    await _beginFinalReceiptPrint(tester);
 
-      await tester.tap(find.text('Reprint Bill'));
-      await tester.tap(find.text('Reprint Bill'));
-      await tester.pump();
+    expect(printer.requestedSalesOrders, ['SO-0001']);
+    expect(printer.requestIds, hasLength(1));
+    expect(printer.requestIds.single, isNotEmpty);
 
-      expect(repository.requestedSalesOrders, ['SO-0001']);
-      expect(repository.requestIds, hasLength(1));
-      expect(repository.requestIds.single, isNotEmpty);
-      expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Sending…'))
-            .onPressed,
-        isNull,
-      );
+    request.complete(_pendingResult());
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Android print job queued · PRINT-JOB-0001 (Pending)'),
+      findsOneWidget,
+    );
+  });
 
-      request.complete(_pendingResult());
-      await tester.pumpAndSettle();
-
-      expect(find.text('Android print job queued · PRINT-JOB-0001 (Pending)'), findsOneWidget);
-    },
-  );
-
-  testWidgets('cashier keeps a print API error visible', (tester) async {
-    final repository = _FakeAndroidPrintGateway(
+  testWidgets('cashier shows Android print API failure in a dialog', (tester) async {
+    final printer = _FakeAndroidPrintGateway(
       requestError: const ApiException('No cashier printer configured.'),
     );
 
-    await tester.pumpWidget(_cashierHarness(repository));
+    await tester.pumpWidget(_cashierHarness(printer));
     await tester.pumpAndSettle();
-    await _expandCashierBill(tester);
-    await tester.tap(find.text('Reprint Bill'));
+    await _beginFinalReceiptPrint(tester);
     await tester.pumpAndSettle();
 
+    expect(find.text('Cashier print failed'), findsOneWidget);
     expect(find.text('No cashier printer configured.'), findsOneWidget);
   });
 
@@ -119,14 +112,14 @@ void main() {
     tester,
   ) async {
     final request = Completer<CashierBillPrintResult>();
-    final repository = _FakeAndroidPrintGateway(request: request.future);
+    final printer = _FakeAndroidPrintGateway(request: request.future);
 
-    await tester.pumpWidget(_cashierHarness(repository));
+    await tester.pumpWidget(_cashierHarness(printer));
     await tester.pumpAndSettle();
-    await _expandCashierBill(tester);
-    await tester.tap(find.text('Reprint Bill'));
-    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await _beginFinalReceiptPrint(tester);
+    expect(printer.requestedSalesOrders, ['SO-0001']);
 
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     request.complete(_pendingResult());
     await tester.pump();
 
@@ -212,9 +205,17 @@ void main() {
 }
 
 
-Future<void> _expandCashierBill(WidgetTester tester) async {
-  await tester.tap(find.text('Table 1'));
+Future<void> _beginFinalReceiptPrint(WidgetTester tester) async {
+  await tester.tap(find.text('Pay'));
   await tester.pumpAndSettle();
+  expect(find.text('Confirm Payment'), findsOneWidget);
+
+  await tester.tap(find.text('Confirm Payment'));
+  await tester.pumpAndSettle();
+  expect(find.text('Yes, Print'), findsOneWidget);
+
+  await tester.tap(find.text('Yes, Print'));
+  await tester.pump();
 }
 
 Widget _cashierHarness(AndroidPrintGateway repository) {
@@ -225,8 +226,8 @@ Widget _cashierHarness(AndroidPrintGateway repository) {
           _bootstrap(cashier: true, canViewPrintStatus: true),
         ),
       ),
+      apiClientProvider.overrideWithValue(_FakeCashierPaymentApiClient()),
       androidPrintRepositoryProvider.overrideWithValue(repository),
-      cashierBillingProvider.overrideWith((ref) async => _billing()),
     ],
     child: const MaterialApp(home: CashierScreen()),
   );
@@ -329,6 +330,74 @@ CashierBill _bill() => CashierBill.fromJson({
   'items': const [],
   'taxes': const [],
 });
+
+class _FakeCashierPaymentApiClient extends ApiClient {
+  _FakeCashierPaymentApiClient()
+      : super(
+          sessionStorage: SessionStorage(
+            storage: const FlutterSecureStorage(),
+          ),
+          dio: Dio(),
+        );
+
+  @override
+  Future<dynamic> getMethod(
+    String method, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    if (method != 'bcn_cashier_billing') {
+      throw StateError('Unexpected GET method: $method');
+    }
+    return {
+      'bills': [
+        {
+          'sales_order': 'SO-0001',
+          'customer': 'Table 1',
+          'customer_name': 'Table 1',
+          'creation': '2026-09-08 10:00:00',
+          'net_total': 1000,
+          'total_taxes_and_charges': 0,
+          'grand_total': 1000,
+          'currency': 'MMK',
+          'restaurant_status': 'Billing',
+          'items': [],
+          'taxes': [],
+        },
+      ],
+      'modes': [
+        {'name': 'Cash', 'default': true},
+      ],
+    };
+  }
+
+  @override
+  Future<dynamic> postMethod(
+    String method, {
+    Map<String, dynamic>? data,
+  }) async {
+    if (method != 'bcn_cashier_billing') {
+      throw StateError('Unexpected POST method: $method');
+    }
+    if (data?['action'] == 'Pay') {
+      return {
+        'sales_order': 'SO-0001',
+        'sales_invoice': 'SI-0001',
+        'restaurant_status': 'Payment Pending',
+        'duplicate': false,
+      };
+    }
+    if (data?['action'] == 'ConfirmPayment') {
+      return {
+        'sales_order': 'SO-0001',
+        'sales_invoice': 'SI-0001',
+        'payment_entries': ['PAY-0001'],
+        'change_amount': 0,
+        'duplicate': false,
+      };
+    }
+    throw StateError('Unexpected cashier action: ${data?['action']}');
+  }
+}
 
 class _FakeAndroidPrintGateway implements AndroidPrintGateway {
   _FakeAndroidPrintGateway({
