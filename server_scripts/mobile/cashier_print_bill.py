@@ -77,7 +77,7 @@ if existing:
     frappe.response["message"] = {
         "sales_order": sales_order, "sales_invoice": invoice.name,
         "print_job": job.name, "request_id": request_id,
-        "status": job.status, "duplicate": True,
+        "status": job.status, "duplicate": True, "success": True,
     }
 else:
     rendered = frappe.call(
@@ -107,5 +107,5 @@ else:
     frappe.response["message"] = {
         "sales_order": sales_order, "sales_invoice": invoice.name,
         "print_job": job.name, "request_id": request_id,
-        "status": job.status, "duplicate": False,
+        "status": job.status, "duplicate": False, "success": True,
     }
