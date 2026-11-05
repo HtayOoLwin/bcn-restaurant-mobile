@@ -341,6 +341,8 @@ class _FakeCashierPaymentApiClient extends ApiClient {
           dio: Dio(),
         );
 
+  bool _paymentCompleted = false;
+
   @override
   Future<dynamic> getMethod(
     String method, {
@@ -350,7 +352,7 @@ class _FakeCashierPaymentApiClient extends ApiClient {
       throw StateError('Unexpected GET method: $method');
     }
     return {
-      'bills': [
+      'bills': _paymentCompleted ? <Map<String, dynamic>>[] : [
         {
           'sales_order': 'SO-0001',
           'customer': 'Table 1',
@@ -388,6 +390,7 @@ class _FakeCashierPaymentApiClient extends ApiClient {
       };
     }
     if (data?['action'] == 'ConfirmPayment') {
+      _paymentCompleted = true;
       return {
         'sales_order': 'SO-0001',
         'sales_invoice': 'SI-0001',
