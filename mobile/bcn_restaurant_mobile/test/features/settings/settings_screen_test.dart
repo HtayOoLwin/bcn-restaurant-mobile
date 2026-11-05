@@ -9,7 +9,7 @@ import 'package:bcn_restaurant_mobile/features/cashier/domain/cashier_models.dar
 import 'package:bcn_restaurant_mobile/features/cashier/presentation/cashier_screen.dart';
 import 'package:bcn_restaurant_mobile/features/notifications/domain/mobile_notification.dart';
 import 'package:bcn_restaurant_mobile/features/notifications/presentation/mobile_notification_watcher.dart';
-import 'package:bcn_restaurant_mobile/features/printing/data/windows_print_repository.dart';
+import 'package:bcn_restaurant_mobile/features/printing/data/android_print_repository.dart';
 import 'package:bcn_restaurant_mobile/features/printing/domain/cashier_bill_print_result.dart';
 import 'package:bcn_restaurant_mobile/features/printing/presentation/printer_settings_screen.dart';
 import 'package:bcn_restaurant_mobile/features/settings/presentation/settings_screen.dart';
@@ -74,7 +74,7 @@ void main() {
     'cashier sends one Sales Order print request while preventing double taps',
     (tester) async {
       final request = Completer<CashierBillPrintResult>();
-      final repository = _FakeWindowsPrintGateway(request: request.future);
+      final repository = _FakeAndroidPrintGateway(request: request.future);
 
       await tester.pumpWidget(_cashierHarness(repository));
       await tester.pumpAndSettle();
@@ -97,12 +97,12 @@ void main() {
       request.complete(_pendingResult());
       await tester.pumpAndSettle();
 
-      expect(find.text('Print job sent · PRINT-JOB-0001'), findsOneWidget);
+      expect(find.text('Android print job queued · PRINT-JOB-0001 (Pending)'), findsOneWidget);
     },
   );
 
   testWidgets('cashier keeps a print API error visible', (tester) async {
-    final repository = _FakeWindowsPrintGateway(
+    final repository = _FakeAndroidPrintGateway(
       requestError: const ApiException('No cashier printer configured.'),
     );
 
@@ -119,7 +119,7 @@ void main() {
     tester,
   ) async {
     final request = Completer<CashierBillPrintResult>();
-    final repository = _FakeWindowsPrintGateway(request: request.future);
+    final repository = _FakeAndroidPrintGateway(request: request.future);
 
     await tester.pumpWidget(_cashierHarness(repository));
     await tester.pumpAndSettle();
@@ -133,7 +133,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('printer screen describes the Windows polling client', (
+  testWidgets('printer screen describes the Android polling worker', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -171,7 +171,7 @@ void main() {
   testWidgets('manager with print permission reaches printer information', (
     tester,
   ) async {
-    final repository = _FakeWindowsPrintGateway();
+    final repository = _FakeAndroidPrintGateway();
     await tester.pumpWidget(
       _routerHarness(
         repository,
@@ -191,7 +191,7 @@ void main() {
   testWidgets('waiter without print permission is denied the printer route', (
     tester,
   ) async {
-    final repository = _FakeWindowsPrintGateway();
+    final repository = _FakeAndroidPrintGateway();
     await tester.pumpWidget(
       _routerHarness(repository, _bootstrap(waiter: true)),
     );
@@ -217,7 +217,7 @@ Future<void> _expandCashierBill(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Widget _cashierHarness(WindowsPrintGateway repository) {
+Widget _cashierHarness(AndroidPrintGateway repository) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(
@@ -225,7 +225,7 @@ Widget _cashierHarness(WindowsPrintGateway repository) {
           _bootstrap(cashier: true, canViewPrintStatus: true),
         ),
       ),
-      windowsPrintRepositoryProvider.overrideWithValue(repository),
+      androidPrintRepositoryProvider.overrideWithValue(repository),
       cashierBillingProvider.overrideWith((ref) async => _billing()),
     ],
     child: const MaterialApp(home: CashierScreen()),
@@ -242,14 +242,14 @@ Widget _printerHarness({required BootstrapModel bootstrap}) {
 }
 
 Widget _routerHarness(
-  WindowsPrintGateway repository,
+  AndroidPrintGateway repository,
   BootstrapModel bootstrap,
 ) {
   return ProviderScope(
     overrides: [
       authControllerProvider.overrideWith(() => _TestAuthController(bootstrap)),
       appVersionProvider.overrideWith((ref) async => 'v1.2.3'),
-      windowsPrintRepositoryProvider.overrideWithValue(repository),
+      androidPrintRepositoryProvider.overrideWithValue(repository),
       cashierBillingProvider.overrideWith((ref) async => _billing()),
       tablesProvider.overrideWith(
         (ref, serviceType) async => TablesResponse(
@@ -330,8 +330,8 @@ CashierBill _bill() => CashierBill.fromJson({
   'taxes': const [],
 });
 
-class _FakeWindowsPrintGateway implements WindowsPrintGateway {
-  _FakeWindowsPrintGateway({
+class _FakeAndroidPrintGateway implements AndroidPrintGateway {
+  _FakeAndroidPrintGateway({
     Future<CashierBillPrintResult>? request,
     this.requestError,
   }) : _request = request ?? Future.value(_pendingResult());
