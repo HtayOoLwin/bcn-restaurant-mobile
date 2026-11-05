@@ -1,3 +1,8 @@
+/// A definitive business rejection from the print API. No job was acknowledged.
+class CashierPrintServerException extends FormatException {
+  const CashierPrintServerException(super.message);
+}
+
 class CashierBillPrintResult {
   const CashierBillPrintResult({
     required this.salesOrder,
@@ -15,7 +20,7 @@ class CashierBillPrintResult {
       final step = json['step']?.toString().trim() ?? '';
       final error = json['error']?.toString().trim() ?? '';
       final details = error.isNotEmpty ? error : 'Cashier print request failed.';
-      throw FormatException(
+      throw CashierPrintServerException(
         step.isEmpty ? details : 'Cashier print failed at $step: $details',
       );
     }
