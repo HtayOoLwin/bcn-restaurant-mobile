@@ -41,6 +41,7 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
       final result = await ref.read(androidPrintRepositoryProvider).requestCashierBill(
         salesOrder: salesOrder,
         requestId: requestId,
+        printSource: 'daily_report',
       );
       if (!mounted) return;
       if (result.status.trim().toLowerCase() == 'failed') {
