@@ -106,7 +106,13 @@ void main() {
 
     expect(find.text('Cashier print failed'), findsOneWidget);
     expect(find.textContaining('No cashier printer configured.'), findsOneWidget);
-    expect(find.text('Retry Print'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Retry Print'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('cashier print completion after disposal does not touch dead state', (
