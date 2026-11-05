@@ -12,6 +12,7 @@ import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../printing/data/android_print_repository.dart';
+import '../../printing/domain/cashier_bill_print_result.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
@@ -46,6 +47,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   String _searchQuery = '';
   final Set<String> _pendingPrintSalesOrders = {};
   final Map<String, String> _retryPrintRequestIds = {};
+  final Set<String> _receiptsPendingPrint = {};
   Timer? _autoRefreshTimer;
 
   @override
@@ -125,6 +127,20 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       ),
       body: Column(
         children: [
+          if (_receiptsPendingPrint.isNotEmpty)
+            ..._receiptsPendingPrint.map(
+              (order) => ListTile(
+                leading: const Icon(Icons.receipt_long),
+                title: Text('Receipt not queued: $order'),
+                subtitle: const Text('Payment is complete. Retry printing only.'),
+                trailing: TextButton(
+                  onPressed: _pendingPrintSalesOrders.contains(order)
+                      ? null
+                      : () => _printBill(context: context, salesOrder: order),
+                  child: const Text('Retry Print'),
+                ),
+              ),
+            ),
           OperationalRefreshIndicator(
             onRefresh: () => ref.invalidate(cashierBillingProvider),
           ),
@@ -206,44 +222,82 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required BuildContext context,
     required String salesOrder,
   }) async {
-    if (_pendingPrintSalesOrders.contains(salesOrder)) return;
-
-    final requestId =
-        _retryPrintRequestIds[salesOrder] ??
-        ref.read(cashierPrintRequestIdFactoryProvider)();
-
+    if (!mounted || _pendingPrintSalesOrders.contains(salesOrder)) return;
     setState(() => _pendingPrintSalesOrders.add(salesOrder));
+
     try {
-      final result = await ref
-          .read(androidPrintRepositoryProvider)
-          .requestCashierBill(
-            salesOrder: salesOrder,
-            requestId: requestId,
-          );
-      if (!mounted || !context.mounted) return;
-      setState(() => _retryPrintRequestIds.remove(salesOrder));
-      ref.invalidate(cashierBillingProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Android print job queued · ${result.printJob} (${result.status})')),
-      );
-    } catch (error) {
-      if (mounted) {
-        setState(() => _retryPrintRequestIds[salesOrder] = requestId);
-      }
-      if (mounted && context.mounted) {
-        await showDialog<void>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Cashier print failed'),
-            content: SelectableText(error.toString()),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('OK'),
+      while (mounted && context.mounted) {
+        final requestId = _retryPrintRequestIds[salesOrder] ??
+            ref.read(cashierPrintRequestIdFactoryProvider)();
+        try {
+          final result = await ref
+              .read(androidPrintRepositoryProvider)
+              .requestCashierBill(
+                salesOrder: salesOrder,
+                requestId: requestId,
+              );
+          if (!mounted || !context.mounted) return;
+
+          // A duplicate acknowledgement does not create another print job.
+          // Never report a previously failed job as newly queued.
+          if (result.status.trim().toLowerCase() == 'failed') {
+            throw StateError(
+              'Existing print job ${result.printJob} failed. '
+              'Check Android Printer Worker before trying a new request.',
+            );
+          }
+          setState(() {
+            _retryPrintRequestIds.remove(salesOrder);
+            _receiptsPendingPrint.remove(salesOrder);
+          });
+          ref.invalidate(cashierBillingProvider);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                result.duplicate
+                    ? 'Existing print job · ${result.printJob} (${result.status})'
+                    : 'Android print job queued · ${result.printJob} (${result.status})',
               ),
-            ],
-          ),
-        );
+            ),
+          );
+          return;
+        } catch (error) {
+          if (!mounted || !context.mounted) return;
+          setState(() {
+            _receiptsPendingPrint.add(salesOrder);
+            if (error is CashierPrintServerException) {
+              // The server definitively rejected the call; a fresh
+              // explicit retry can use a new request ID.
+              _retryPrintRequestIds.remove(salesOrder);
+            } else {
+              // A timeout / malformed response may hide a committed job.
+              // Reuse the ID until the server acknowledges the outcome.
+              _retryPrintRequestIds[salesOrder] = requestId;
+            }
+          });
+
+          final retry = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('Cashier print failed'),
+              content: SelectableText(
+                'Sales Order: $salesOrder\n\n$error\n\n'
+                'Payment is already completed. Do not pay again.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Later'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Retry Print'),
+                ),
+              ],
+            ),
+          );
+          if (retry != true || !mounted || !context.mounted) return;
+        }
       }
     } finally {
       if (mounted) {
