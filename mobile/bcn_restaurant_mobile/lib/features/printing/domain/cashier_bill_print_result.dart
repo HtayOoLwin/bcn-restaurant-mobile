@@ -9,6 +9,16 @@ class CashierBillPrintResult {
   });
 
   factory CashierBillPrintResult.fromJson(Map<String, dynamic> json) {
+    // Frappe Server Scripts may return HTTP 200 for a failed print request.
+    // Surface their actual step/error instead of a missing print_job error.
+    if (json['success'] == false || json['success'] == 0) {
+      final step = json['step']?.toString().trim() ?? '';
+      final error = json['error']?.toString().trim() ?? '';
+      final details = error.isNotEmpty ? error : 'Cashier print request failed.';
+      throw FormatException(
+        step.isEmpty ? details : 'Cashier print failed at $step: $details',
+      );
+    }
     final salesOrder = json['sales_order']?.toString().trim() ?? '';
     final requestId = json['request_id']?.toString().trim() ?? '';
     final printJob = json['print_job']?.toString().trim() ?? '';
