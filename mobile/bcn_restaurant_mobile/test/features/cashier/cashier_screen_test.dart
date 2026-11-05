@@ -16,41 +16,33 @@ const _disabledBackground = Color(0xFFE2E8F0);
 const _disabledForeground = Color(0xFF94A3B8);
 
 void main() {
-  group('CashierScreen request-safe draft Sales Order flow', () {
-    testWidgets(
-      'Billing bill starts collapsed with actions visible and header expands details',
-      (tester) async {
-        final api = _FakeApiClient(
-          billingResponse: _billingResponse(restaurantStatus: 'Billing'),
-        );
-        final printer = _FakePrintGateway();
+  group('CashierScreen payment and Android receipt printing', () {
+    testWidgets('Billing order shows Pay and Credit before and after expansion',
+        (tester) async {
+      final api = _FakeApiClient(
+        billingResponse: _billingResponse(restaurantStatus: 'Billing'),
+      );
+      final printer = _FakePrintGateway();
+      await _pumpCashier(tester,
+          api: api, printer: printer, requestIds: ['REQ-A']);
 
-        await _pumpCashier(
-          tester,
-          api: api,
-          printer: printer,
-          requestIds: ['REQ-A'],
-        );
+      expect(find.text('Table 01'), findsOneWidget);
+      expect(find.text('SAL-ORD-2026-00005'), findsOneWidget);
+      expect(find.byIcon(Icons.expand_more), findsOneWidget);
+      expect(find.text('Grand Total'), findsNothing);
+      expect(find.text('Pay'), findsOneWidget);
+      expect(find.text('Credit'), findsOneWidget);
+      expect(find.text('Reprint Bill'), findsNothing);
 
-        expect(find.text('Table 01'), findsOneWidget);
-        expect(find.text('SAL-ORD-2026-00005'), findsOneWidget);
-        expect(find.byIcon(Icons.expand_more), findsOneWidget);
-        expect(find.text('Grand Total'), findsNothing);
-        expect(find.text('Reprint Bill'), findsOneWidget);
-        expect(find.text('Payment'), findsOneWidget);
+      await _expandBill(tester);
+      expect(find.byIcon(Icons.expand_less), findsOneWidget);
+      expect(find.text('Grand Total'), findsOneWidget);
+      expect(find.text('Pay'), findsOneWidget);
+      expect(find.text('Credit'), findsOneWidget);
+    });
 
-        await _expandBill(tester);
-
-        expect(find.byIcon(Icons.expand_less), findsOneWidget);
-        expect(find.text('Grand Total'), findsOneWidget);
-        expect(find.text('Reprint Bill'), findsOneWidget);
-        expect(find.text('Payment'), findsOneWidget);
-      },
-    );
-
-    testWidgets('Billing bill uses green card and colored action buttons', (
-      tester,
-    ) async {
+    testWidgets('Billing order uses green card and active Pay and Credit',
+        (tester) async {
       final api = _FakeApiClient(
         billingResponse: _billingResponse(
           restaurantStatus: 'Billing',
@@ -58,77 +50,43 @@ void main() {
           lastPrintJob: 'PRINT-JOB-X',
         ),
       );
-      final printer = _FakePrintGateway();
-
-      await _pumpCashier(
-        tester,
-        api: api,
-        printer: printer,
-        requestIds: ['REQ-A'],
-      );
-
+      await _pumpCashier(tester,
+          api: api, printer: _FakePrintGateway(), requestIds: ['REQ-A']);
       final card = tester.widget<Card>(
-        find.ancestor(of: find.text('Table 01'), matching: find.byType(Card)).first,
+        find.ancestor(
+            of: find.text('Table 01'), matching: find.byType(Card)).first,
       );
       expect(card.color, _billingCardColor);
-
-      final reprint = _filledButton(tester, 'Reprint Bill');
-      final payment = _filledButton(tester, 'Payment');
-      expect(reprint.onPressed, isNotNull);
-      expect(payment.onPressed, isNotNull);
-      expect(reprint.style?.backgroundColor?.resolve({}), _reprintBlue);
-      expect(payment.style?.backgroundColor?.resolve({}), _paymentGreen);
+      final pay = _filledButton(tester, 'Pay');
+      final credit = _filledButton(tester, 'Credit');
+      expect(pay.onPressed, isNotNull);
+      expect(credit.onPressed, isNotNull);
+      expect(pay.style?.backgroundColor?.resolve({}), _paymentGreen);
+      expect(credit.style?.backgroundColor?.resolve({}),
+          const Color(0xFFC62828));
     });
 
-    testWidgets('Open bill stays white with faded disabled action buttons', (
-      tester,
-    ) async {
+    testWidgets('Open order permits checkout with Pay and Credit',
+        (tester) async {
       final api = _FakeApiClient(
         billingResponse: _billingResponse(restaurantStatus: 'Open'),
       );
-      final printer = _FakePrintGateway();
-
-      await _pumpCashier(
-        tester,
-        api: api,
-        printer: printer,
-        requestIds: ['REQ-A'],
-      );
-
+      await _pumpCashier(tester,
+          api: api, printer: _FakePrintGateway(), requestIds: ['REQ-A']);
       final card = tester.widget<Card>(
-        find.ancestor(of: find.text('Table 01'), matching: find.byType(Card)).first,
+        find.ancestor(
+            of: find.text('Table 01'), matching: find.byType(Card)).first,
       );
-      expect(card.color, _openCardColor);
-      expect(find.text('Reprint Bill'), findsNothing);
-      expect(find.text('Payment'), findsNothing);
-
+      expect(card.color, _billingCardColor);
+      expect(_filledButton(tester, 'Pay').onPressed, isNotNull);
+      expect(_filledButton(tester, 'Credit').onPressed, isNotNull);
       await _expandBill(tester);
-
-      final reprint = _filledButton(tester, 'Reprint Bill');
-      final payment = _filledButton(tester, 'Payment');
-      expect(reprint.onPressed, isNull);
-      expect(payment.onPressed, isNull);
-      expect(
-        reprint.style?.backgroundColor?.resolve({WidgetState.disabled}),
-        _disabledBackground,
-      );
-      expect(
-        reprint.style?.foregroundColor?.resolve({WidgetState.disabled}),
-        _disabledForeground,
-      );
-      expect(
-        payment.style?.backgroundColor?.resolve({WidgetState.disabled}),
-        _disabledBackground,
-      );
-      expect(
-        payment.style?.foregroundColor?.resolve({WidgetState.disabled}),
-        _disabledForeground,
-      );
+      expect(_filledButton(tester, 'Pay').onPressed, isNotNull);
+      expect(_filledButton(tester, 'Credit').onPressed, isNotNull);
     });
 
-    testWidgets('Billing failed bill shows Reprint, status, and Payment', (
-      tester,
-    ) async {
+    testWidgets('Failed prior print does not auto-queue another receipt',
+        (tester) async {
       final api = _FakeApiClient(
         billingResponse: _billingResponse(
           restaurantStatus: 'Billing',
@@ -137,130 +95,73 @@ void main() {
         ),
       );
       final printer = _FakePrintGateway();
-
-      await _pumpCashier(
-        tester,
-        api: api,
-        printer: printer,
-        requestIds: ['REQ-A'],
-      );
+      await _pumpCashier(tester,
+          api: api, printer: printer, requestIds: ['REQ-A']);
       await _expandBill(tester);
-
-      expect(find.text('Reprint Bill'), findsOneWidget);
-      expect(find.text('Last Print: Failed'), findsOneWidget);
-      expect(find.text('Payment'), findsOneWidget);
-    });
-
-    testWidgets('Failed print state never auto-reprints', (tester) async {
-      final api = _FakeApiClient(
-        billingResponse: _billingResponse(
-          restaurantStatus: 'Billing',
-          lastPrintStatus: 'Failed',
-          lastPrintJob: 'PRINT-JOB-X',
-        ),
-      );
-      final printer = _FakePrintGateway();
-
-      await _pumpCashier(
-        tester,
-        api: api,
-        printer: printer,
-        requestIds: ['REQ-A'],
-      );
-
+      expect(find.text('Pay'), findsOneWidget);
+      expect(find.text('Credit'), findsOneWidget);
       expect(printer.calls, isEmpty);
     });
 
-    testWidgets(
-      'transport retry reuses request id and later intentional reprint gets a new id',
-      (tester) async {
-        final api = _FakeApiClient(
-          billingResponse: _billingResponse(
-            restaurantStatus: 'Billing',
-            lastPrintStatus: 'Failed',
-            lastPrintJob: 'PRINT-JOB-X',
-          ),
-        );
-        final printer = _FakePrintGateway(failuresRemaining: 1);
+    testWidgets('Transport retry reuses request id without repeating payment',
+        (tester) async {
+      final api = _FakeApiClient(
+        billingResponse: _billingResponse(restaurantStatus: 'Billing'),
+        removeBillAfterPayment: true,
+      );
+      final printer = _FakePrintGateway(failuresRemaining: 1);
+      await _pumpCashier(tester,
+          api: api, printer: printer, requestIds: ['REQ-A', 'REQ-B']);
 
-        await _pumpCashier(
-          tester,
-          api: api,
-          printer: printer,
-          requestIds: ['REQ-A', 'REQ-B'],
-        );
-        await _expandBill(tester);
+      await _completePaymentAndChoosePrint(tester);
+      expect(printer.calls, hasLength(1));
+      expect(printer.calls[0].requestId, 'REQ-A');
+      expect(find.text('Cashier print failed'), findsOneWidget);
 
-        await tester.tap(find.text('Reprint Bill'));
-        await tester.pumpAndSettle();
-        expect(printer.calls, hasLength(1));
-        expect(printer.calls[0].requestId, 'REQ-A');
-        expect(find.text('Cashier print failed'), findsOneWidget);
-        await tester.tap(find.text('OK'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Retry Print'));
+      await tester.pumpAndSettle();
+      expect(printer.calls, hasLength(2));
+      expect(printer.calls[1].requestId, 'REQ-A');
+      expect(api.paymentActions, ['Pay', 'ConfirmPayment']);
+    });
 
-        await tester.tap(find.text('Reprint Bill'));
-        await tester.pumpAndSettle();
-        expect(printer.calls, hasLength(2));
-        expect(printer.calls[1].requestId, 'REQ-A');
-
-        await tester.tap(find.text('Reprint Bill'));
-        await tester.pumpAndSettle();
-        expect(printer.calls, hasLength(3));
-        expect(printer.calls[2].requestId, 'REQ-B');
-      },
-    );
-
-    testWidgets('payment success offers manual finalized Sales Order reprint', (
-      tester,
-    ) async {
+    testWidgets('Successful payment prints even after bill leaves active list',
+        (tester) async {
       final api = _FakeApiClient(
         billingResponse: _billingResponse(
           restaurantStatus: 'Billing',
           lastPrintStatus: 'Printed',
           lastPrintJob: 'PRINT-JOB-X',
         ),
-        paymentResponse: const {
-          'sales_order': 'SAL-ORD-2026-00005',
-          'sales_invoice': 'ACC-SINV-2026-00001',
-          'payment_entries': ['ACC-PAY-2026-00001'],
-          'change_amount': 0,
-          'duplicate': false,
-        },
         removeBillAfterPayment: true,
       );
       final printer = _FakePrintGateway();
+      await _pumpCashier(tester,
+          api: api, printer: printer, requestIds: ['REQ-POST-PAY']);
 
-      await _pumpCashier(
-        tester,
-        api: api,
-        printer: printer,
-        requestIds: ['REQ-POST-PAY'],
-      );
-      await _expandBill(tester);
-
-      await tester.tap(find.text('Payment'));
+      await _completePaymentAndChoosePrint(tester);
       await tester.pumpAndSettle();
-      expect(find.text('Confirm Payment'), findsOneWidget);
-
-      await tester.tap(find.text('Confirm Payment'));
-      await tester.pumpAndSettle();
-
       expect(api.paymentSalesOrders, [
         'SAL-ORD-2026-00005',
         'SAL-ORD-2026-00005',
       ]);
       expect(api.paymentActions, ['Pay', 'ConfirmPayment']);
-      expect(find.text('Reprint Bill'), findsOneWidget);
-
-      await tester.tap(find.text('Reprint Bill'));
-      await tester.pumpAndSettle();
-
       expect(printer.calls, hasLength(1));
       expect(printer.calls.single.salesOrder, 'SAL-ORD-2026-00005');
       expect(printer.calls.single.requestId, 'REQ-POST-PAY');
     });
   });
+}
+
+Future<void> _completePaymentAndChoosePrint(WidgetTester tester) async {
+  await tester.tap(find.text('Pay'));
+  await tester.pumpAndSettle();
+  expect(find.text('Confirm Payment'), findsOneWidget);
+  await tester.tap(find.text('Confirm Payment'));
+  await tester.pumpAndSettle();
+  expect(find.text('Yes, Print'), findsOneWidget);
+  await tester.tap(find.text('Yes, Print'));
+  await tester.pumpAndSettle();
 }
 
 FilledButton _filledButton(WidgetTester tester, String label) {
