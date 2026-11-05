@@ -17,10 +17,13 @@ if not (user == "Administrator" or "System Manager" in role_names or "Cashier" i
 
 sales_order = (frappe.form_dict.get("sales_order") or "").strip()
 request_id = (frappe.form_dict.get("request_id") or "").strip()
+print_source = (frappe.form_dict.get("print_source") or "cashier").strip()
 if not sales_order or not request_id:
     frappe.throw("sales_order and request_id are required")
 if len(request_id) > 140 or request_id.startswith("bill-request|"):
     frappe.throw("Invalid request_id")
+if print_source not in ("cashier", "daily_report"):
+    frappe.throw("Invalid print_source")
 
 locked = frappe.db.sql(
     "SELECT name FROM `tabSales Order` WHERE name=%(name)s FOR UPDATE",
@@ -78,6 +81,7 @@ if existing:
         "sales_order": sales_order, "sales_invoice": invoice.name,
         "print_job": job.name, "request_id": request_id,
         "status": job.status, "duplicate": True, "success": True,
+        "print_source": print_source,
     }
 else:
     rendered = frappe.call(
@@ -87,9 +91,20 @@ else:
     )
     if not (rendered.get("html") or "").strip():
         frappe.throw("Receipt HTML is empty")
+    receipt_body = rendered.get("html") or ""
+    if print_source == "daily_report":
+        # Add a visible marker to the queued HTML only.
+        # Do not modify the submitted invoice or its Print Format.
+        reprint_banner = (
+            "<div style='text-align:center;font-weight:800;font-size:20px;"
+            "padding:8px 0;margin:6px 0 10px;"
+            "border-top:1px dashed #000;border-bottom:1px dashed #000;'>"
+            "REPRINT</div>"
+        )
+        receipt_body = reprint_banner + receipt_body
     html = "<!doctype html><html><head><meta charset='utf-8'><style>" + (
         rendered.get("style") or ""
-    ) + "</style></head><body>" + rendered.get("html") + "</body></html>"
+    ) + "</style></head><body>" + receipt_body + "</body></html>"
     job = frappe.new_doc("BCN Print Job")
     job.request_id = request_id
     job.document_type = "Sales Invoice"
@@ -108,4 +123,5 @@ else:
         "sales_order": sales_order, "sales_invoice": invoice.name,
         "print_job": job.name, "request_id": request_id,
         "status": job.status, "duplicate": False, "success": True,
+        "print_source": print_source,
     }
