@@ -53,7 +53,7 @@ void main() {
     expect(source, contains('if (_expanded) ...['));
   });
 
-  test('collapsed header shows table name sales order and bill action', () {
+  test('collapsed header shows table name and sales order', () {
     final cardStart = source.indexOf('class _ProgressCard');
     final headerStart = source.indexOf('Row(', cardStart);
     final expandedStart = source.indexOf('if (_expanded) ...[', headerStart);
@@ -61,7 +61,6 @@ void main() {
 
     expect(header, contains('widget.order.customer'));
     expect(header, contains('widget.order.name'));
-    expect(header, contains('Request for Bill'));
     expect(header, isNot(contains('widget.order.items')));
   });
 
@@ -79,20 +78,15 @@ void main() {
     expect(itemList, greaterThan(expandedStart));
   });
 
-  test('expanded item rows mirror cashier quantity x item style without money totals', () {
+  test('expanded item rows show quantity, item and totals', () {
     final expandedStart = source.indexOf('if (_expanded) ...[');
     final cardEnd = source.indexOf('\nextension on double', expandedStart);
     final expandedContent = source.substring(expandedStart, cardEnd);
 
-    expect(
-      expandedContent,
-      contains("'\${item.qty.g} × \${item.itemName}'"),
-    );
-    expect(expandedContent, isNot(contains('item.uom')));
-    expect(expandedContent, isNot(contains('item.kitchenCounter')));
-    expect(expandedContent, isNot(contains('item.kitchenNote')));
-    expect(expandedContent, isNot(contains('formatMoney(')));
-    expect(expandedContent, isNot(contains("'Subtotal'")));
-    expect(expandedContent, isNot(contains("'Grand Total'")));
+    expect(expandedContent, contains("'\${item.qty.g} ×'"));
+    expect(expandedContent, contains('Text(item.itemName)'));
+    expect(expandedContent, contains('formatMoney(item.amount, widget.order.currency)'));
+    expect(expandedContent, contains("'Subtotal'"));
+    expect(expandedContent, contains("'Grand Total'"));
   });
 }
