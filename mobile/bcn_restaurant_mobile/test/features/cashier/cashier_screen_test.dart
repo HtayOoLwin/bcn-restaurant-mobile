@@ -2,7 +2,7 @@ import 'package:bcn_restaurant_mobile/core/network/api_client.dart';
 import 'package:bcn_restaurant_mobile/core/storage/session_storage.dart';
 import 'package:bcn_restaurant_mobile/features/auth/presentation/auth_controller.dart';
 import 'package:bcn_restaurant_mobile/features/cashier/presentation/cashier_screen.dart';
-import 'package:bcn_restaurant_mobile/features/printing/data/windows_print_repository.dart';
+import 'package:bcn_restaurant_mobile/features/printing/data/android_print_repository.dart';
 import 'package:bcn_restaurant_mobile/features/printing/domain/cashier_bill_print_result.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -195,6 +195,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(printer.calls, hasLength(1));
         expect(printer.calls[0].requestId, 'REQ-A');
+        expect(find.text('Cashier print failed'), findsOneWidget);
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
 
         await tester.tap(find.text('Reprint Bill'));
         await tester.pumpAndSettle();
@@ -282,7 +285,7 @@ Future<void> _pumpCashier(
     ProviderScope(
       overrides: [
         apiClientProvider.overrideWithValue(api),
-        windowsPrintRepositoryProvider.overrideWithValue(printer),
+        androidPrintRepositoryProvider.overrideWithValue(printer),
         cashierPrintRequestIdFactoryProvider.overrideWithValue(
           () => requestIds[requestIndex++],
         ),
@@ -322,7 +325,7 @@ Map<String, dynamic> _billingResponse({
   };
 }
 
-class _FakePrintGateway implements WindowsPrintGateway {
+class _FakePrintGateway implements AndroidPrintGateway {
   _FakePrintGateway({this.failuresRemaining = 0});
 
   int failuresRemaining;
