@@ -105,7 +105,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Cashier print failed'), findsOneWidget);
-    expect(find.text('No cashier printer configured.'), findsOneWidget);
+    expect(find.textContaining('No cashier printer configured.'), findsOneWidget);
+    expect(find.text('Retry Print'), findsOneWidget);
   });
 
   testWidgets('cashier print completion after disposal does not touch dead state', (
