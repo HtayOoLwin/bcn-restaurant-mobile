@@ -424,6 +424,7 @@ class _FakeAndroidPrintGateway implements AndroidPrintGateway {
   Future<CashierBillPrintResult> requestCashierBill({
     required String salesOrder,
     required String requestId,
+    String printSource = 'cashier',
   }) {
     requestedSalesOrders.add(salesOrder);
     requestIds.add(requestId);
