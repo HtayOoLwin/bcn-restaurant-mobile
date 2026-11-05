@@ -195,13 +195,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                               bill: bill,
 
                               onPayment: () => _prepareAndOpenPayment(
-                                context: context,
+                                context: this.context,
                                 billing: data,
                                 bill: bill,
                                 creditFlow: false,
                               ),
                               onCredit: () => _prepareAndOpenPayment(
-                                context: context,
+                                context: this.context,
                                 billing: data,
                                 bill: bill,
                                 creditFlow: true,
