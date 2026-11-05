@@ -1,20 +1,96 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../printing/data/android_print_repository.dart';
+import '../../printing/domain/cashier_bill_print_result.dart';
 
 import '../../../core/formatters/amount_format.dart';
 import '../data/cashier_repository.dart';
 
-class CashierDailyReportScreen extends StatefulWidget {
+class CashierDailyReportScreen extends ConsumerStatefulWidget {
   const CashierDailyReportScreen({super.key, required this.repository});
 
   final CashierRepository repository;
 
   @override
-  State<CashierDailyReportScreen> createState() => _CashierDailyReportScreenState();
+  ConsumerState<CashierDailyReportScreen> createState() => _CashierDailyReportScreenState();
 }
 
-class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
+class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScreen> {
   DateTime _selectedDate = DateTime.now();
   late Future<Map<String, dynamic>> _report;
+  final Set<String> _printingInvoices = {};
+  final Map<String, String> _unconfirmedRequestIds = {};
+
+  String _newPrintRequestId() {
+    final nonce = Random.secure().nextInt(0x7fffffff).toRadixString(16);
+    return 'daily-reprint-${DateTime.now().microsecondsSinceEpoch}-$nonce';
+  }
+
+  Future<void> _reprintReceipt({
+    required String invoiceName,
+    required String salesOrder,
+  }) async {
+    if (!mounted || _printingInvoices.contains(invoiceName)) return;
+    setState(() => _printingInvoices.add(invoiceName));
+    final requestId = _unconfirmedRequestIds[invoiceName] ?? _newPrintRequestId();
+
+    try {
+      final result = await ref.read(androidPrintRepositoryProvider).requestCashierBill(
+        salesOrder: salesOrder,
+        requestId: requestId,
+      );
+      if (!mounted) return;
+      if (result.status.trim().toLowerCase() == 'failed') {
+        _unconfirmedRequestIds.remove(invoiceName);
+        throw StateError(
+          'Print Job ${result.printJob} is Failed. Check the Android '
+          'Printer Worker and use Reprint Receipt to create a new job.',
+        );
+      }
+      setState(() => _unconfirmedRequestIds.remove(invoiceName));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.duplicate
+                ? 'Existing print job: ${result.printJob} (${result.status})'
+                : 'Receipt print job queued: ${result.printJob} (${result.status})',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      // Preserve the request ID after an ambiguous transport failure.
+      // The retry will discover an already-created job instead of
+      // generating a duplicate physical receipt.
+      if (error is CashierPrintServerException) {
+        _unconfirmedRequestIds.remove(invoiceName);
+      } else {
+        _unconfirmedRequestIds.putIfAbsent(invoiceName, () => requestId);
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Receipt reprint failed'),
+          content: SelectableText(
+            'Sales Invoice: $invoiceName\n'
+            'Sales Order: $salesOrder\n\n$error\n\n'
+            'Payment has not been repeated. Check the printer before retrying.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _printingInvoices.remove(invoiceName));
+    }
+  }
 
   String _dateText(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -231,6 +307,47 @@ class _CashierDailyReportScreenState extends State<CashierDailyReportScreen> {
                                         (method['amount'] as num?) ?? 0, currency),
                                 if (due > 0.01)
                                   _line('Outstanding', due, currency),
+                                const SizedBox(height: 10),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Builder(
+                                    builder: (context) {
+                                      final invoiceName =
+                                          raw['name']?.toString().trim() ?? '';
+                                      final salesOrder =
+                                          raw['sales_order']?.toString().trim() ?? '';
+                                      final busy = _printingInvoices.contains(invoiceName);
+                                      return FilledButton.icon(
+                                        onPressed: invoiceName.isEmpty ||
+                                                salesOrder.isEmpty ||
+                                                busy
+                                            ? null
+                                            : () => _reprintReceipt(
+                                                  invoiceName: invoiceName,
+                                                  salesOrder: salesOrder,
+                                                ),
+                                        icon: busy
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                            : const Icon(Icons.print),
+                                        label: Text(busy ? 'Sending…' : 'Reprint Receipt'),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                if ((raw['sales_order']?.toString().trim() ?? '').isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 6),
+                                    child: Text(
+                                      'Linked Sales Order is unavailable. Reprint disabled.',
+                                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                                    ),
+                                  ),
                               ],
                             ),
                           );
