@@ -11,7 +11,7 @@ import '../../../core/search/order_search.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
-import '../../printing/data/windows_print_repository.dart';
+import '../../printing/data/android_print_repository.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
@@ -215,7 +215,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     setState(() => _pendingPrintSalesOrders.add(salesOrder));
     try {
       final result = await ref
-          .read(windowsPrintRepositoryProvider)
+          .read(androidPrintRepositoryProvider)
           .requestCashierBill(
             salesOrder: salesOrder,
             requestId: requestId,
@@ -224,16 +224,26 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       setState(() => _retryPrintRequestIds.remove(salesOrder));
       ref.invalidate(cashierBillingProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print job sent · ${result.printJob}')),
+        SnackBar(content: Text('Android print job queued · ${result.printJob} (${result.status})')),
       );
     } catch (error) {
       if (mounted) {
         setState(() => _retryPrintRequestIds[salesOrder] = requestId);
       }
       if (mounted && context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Cashier print failed'),
+            content: SelectableText(error.toString()),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
     } finally {
       if (mounted) {
