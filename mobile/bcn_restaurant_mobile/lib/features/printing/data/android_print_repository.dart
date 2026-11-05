@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
@@ -32,6 +33,9 @@ class AndroidPrintRepository implements AndroidPrintGateway {
     if (id.isEmpty) {
       throw const FormatException('Print request ID is required.');
     }
+    if (kDebugMode) {
+      debugPrint('CASHIER_PRINT request sales_order=$order request_id=$id');
+    }
     final data = await _apiClient.postMethod(
       _requestCashierBillMethod,
       data: {'sales_order': order, 'request_id': id},
@@ -39,7 +43,14 @@ class AndroidPrintRepository implements AndroidPrintGateway {
     if (data is! Map) {
       throw const FormatException('Print API returned an invalid response.');
     }
-    return CashierBillPrintResult.fromJson(Map<String, dynamic>.from(data));
+    final response = Map<String, dynamic>.from(data);
+    if (kDebugMode) {
+      debugPrint('CASHIER_PRINT response success=${response['success']} '
+          'duplicate=${response['duplicate']} job=${response['print_job']} '
+          'status=${response['status']} step=${response['step']} '
+          'error=${response['error']}');
+    }
+    return CashierBillPrintResult.fromJson(response);
   }
 }
 
