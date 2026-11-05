@@ -9,11 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _billingCardColor = Color(0xFFE9F8EF);
-const _openCardColor = Colors.white;
-const _reprintBlue = Color(0xFF0D47A1);
 const _paymentGreen = Color(0xFF0B6B3A);
-const _disabledBackground = Color(0xFFE2E8F0);
-const _disabledForeground = Color(0xFF94A3B8);
 
 void main() {
   group('CashierScreen payment and Android receipt printing', () {
@@ -256,18 +252,10 @@ class _FakePrintGateway implements AndroidPrintGateway {
 class _FakeApiClient extends ApiClient {
   _FakeApiClient({
     required this.billingResponse,
-    this.paymentResponse = const {
-      'sales_order': 'SAL-ORD-2026-00005',
-      'sales_invoice': 'ACC-SINV-2026-00001',
-      'payment_entries': ['ACC-PAY-2026-00001'],
-      'change_amount': 0,
-      'duplicate': false,
-    },
     this.removeBillAfterPayment = false,
   }) : super(sessionStorage: _MemorySessionStorage());
 
   Map<String, dynamic> billingResponse;
-  final Map<String, dynamic> paymentResponse;
   final bool removeBillAfterPayment;
   final List<String> paymentSalesOrders = [];
   final List<String> paymentActions = [];
@@ -321,7 +309,13 @@ class _FakeApiClient extends ApiClient {
         'modes': billingResponse['modes'] ?? const [],
       };
     }
-    return paymentResponse;
+    return {
+      'sales_order': 'SAL-ORD-2026-00005',
+      'sales_invoice': 'ACC-SINV-2026-00001',
+      'payment_entries': ['ACC-PAY-2026-00001'],
+      'change_amount': 0,
+      'duplicate': false,
+    };
   }
 }
 
