@@ -25,9 +25,28 @@ void main() {
     expect(api.payload, {
       'sales_order': 'SAL-ORD-2026-00216',
       'request_id': 'REQ-ANDROID-1',
+      'print_source': 'cashier',
     });
     expect(result.printJob, 'PRINT-JOB-1');
     expect(result.status, 'Pending');
+  });
+
+  test('Daily Sales reprint sends daily_report source', () async {
+    final api = _FakeApiClient({
+      'success': true,
+      'sales_order': 'SAL-ORD-2026-00216',
+      'request_id': 'REQ-DAILY-1',
+      'print_job': 'PRINT-JOB-2',
+      'status': 'Pending',
+      'duplicate': false,
+    });
+    final result = await AndroidPrintRepository(api).requestCashierBill(
+      salesOrder: 'SAL-ORD-2026-00216',
+      requestId: 'REQ-DAILY-1',
+      printSource: 'daily_report',
+    );
+    expect(api.payload?['print_source'], 'daily_report');
+    expect(result.printJob, 'PRINT-JOB-2');
   });
 
   test('HTTP 200 with success false exposes Frappe step and error', () async {
