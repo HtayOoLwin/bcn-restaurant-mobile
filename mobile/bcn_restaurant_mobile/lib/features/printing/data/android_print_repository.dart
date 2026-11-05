@@ -11,6 +11,7 @@ abstract interface class AndroidPrintGateway {
   Future<CashierBillPrintResult> requestCashierBill({
     required String salesOrder,
     required String requestId,
+    String printSource = 'cashier',
   });
 }
 
@@ -24,21 +25,26 @@ class AndroidPrintRepository implements AndroidPrintGateway {
   Future<CashierBillPrintResult> requestCashierBill({
     required String salesOrder,
     required String requestId,
+    String printSource = 'cashier',
   }) async {
     final order = salesOrder.trim();
     final id = requestId.trim();
+    final source = printSource.trim();
     if (order.isEmpty) {
       throw const FormatException('Sales Order is required for cashier print.');
     }
     if (id.isEmpty) {
       throw const FormatException('Print request ID is required.');
     }
+    if (source != 'cashier' && source != 'daily_report') {
+      throw const FormatException('Invalid cashier print source.');
+    }
     if (kDebugMode) {
       debugPrint('CASHIER_PRINT request sales_order=$order request_id=$id');
     }
     final data = await _apiClient.postMethod(
       _requestCashierBillMethod,
-      data: {'sales_order': order, 'request_id': id},
+      data: {'sales_order': order, 'request_id': id, 'print_source': source},
     );
     if (data is! Map) {
       throw const FormatException('Print API returned an invalid response.');
