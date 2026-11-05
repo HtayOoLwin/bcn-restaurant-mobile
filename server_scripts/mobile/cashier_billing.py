@@ -561,6 +561,30 @@ elif action == "DailyReport":
             details[mode] = details.get(mode, 0.0) + allocated
             payment_totals[mode] = payment_totals.get(mode, 0.0) + allocated
 
+    # Resolve the Sales Order linked to each submitted Sales Invoice.
+    # Fetch in batches to avoid N+1 queries for a busy restaurant day.
+    sales_orders_by_invoice = {}
+    for chunk_start in range(0, len(invoice_names), 100):
+        names = invoice_names[chunk_start:chunk_start + 100]
+        invoice_items = frappe.get_all(
+            "Sales Invoice Item",
+            filters={
+                "parent": ["in", names],
+                "parenttype": "Sales Invoice",
+            },
+            fields=["parent", "sales_order"],
+            limit_page_length=10000,
+        )
+        for invoice_item in invoice_items:
+            linked_order = (invoice_item.sales_order or "").strip()
+            if not linked_order:
+                continue
+            orders = sales_orders_by_invoice.setdefault(
+                invoice_item.parent, []
+            )
+            if linked_order not in orders:
+                orders.append(linked_order)
+
     total_sales = 0.0
     total_outstanding = 0.0
     invoices = []
@@ -569,8 +593,13 @@ elif action == "DailyReport":
         outstanding = float(row.outstanding_amount or 0)
         total_sales += grand
         total_outstanding += outstanding
+        linked_orders = sales_orders_by_invoice.get(row.name, [])
+        # An invoice spanning multiple orders cannot safely be reprinted
+        # through the cashier API, which expects exactly one Sales Order.
+        linked_sales_order = linked_orders[0] if len(linked_orders) == 1 else ""
         invoices.append({
             "name": row.name,
+            "sales_order": linked_sales_order,
             "customer": row.customer_name or row.customer,
             "time": str(row.posting_time or ""),
             "grand_total": grand,
