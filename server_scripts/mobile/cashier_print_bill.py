@@ -96,7 +96,7 @@ else:
         # Add a visible marker to the queued HTML only.
         # Do not modify the submitted invoice or its Print Format.
         reprint_banner = (
-            "<div style='text-align:center;font-weight:800;font-size:20px;"
+            "<div class='cashier-reprint-banner' style='text-align:center;font-weight:800;font-size:20px;"
             "padding:8px 0;margin:6px 0 10px;"
             "border-top:1px dashed #000;border-bottom:1px dashed #000;'>"
             "REPRINT</div>"
