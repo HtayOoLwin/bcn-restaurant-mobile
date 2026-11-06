@@ -51,8 +51,22 @@ row_info = frappe.db.get_value(
 if not row_info or row_info.parenttype != "Sales Order":
     frappe.throw("Sales Order Item was not found")
 
-# A row lock prevents two waiter operations from saving the same SO
-# concurrently when they follow this lock protocol.
+# Use the same Customer -> Sales Order lock order as bcn_mobile_create_order.
+# This prevents an order append from racing against an item cancellation.
+source_customer = frappe.db.get_value(
+    "Sales Order", row_info.parent, "customer"
+)
+if not source_customer:
+    frappe.throw("Sales Order table was not found")
+locked_customer = frappe.db.sql(
+    "SELECT name FROM `tabCustomer` WHERE name = %(name)s FOR UPDATE",
+    {"name": source_customer},
+    as_dict=True,
+)
+if not locked_customer:
+    frappe.throw("Order table was not found")
+
+# Lock the Sales Order before validating or modifying its child items.
 locked = frappe.db.sql(
     "SELECT name FROM `tabSales Order` WHERE name = %(name)s FOR UPDATE",
     {"name": row_info.parent},
