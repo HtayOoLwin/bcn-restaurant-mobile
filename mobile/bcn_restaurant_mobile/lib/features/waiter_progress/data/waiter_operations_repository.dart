@@ -34,10 +34,16 @@ class WaiterOperationsRepository {
     required String rowName,
     required String action,
   }) async {
-    await _apiClient.postMethod(
-      'bcn_waiter_orders',
-      data: {'item_row_name': rowName, 'action': action},
+    if (action != 'Cancel') {
+      throw ArgumentError.value(action, 'action', 'Unsupported item action');
+    }
+    final response = await _apiClient.postMethod(
+      'bcn_waiter_cancel_order_item',
+      data: {'item_row_name': rowName},
     );
+    if (response is! Map || response['success'] != true) {
+      throw StateError('Server did not confirm item cancellation.');
+    }
   }
 
   Future<void> serveWholeOrder(String orderName) async {
