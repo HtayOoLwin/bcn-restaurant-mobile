@@ -59,6 +59,7 @@ orders = frappe.get_all(
         "net_total",
         "total_taxes_and_charges",
         "currency",
+        "custom_restaurant_status",
     ],
     order_by="creation asc",
     limit_page_length=500,
@@ -86,6 +87,7 @@ for order in orders:
             "custom_kitchen_note",
             "custom_foc",
             "custom_parcel",
+            "custom_printed_qty",
         ],
         order_by="idx asc",
         limit_page_length=1000,
@@ -110,7 +112,13 @@ for order in orders:
                 "custom_foc": int(row.custom_foc or 0),
                 "custom_parcel": int(row.custom_parcel or 0),
                 "status": "New",
-                "can_cancel": False,
+                # Only unprinted rows in Open Draft orders can be cancelled.
+                # Keep at least one line in the Sales Order.
+                "can_cancel": (
+                    order.custom_restaurant_status == "Open"
+                    and len(item_rows) > 1
+                    and frappe.utils.flt(row.custom_printed_qty) <= 0
+                ),
             }
         )
 
