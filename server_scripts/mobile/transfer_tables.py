@@ -21,17 +21,17 @@ source = frappe.db.get_value(
     ["name", "customer_name", "customer_group", "disabled"],
     as_dict=True
 )
-if not source or source.disabled:
-    frappe.throw("Current table is not available")
+if not source or source.disabled or source.customer_group in ("Takeaway", "Credit"):
+    frappe.throw("Current table is not an active dining table")
 
 # A table is represented by a Customer in this restaurant installation.
-# Restrict the destination to the same Customer Group to avoid unintended
-# room-charge or tax policy changes during a table-only transfer.
+# Include empty physical dining tables across AC / Dine In areas.
+# Keep existing order rates, room charges and tax totals unchanged.
 customers = frappe.get_all(
     "Customer",
     filters={
         "disabled": 0,
-        "customer_group": source.customer_group,
+        "customer_group": ["not in", ["Takeaway", "Credit"]],
     },
     fields=["name", "customer_name", "customer_group"],
     order_by="customer_name asc",
