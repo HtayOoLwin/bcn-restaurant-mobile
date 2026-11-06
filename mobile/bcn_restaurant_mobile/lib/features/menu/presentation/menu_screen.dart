@@ -80,12 +80,27 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
       return;
     }
     if (order.lines.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(
-          'Please place or clear the pending cart items before transferring this table.',
-        )),
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Unsaved cart items'),
+          content: const Text(
+            'There are items in your cart that have not been placed. '
+            'Transferring the table will clear these unsaved items. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
       );
-      return;
+      if (proceed != true || !mounted) return;
     }
 
     final candidatesFuture = ref.read(tablesRepositoryProvider)
