@@ -360,10 +360,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                   const SizedBox(height: 8),
                   ...widget.order.items.map(
                     (item) => Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 5,
-                      ),
+                      padding: const EdgeInsets.only(left: 4, right: 0, top: 5, bottom: 5),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -410,20 +407,46 @@ class _ProgressCardState extends State<_ProgressCard> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            formatMoney(item.amount, widget.order.currency),
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                formatMoney(item.amount, widget.order.currency),
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              if (item.canCancel) ...[
+                                const SizedBox(height: 6),
+                                OutlinedButton.icon(
+                                  onPressed: widget.busyRow == item.rowName
+                                      ? null
+                                      : () => widget.onCancel(item),
+                                  icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                                  label: const Text('Cancel'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFD32F2F),
+                                    side: const BorderSide(
+                                      color: Color(0xFFD32F2F),
+                                      width: 1.4,
+                                    ),
+                                    backgroundColor: const Color(0xFFFFF5F5),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 7,
+                                    ),
+                                    minimumSize: const Size(0, 36),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                          if (item.canCancel) ...[
-                            const SizedBox(width: 6),
-                            TextButton(
-                              onPressed: widget.busyRow == item.rowName
-                                  ? null
-                                  : () => widget.onCancel(item),
-                              child: const Text('Cancel'),
-                            ),
-                          ],
                         ],
                       ),
                     ),
