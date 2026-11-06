@@ -259,6 +259,7 @@ class _ProgressCard extends StatefulWidget {
 
 class _ProgressCardState extends State<_ProgressCard> {
   bool _expanded = false;
+  bool _cancelMode = false;
 
   @override
   Widget build(BuildContext context) {
@@ -349,12 +350,52 @@ class _ProgressCardState extends State<_ProgressCard> {
                       color: const Color(0xFFDDEBFA),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      'Items (${widget.order.items.length})',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF153D69),
-                      ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Items (${widget.order.items.length})',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF153D69),
+                            ),
+                          ),
+                        ),
+                        if (widget.order.items.any((item) => item.canCancel))
+                          OutlinedButton.icon(
+                            onPressed: widget.busyRow != null
+                                ? null
+                                : () => setState(() => _cancelMode = !_cancelMode),
+                            icon: Icon(
+                              _cancelMode
+                                  ? Icons.check_rounded
+                                  : Icons.delete_outline_rounded,
+                              size: 16,
+                            ),
+                            label: Text(_cancelMode ? 'Done' : 'Cancel Items'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _cancelMode
+                                  ? const Color(0xFF156B51)
+                                  : const Color(0xFFD32F2F),
+                              side: BorderSide(
+                                color: _cancelMode
+                                    ? const Color(0xFF156B51)
+                                    : const Color(0xFFD32F2F),
+                              ),
+                              backgroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 5,
+                              ),
+                              minimumSize: const Size(0, 32),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              textStyle: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -415,7 +456,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                                 textAlign: TextAlign.right,
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
-                              if (item.canCancel) ...[
+                              if (_cancelMode && item.canCancel) ...[
                                 const SizedBox(height: 6),
                                 OutlinedButton.icon(
                                   onPressed: widget.busyRow == item.rowName
