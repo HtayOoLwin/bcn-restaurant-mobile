@@ -33,18 +33,32 @@ class WaiterOperationsRepository {
   Future<void> itemAction({
     required String rowName,
     required String action,
-    required int cancelQty,
+    int? cancelQty,
   }) async {
-    if (action != 'Cancel') {
-      throw ArgumentError.value(action, 'action', 'Unsupported item action');
+    if (action == 'Cancel') {
+      if (cancelQty == null || cancelQty <= 0) {
+        throw ArgumentError.value(cancelQty, 'cancelQty', 'Cancel quantity must be positive');
+      }
+      final response = await _apiClient.postMethod(
+        'bcn_waiter_cancel_order_item',
+        data: {'item_row_name': rowName, 'cancel_qty': cancelQty.toString()},
+      );
+      if (response is! Map || response['success'] != true) {
+        throw StateError('Server did not confirm item cancellation.');
+      }
+      return;
     }
-    final response = await _apiClient.postMethod(
-      'bcn_waiter_cancel_order_item',
-      data: {'item_row_name': rowName, 'cancel_qty': cancelQty.toString()},
-    );
-    if (response is! Map || response['success'] != true) {
-      throw StateError('Server did not confirm item cancellation.');
+
+    if (action == 'Mark Served') {
+      // Preserve the existing Ready screen workflow and its original API.
+      await _apiClient.postMethod(
+        'bcn_waiter_orders',
+        data: {'item_row_name': rowName, 'action': 'Mark Served'},
+      );
+      return;
     }
+
+    throw ArgumentError.value(action, 'action', 'Unsupported item action');
   }
 
   Future<void> serveWholeOrder(String orderName) async {
