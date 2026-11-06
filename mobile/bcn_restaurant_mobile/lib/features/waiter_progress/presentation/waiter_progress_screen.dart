@@ -361,11 +361,23 @@ class _ProgressCardState extends State<_ProgressCard> {
                             ),
                           ),
                         ),
-                        if (widget.order.items.any((item) => item.canCancel))
-                          OutlinedButton.icon(
+                        OutlinedButton.icon(
                             onPressed: widget.busyRow != null
                                 ? null
-                                : () => setState(() => _cancelMode = !_cancelMode),
+                                : () {
+                                    if (!_cancelMode &&
+                                        !widget.order.items.any((item) => item.canCancel)) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'No items can be cancelled. Only unprinted quantities in Open orders are eligible.',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    setState(() => _cancelMode = !_cancelMode);
+                                  },
                             icon: Icon(
                               _cancelMode
                                   ? Icons.check_rounded
