@@ -11,7 +11,7 @@ class TablesRepository {
     String fromCustomer,
   ) async {
     final raw = await _apiClient.getMethod(
-      'bcn_mobile_transfer_tables',
+      'bcn_mobile_transfer_tables_search',
       queryParameters: {'from_customer': fromCustomer},
     );
     if (raw is! Map) {
