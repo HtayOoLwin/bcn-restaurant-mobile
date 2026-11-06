@@ -5,8 +5,26 @@
 user = frappe.session.user
 if not user or user == "Guest":
     frappe.throw("Authentication required")
-roles = frappe.get_roles(user)
-if not (user == "Administrator" or "System Manager" in roles or "Admin" in roles or "Waiter" in roles or "Restaurant Manager" in roles):
+# Use the same Server Script-safe role lookup as bcn_mobile_tables.
+# frappe.get_roles may be unavailable in Frappe safe execution.
+role_rows = frappe.get_all(
+    "Has Role",
+    filters={"parent": user, "parenttype": "User"},
+    fields=["role"],
+    limit_page_length=200,
+)
+roles = []
+for role_row in role_rows:
+    if role_row.role and role_row.role not in roles:
+        roles.append(role_row.role)
+
+if not (
+    user == "Administrator"
+    or "System Manager" in roles
+    or "Admin" in roles
+    or "Waiter" in roles
+    or "Restaurant Manager" in roles
+):
     frappe.throw("Not allowed to transfer tables")
 
 profile = frappe.get_doc("POS Profile", "DMT")
