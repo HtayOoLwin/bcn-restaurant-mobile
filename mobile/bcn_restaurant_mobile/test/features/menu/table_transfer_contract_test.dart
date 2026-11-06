@@ -34,7 +34,7 @@ void main() {
       'lib/features/waiter/data/tables_repository.dart',
     ).readAsStringSync();
 
-    expect(source, contains("'bcn_mobile_transfer_tables'"));
+    expect(source, contains("'bcn_mobile_transfer_tables_search'"));
     expect(source, contains("'bcn_mobile_transfer_table'"));
     expect(source, contains("'sales_order': salesOrder"));
     expect(source, contains("'from_customer': fromCustomer"));
