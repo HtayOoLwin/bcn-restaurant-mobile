@@ -137,7 +137,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Cancel item?'),
         content: Text(
-          'Cancel ${item.itemName}? Only New items can be cancelled.',
+          'Cancel ${item.itemName} (${item.qty.g} ×)? This removes the unprinted item from the order and recalculates the total.',
         ),
         actions: [
           TextButton(
@@ -162,6 +162,11 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       ref.invalidate(waiterReadyProvider);
       ref.invalidate(tablesProvider('dine_in'));
       ref.invalidate(tablesProvider('takeaway'));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${item.itemName} cancelled successfully.')),
+        );
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
