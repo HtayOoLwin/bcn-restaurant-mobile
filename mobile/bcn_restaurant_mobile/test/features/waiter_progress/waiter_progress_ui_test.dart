@@ -116,6 +116,8 @@ void main() {
 
     expect(expandedContent, contains("'\${item.qty.g} ×'"));
     expect(expandedContent, contains('Text(item.itemName)'));
+    expect(expandedContent, contains('Unit Price:'));
+    expect(expandedContent, contains('formatMoney(item.rate, widget.order.currency)'));
     expect(expandedContent, contains('formatMoney(item.amount, widget.order.currency)'));
     expect(expandedContent, contains("'Subtotal'"));
     expect(expandedContent, contains("'Grand Total'"));
