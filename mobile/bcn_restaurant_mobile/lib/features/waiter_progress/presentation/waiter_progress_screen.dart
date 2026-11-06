@@ -132,46 +132,105 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
   }
 
   Future<void> _cancelItem(WaiterProgressItem item) async {
-    final confirmed = await showDialog<bool>(
+    final maxCancelable = item.cancelableQty.floor();
+    if (maxCancelable < 1) return;
+
+    var selectedQty = 1;
+    final cancelQty = await showDialog<int>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel item?'),
-        content: Text(
-          'Cancel ${item.itemName} (${item.qty.g} ×)? This removes the unprinted item from the order and recalculates the total.',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, updateDialog) => AlertDialog(
+          title: const Text('Cancel Item Quantity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(item.itemName,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text('Ordered: ${item.qty.g} ${item.uom}'),
+              Text('Available to cancel: $maxCancelable ${item.uom}'),
+              const SizedBox(height: 16),
+              const Text('Cancel Quantity',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton.filledTonal(
+                    tooltip: 'Decrease cancel quantity',
+                    onPressed: selectedQty > 1
+                        ? () => updateDialog(() => selectedQty--)
+                        : null,
+                    icon: const Icon(Icons.remove),
+                  ),
+                  SizedBox(
+                    width: 70,
+                    child: Text(
+                      '$selectedQty',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    tooltip: 'Increase cancel quantity',
+                    onPressed: selectedQty < maxCancelable
+                        ? () => updateDialog(() => selectedQty++)
+                        : null,
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Remaining quantity: ${(item.qty - selectedQty).g} ${item.uom}',
+                style: const TextStyle(color: Color(0xFF617B94)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Keep'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, selectedQty),
+              child: const Text('Confirm Cancel'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cancel Item'),
-          ),
-        ],
       ),
     );
-    if (confirmed != true) return;
+    if (cancelQty == null || !mounted) return;
 
     setState(() => _busyRow = item.rowName);
     try {
       await ref
           .read(waiterOperationsRepositoryProvider)
-          .itemAction(rowName: item.rowName, action: 'Cancel');
+          .itemAction(
+            rowName: item.rowName,
+            action: 'Cancel',
+            cancelQty: cancelQty,
+          );
       ref.invalidate(waiterProgressProvider);
       ref.invalidate(waiterReadyProvider);
       ref.invalidate(tablesProvider('dine_in'));
       ref.invalidate(tablesProvider('takeaway'));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${item.itemName} cancelled successfully.')),
+          SnackBar(content: Text(
+            'Cancelled $cancelQty × ${item.itemName} successfully.',
+          )),
         );
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
       }
     } finally {
       if (mounted) setState(() => _busyRow = null);
