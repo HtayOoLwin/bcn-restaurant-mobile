@@ -198,6 +198,10 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, selectedQty),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFD32F2F),
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Confirm Cancel'),
             ),
           ],
