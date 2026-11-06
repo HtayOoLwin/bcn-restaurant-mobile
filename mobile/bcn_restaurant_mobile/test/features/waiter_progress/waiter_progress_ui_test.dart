@@ -80,9 +80,12 @@ void main() {
 
   test('waiter can cancel only eligible order rows with confirmation', () {
     expect(source, contains('if (item.canCancel) ...['));
-    expect(source, contains('Cancel item?'));
+    expect(source, contains('Cancel Item Quantity'));
+    expect(source, contains('Confirm Cancel'));
+    expect(source, contains('cancelQty: cancelQty'));
+    expect(source, contains('Remaining quantity:'));
     expect(source, contains("action: 'Cancel'"));
-    expect(source, contains('cancelled successfully.'));
+    expect(source, contains('successfully.'));
   });
 
   test('expanded item rows show quantity, item and totals', () {
