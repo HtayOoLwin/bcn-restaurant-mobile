@@ -112,12 +112,20 @@ for order in orders:
                 "custom_foc": int(row.custom_foc or 0),
                 "custom_parcel": int(row.custom_parcel or 0),
                 "status": "New",
-                # Only unprinted rows in Open Draft orders can be cancelled.
-                # Keep at least one line in the Sales Order.
+                "printed_qty": float(row.custom_printed_qty or 0),
+                "cancelable_qty": float(
+                    max(
+                        0,
+                        min(
+                            qty - frappe.utils.flt(row.custom_printed_qty),
+                            qty if len(item_rows) > 1 else qty - 1,
+                        ),
+                    )
+                ),
                 "can_cancel": (
                     order.custom_restaurant_status == "Open"
-                    and len(item_rows) > 1
-                    and frappe.utils.flt(row.custom_printed_qty) <= 0
+                    and qty - frappe.utils.flt(row.custom_printed_qty) >= 1
+                    and (len(item_rows) > 1 or qty >= 2)
                 ),
             }
         )
