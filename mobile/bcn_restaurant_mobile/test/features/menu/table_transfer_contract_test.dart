@@ -25,6 +25,10 @@ void main() {
     expect(source, contains('Available tables only'));
     expect(source, contains('Confirm Table Transfer'));
     expect(source, contains('transferTable('));
+    expect(source, contains('Table Transferred Successfully!'));
+    expect(source, contains('Dialog.fullscreen('));
+    expect(source, contains('Back to Dashboard'));
+    expect(source, contains('barrierDismissible: false'));
     expect(source, contains("context.go('/tables')"));
     expect(source, isNot(contains('Transfer History')));
   });
