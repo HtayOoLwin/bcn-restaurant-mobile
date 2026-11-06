@@ -426,24 +426,38 @@ class _ProgressCardState extends State<_ProgressCard> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
-                              runSpacing: 4,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(item.itemName),
-                                if (item.foc)
-                                  const _ProgressItemBadge(
-                                    label: 'FOC',
-                                    color: Color(0xFFC62828),
-                                    background: Color(0xFFFFEBEE),
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    Text(item.itemName),
+                                    if (item.foc)
+                                      const _ProgressItemBadge(
+                                        label: 'FOC',
+                                        color: Color(0xFFC62828),
+                                        background: Color(0xFFFFEBEE),
+                                      ),
+                                    if (item.parcel)
+                                      const _ProgressItemBadge(
+                                        label: 'PARCEL',
+                                        color: Color(0xFF18834B),
+                                        background: Color(0xFFE3F6E9),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Unit Price: ${formatMoney(item.rate, widget.order.currency)} / ${item.uom}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF436783),
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                if (item.parcel)
-                                  const _ProgressItemBadge(
-                                    label: 'PARCEL',
-                                    color: Color(0xFF18834B),
-                                    background: Color(0xFFE3F6E9),
-                                  ),
+                                ),
                               ],
                             ),
                           ),
