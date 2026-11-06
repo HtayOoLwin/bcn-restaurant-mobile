@@ -78,6 +78,13 @@ void main() {
     expect(itemList, greaterThan(expandedStart));
   });
 
+  test('waiter can cancel only eligible order rows with confirmation', () {
+    expect(source, contains('if (item.canCancel) ...['));
+    expect(source, contains('Cancel item?'));
+    expect(source, contains("action: 'Cancel'"));
+    expect(source, contains('cancelled successfully.'));
+  });
+
   test('expanded item rows show quantity, item and totals', () {
     final expandedStart = source.indexOf('if (_expanded) ...[');
     final cardEnd = source.indexOf('\nextension on double', expandedStart);
