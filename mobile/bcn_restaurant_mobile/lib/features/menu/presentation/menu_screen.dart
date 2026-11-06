@@ -271,7 +271,82 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                                   ref.invalidate(tablesProvider(destination.customerGroup));
                                   if (!mounted || !sheetContext.mounted) return;
                                   Navigator.pop(sheetContext);
-                                  context.go('/tables');
+
+                                  // Show a dedicated success screen before
+                                  // returning to the tables dashboard.
+                                  await showDialog<void>(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (successContext) => PopScope(
+                                      canPop: false,
+                                      child: Dialog.fullscreen(
+                                        child: SafeArea(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(24),
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Container(
+                                                  width: 104,
+                                                  height: 104,
+                                                  decoration: const BoxDecoration(
+                                                    color: Color(0xFFE4F8EF),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.check_circle_rounded,
+                                                    size: 70,
+                                                    color: Color(0xFF159766),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 24),
+                                                const Text(
+                                                  'Table Transferred Successfully!',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: 23,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(0xFF153956),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Text(
+                                                  '${widget.customer}  →  ${destination.customerName}',
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    fontSize: 19,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF159766),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 10),
+                                                const Text(
+                                                  'Your order has been moved to the new table.',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(color: Color(0xFF617B94)),
+                                                ),
+                                                const SizedBox(height: 36),
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: FilledButton.icon(
+                                                    onPressed: () => Navigator.pop(successContext),
+                                                    icon: const Icon(Icons.dashboard_outlined),
+                                                    label: const Text('Back to Dashboard'),
+                                                    style: FilledButton.styleFrom(
+                                                      backgroundColor: const Color(0xFF00A99A),
+                                                      foregroundColor: Colors.white,
+                                                      padding: const EdgeInsets.symmetric(vertical: 15),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                  if (mounted) context.go('/tables');
                                 } catch (error) {
                                   if (!mounted || !sheetContext.mounted) return;
                                   updateSheet(() => transferring = false);
