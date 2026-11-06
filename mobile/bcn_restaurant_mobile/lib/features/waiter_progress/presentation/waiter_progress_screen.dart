@@ -210,6 +210,39 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
     );
     if (cancelQty == null || !mounted) return;
 
+    final unprintedQty = (item.qty - item.printedQty).clamp(0.0, item.qty);
+    final printedCancelQty = (cancelQty - unprintedQty).clamp(0.0, item.printedQty);
+    if (printedCancelQty > 0) {
+      final acknowledged = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Kitchen Already Printed'),
+          content: Text(
+            '${printedCancelQty.toStringAsFixed(0)} × ${item.itemName} '
+            'has already been printed to the kitchen. '
+            'Cancel this quantity anyway? '
+            'Please notify the kitchen manually. '
+            'No cancellation ticket will be printed.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFD32F2F),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm Cancel'),
+            ),
+          ],
+        ),
+      );
+      if (acknowledged != true || !mounted) return;
+    }
+
     setState(() => _busyRow = item.rowName);
     try {
       await ref
@@ -218,6 +251,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
             rowName: item.rowName,
             action: 'Cancel',
             cancelQty: cancelQty,
+            confirmPrintedCancel: printedCancelQty > 0,
           );
       ref.invalidate(waiterProgressProvider);
       ref.invalidate(waiterReadyProvider);
@@ -226,7 +260,9 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(
-            'Cancelled $cancelQty × ${item.itemName} successfully.',
+            printedCancelQty > 0
+                ? 'Cancelled $cancelQty × ${item.itemName}. Please notify the kitchen manually.'
+                : 'Cancelled $cancelQty × ${item.itemName} successfully.',
           )),
         );
       }
