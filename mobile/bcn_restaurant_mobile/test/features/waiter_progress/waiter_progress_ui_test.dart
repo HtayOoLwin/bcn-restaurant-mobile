@@ -97,6 +97,12 @@ void main() {
     expect(source, contains('right: 0'));
   });
 
+  test('printed items require an explicit warning and no ticket print', () {
+    expect(source, contains('Kitchen Already Printed'));
+    expect(source, contains('No cancellation ticket will be printed.'));
+    expect(source, contains('confirmPrintedCancel: printedCancelQty > 0'));
+  });
+
   test('waiter can cancel only eligible order rows with confirmation', () {
     expect(source, contains('if (_cancelMode && item.canCancel) ...['));
     expect(source, contains("label: Text(_cancelMode ? 'Done' : 'Cancel Items')"));
