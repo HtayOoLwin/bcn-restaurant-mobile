@@ -451,7 +451,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Unit Price: ${formatMoney(item.rate, widget.order.currency)} / ${item.uom}',
+                                  '@ ${formatAmount(item.rate)}',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Color(0xFF436783),
