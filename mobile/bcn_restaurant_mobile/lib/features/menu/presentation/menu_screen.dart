@@ -136,7 +136,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                       ),
                     ],
                   ),
-                  Text('From: ' + widget.customer,
+                  Text('From: ${widget.customer}',
                       style: const TextStyle(color: Color(0xFF617B94))),
                   const SizedBox(height: 12),
                   TextField(
@@ -166,8 +166,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                           return const Center(child: CircularProgressIndicator());
                         }
                         if (snapshot.hasError) {
-                          return Center(child: Text('Unable to load available tables: ' +
-                            snapshot.error.toString(), textAlign: TextAlign.center));
+                          return Center(child: Text('Unable to load available tables: ${snapshot.error}', textAlign: TextAlign.center));
                         }
                         final tables = (snapshot.data ?? const <RestaurantTableModel>[])
                           .where((table) =>
@@ -246,8 +245,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                                   context: sheetContext,
                                   builder: (dialogContext) => AlertDialog(
                                     title: const Text('Confirm Table Transfer'),
-                                    content: Text('Are you sure you want to transfer ' +
-                                      widget.customer + ' to ' + destination.customerName + '?'),
+                                    content: Text('Are you sure you want to transfer ${widget.customer} to ${destination.customerName}?'),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(dialogContext, false),
