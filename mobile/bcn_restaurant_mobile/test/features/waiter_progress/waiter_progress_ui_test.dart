@@ -15,6 +15,17 @@ void main() {
     cartSource = File(cartPath).readAsStringSync();
   });
 
+  test('Ready item actions do not require cancel quantity', () {
+    final repository = File(
+      'lib/features/waiter_progress/data/waiter_operations_repository.dart',
+    ).readAsStringSync();
+    expect(repository, contains('int? cancelQty,'));
+    expect(repository, contains("if (action == 'Cancel')"));
+    expect(repository, contains("if (action == 'Mark Served')"));
+    expect(repository, contains("'bcn_waiter_orders'"));
+    expect(repository, contains("'bcn_waiter_cancel_order_item'"));
+  });
+
   test('progress screen refreshes immediately when opened', () {
     final initStart = source.indexOf('void initState()');
     final timerStart = source.indexOf('Timer.periodic', initStart);
