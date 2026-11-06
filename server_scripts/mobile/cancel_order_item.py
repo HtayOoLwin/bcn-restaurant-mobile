@@ -4,8 +4,8 @@
 #
 # IMPORTANT:
 # - Only Open Draft Sales Orders may be edited.
-# - Only units NOT yet printed to kitchen may be cancelled.
-# - This does not issue KOT cancellation printouts.
+# - Printed units require explicit acknowledgement and manual kitchen notice.
+# - This API does NOT print a kitchen cancellation ticket.
 # - The final Sales Order item row cannot be completely removed.
 
 user = frappe.session.user
@@ -106,11 +106,20 @@ available_qty = current_qty - printed_qty
 if printed_qty < 0 or available_qty < -0.000001:
     frappe.throw("Printed quantity is inconsistent with the order item")
 
-if cancel_qty > available_qty + 0.000001:
+if cancel_qty > current_qty + 0.000001:
+    frappe.throw("Cannot cancel more than ordered quantity. Refresh order progress")
+
+# The unprinted units are cancelled first. Cancelling beyond that quantity
+# affects units the kitchen has already received on the original KOT.
+printed_cancel_qty = max(0, cancel_qty - available_qty)
+confirm_printed = str(
+    frappe.form_dict.get("confirm_printed_cancel") or ""
+).strip().lower() in ("1", "true", "yes")
+
+if printed_cancel_qty > 0 and not confirm_printed:
     frappe.throw(
-        "Cannot cancel more than unprinted quantity ("
-        + str(available_qty)
-        + "). Refresh order progress"
+        "Printed kitchen quantity would be cancelled. Confirm and notify "
+        "the kitchen manually; no cancellation KOT is printed by this API"
     )
 
 remaining_qty = current_qty - cancel_qty
@@ -142,6 +151,9 @@ if remove_row:
     order.remove(target)
 else:
     target.qty = remaining_qty
+    # Never leave printed quantity above the reduced active order quantity.
+    # This does not undo a physical kitchen print.
+    target.custom_printed_qty = min(printed_qty, remaining_qty)
 
 order.calculate_taxes_and_totals()
 order.flags.ignore_permissions = True
@@ -153,6 +165,8 @@ frappe.response["message"] = {
     "cancelled_row": row_name,
     "cancelled_item": item_name,
     "cancelled_qty": float(cancel_qty),
+    "cancelled_printed_qty": float(printed_cancel_qty),
+    "kitchen_notification_required": bool(printed_cancel_qty > 0),
     "remaining_qty": float(max(remaining_qty, 0)),
     "grand_total": float(order.grand_total or 0),
     "message": "Item cancelled successfully",
