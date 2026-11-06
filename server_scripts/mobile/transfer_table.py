@@ -59,8 +59,8 @@ destination = frappe.db.get_value(
 )
 if not source or source.disabled or not destination or destination.disabled:
     frappe.throw("Source or destination table is disabled")
-if source.customer_group in ("Takeaway", "Credit") or destination.customer_group in ("Takeaway", "Credit"):
-    frappe.throw("Source and destination must be physical dining tables")
+if source.customer_group not in ("AC", "Dine In") or destination.customer_group not in ("AC", "Dine In"):
+    frappe.throw("Source and destination must be AC or Dine In tables")
 
 # Recheck availability AFTER the row locks. This includes submitted bills.
 occupied = frappe.get_all(
