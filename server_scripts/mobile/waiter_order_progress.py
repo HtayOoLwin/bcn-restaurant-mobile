@@ -113,18 +113,13 @@ for order in orders:
                 "custom_parcel": int(row.custom_parcel or 0),
                 "status": "New",
                 "printed_qty": float(row.custom_printed_qty or 0),
+                # All active quantity can be cancelled, even if previously
+                # printed. Keep at least one unit when this is the final row.
                 "cancelable_qty": float(
-                    max(
-                        0,
-                        min(
-                            qty - frappe.utils.flt(row.custom_printed_qty),
-                            qty if len(item_rows) > 1 else qty - 1,
-                        ),
-                    )
+                    max(0, qty if len(item_rows) > 1 else qty - 1)
                 ),
                 "can_cancel": (
                     order.custom_restaurant_status == "Open"
-                    and qty - frappe.utils.flt(row.custom_printed_qty) >= 1
                     and (len(item_rows) > 1 or qty >= 2)
                 ),
             }
