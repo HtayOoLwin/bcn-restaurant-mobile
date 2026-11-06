@@ -9,6 +9,7 @@ class WaiterProgressItem {
     required this.status,
     required this.canCancel,
     required this.cancelableQty,
+    required this.printedQty,
     this.foc = false,
     this.parcel = false,
     this.kitchenCounter,
@@ -27,6 +28,7 @@ class WaiterProgressItem {
       status: json['status']?.toString() ?? 'New',
       canCancel: json['can_cancel'] == true,
       cancelableQty: (json['cancelable_qty'] as num?)?.toDouble() ?? 0,
+      printedQty: (json['printed_qty'] as num?)?.toDouble() ?? 0,
       foc: json['custom_foc'] == true || json['custom_foc'] == 1 || json['custom_foc'] == '1',
       parcel: json['custom_parcel'] == true || json['custom_parcel'] == 1 || json['custom_parcel'] == '1',
       kitchenCounter: json['kitchen_counter']?.toString(),
@@ -43,6 +45,7 @@ class WaiterProgressItem {
   final String status;
   final bool canCancel;
   final double cancelableQty;
+  final double printedQty;
   final bool foc;
   final bool parcel;
   final String? kitchenCounter;
