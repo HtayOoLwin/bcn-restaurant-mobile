@@ -1,4 +1,4 @@
-# Server Script API: bcn_mobile_transfer_tables
+# Server Script API: bcn_mobile_transfer_tables_search
 # Lists eligible empty tables; does not change any order.
 POS_PROFILE = "DMT"
 user = frappe.session.user
