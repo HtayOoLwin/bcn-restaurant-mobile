@@ -1,12 +1,12 @@
 # Server Script API: bcn_waiter_cancel_order_item
-# OurCity Restaurant - Cancel one unprinted item row from an Open Draft SO.
-# The client uses item_row_name (Sales Order Item.name).
+# OurCity Restaurant - Cancel a chosen quantity from an Open Draft SO item.
+# The client supplies item_row_name and cancel_qty (positive whole units).
 #
 # IMPORTANT:
 # - Only Open Draft Sales Orders may be edited.
-# - Printed items are never removed through this endpoint.
+# - Only units NOT yet printed to kitchen may be cancelled.
 # - This does not issue KOT cancellation printouts.
-# - Removing the last remaining order line is not supported.
+# - The final Sales Order item row cannot be completely removed.
 
 user = frappe.session.user
 if not user or user == "Guest":
@@ -40,6 +40,11 @@ if not company:
 row_name = (frappe.form_dict.get("item_row_name") or "").strip()
 if not row_name:
     frappe.throw("item_row_name is required")
+
+raw_cancel_qty = frappe.form_dict.get("cancel_qty")
+cancel_qty = frappe.utils.flt(raw_cancel_qty)
+if cancel_qty <= 0 or abs(cancel_qty - round(cancel_qty)) > 0.000001:
+    frappe.throw("cancel_qty must be a positive whole number")
 
 # Resolve the SO parent from the requested row.
 row_info = frappe.db.get_value(
@@ -85,9 +90,6 @@ if order.docstatus != 0 or (order.get("custom_restaurant_status") or "") != "Ope
 if order.get("custom_check_out"):
     frappe.throw("Bill was already requested. Item cancellation is not allowed")
 
-if len(order.items) <= 1:
-    frappe.throw("Cannot cancel the last item. Please handle the whole order separately")
-
 target = None
 for line in order.items:
     if line.name == row_name:
@@ -98,8 +100,23 @@ if not target:
     frappe.throw("Item no longer exists in this order. Please refresh")
 
 printed_qty = frappe.utils.flt(target.get("custom_printed_qty"))
-if printed_qty > 0:
-    frappe.throw("Item was already printed to kitchen and cannot be cancelled here")
+current_qty = frappe.utils.flt(target.qty)
+available_qty = current_qty - printed_qty
+
+if printed_qty < 0 or available_qty < -0.000001:
+    frappe.throw("Printed quantity is inconsistent with the order item")
+
+if cancel_qty > available_qty + 0.000001:
+    frappe.throw(
+        "Cannot cancel more than unprinted quantity ("
+        + str(available_qty)
+        + "). Refresh order progress"
+    )
+
+remaining_qty = current_qty - cancel_qty
+remove_row = remaining_qty <= 0.000001
+if remove_row and len(order.items) <= 1:
+    frappe.throw("Cannot cancel the last item completely. Keep at least one item")
 
 # Avoid cancelling while a kitchen print job is queued or in progress.
 # This is a conservative safety check using the existing BCN Print Job.
@@ -121,7 +138,11 @@ if frappe.db.exists("DocType", "BCN Print Job"):
         )
 
 item_name = target.item_name or target.item_code
-order.remove(target)
+if remove_row:
+    order.remove(target)
+else:
+    target.qty = remaining_qty
+
 order.calculate_taxes_and_totals()
 order.flags.ignore_permissions = True
 order.save(ignore_permissions=True)
@@ -131,6 +152,8 @@ frappe.response["message"] = {
     "sales_order": order.name,
     "cancelled_row": row_name,
     "cancelled_item": item_name,
+    "cancelled_qty": float(cancel_qty),
+    "remaining_qty": float(max(remaining_qty, 0)),
     "grand_total": float(order.grand_total or 0),
     "message": "Item cancelled successfully",
 }
