@@ -34,6 +34,7 @@ class WaiterOperationsRepository {
     required String rowName,
     required String action,
     int? cancelQty,
+    bool confirmPrintedCancel = false,
   }) async {
     if (action == 'Cancel') {
       if (cancelQty == null || cancelQty <= 0) {
@@ -41,7 +42,11 @@ class WaiterOperationsRepository {
       }
       final response = await _apiClient.postMethod(
         'bcn_waiter_cancel_order_item',
-        data: {'item_row_name': rowName, 'cancel_qty': cancelQty.toString()},
+        data: {
+          'item_row_name': rowName,
+          'cancel_qty': cancelQty.toString(),
+          'confirm_printed_cancel': confirmPrintedCancel ? '1' : '0',
+        },
       );
       if (response is! Map || response['success'] != true) {
         throw StateError('Server did not confirm item cancellation.');
