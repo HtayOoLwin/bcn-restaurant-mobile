@@ -6,6 +6,8 @@ import '../../../core/config/app_config.dart';
 import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cart/domain/cart_controller.dart';
+import '../../waiter/presentation/waiter_tables_screen.dart';
+import '../../waiter/domain/table_models.dart';
 import '../data/menu_repository.dart';
 import '../domain/menu_models.dart';
 
@@ -68,6 +70,230 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
   }
 
+  Future<void> _showTransferTable() async {
+    final order = ref.read(cartProvider);
+    final salesOrder = (order.session ?? '').trim();
+    if (salesOrder.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please open an existing order before transferring its table.')),
+      );
+      return;
+    }
+    if (order.lines.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(
+          'Please place or clear the pending cart items before transferring this table.',
+        )),
+      );
+      return;
+    }
+
+    final candidatesFuture = ref.read(tablesRepositoryProvider)
+        .getTransferCandidates(widget.customer);
+    var query = '';
+    RestaurantTableModel? selectedTable;
+    var transferring = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, updateSheet) {
+          return SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.swap_horiz_rounded, color: Color(0xFF009F90)),
+                      const SizedBox(width: 8),
+                      const Expanded(child: Text('Table Transfer',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: transferring ? null : () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  Text('From: ' + widget.customer,
+                      style: const TextStyle(color: Color(0xFF617B94))),
+                  const SizedBox(height: 12),
+                  TextField(
+                    enabled: !transferring,
+                    decoration: InputDecoration(
+                      hintText: 'Search destination table...',
+                      prefixIcon: const Icon(Icons.search),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onChanged: (value) => updateSheet(() {
+                      query = value.trim().toLowerCase();
+                      selectedTable = null;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Available tables only',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: FutureBuilder<List<RestaurantTableModel>>(
+                      future: candidatesFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState != ConnectionState.done) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (snapshot.hasError) {
+                          return Center(child: Text('Unable to load available tables: ' +
+                            snapshot.error.toString(), textAlign: TextAlign.center));
+                        }
+                        final tables = (snapshot.data ?? const <RestaurantTableModel>[])
+                          .where((table) =>
+                            table.customerName.toLowerCase().contains(query) ||
+                            table.customer.toLowerCase().contains(query))
+                          .toList();
+                        if (tables.isEmpty) {
+                          return const Center(child: Text('No available tables found.'));
+                        }
+                        return GridView.builder(
+                          itemCount: tables.length,
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 9,
+                            mainAxisSpacing: 9,
+                            childAspectRatio: 0.95,
+                          ),
+                          itemBuilder: (context, index) {
+                            final table = tables[index];
+                            final isSelected = selectedTable?.customer == table.customer;
+                            return InkWell(
+                              onTap: transferring ? null : () =>
+                                  updateSheet(() => selectedTable = table),
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE7F8EE),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFF008EAD)
+                                        : const Color(0xFFC2E9D1),
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.all(5),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      isSelected ? Icons.check_circle : Icons.table_restaurant_outlined,
+                                      color: const Color(0xFF147B60),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(table.customerName,
+                                      maxLines: 2,
+                                      textAlign: TextAlign.center,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12,
+                                        fontWeight: FontWeight.w700)),
+                                    const Text('Available',
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF147B60))),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: OutlinedButton(
+                        onPressed: transferring ? null : () => Navigator.pop(sheetContext),
+                        child: const Text('Cancel'),
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(child: FilledButton(
+                        onPressed: selectedTable == null || transferring
+                            ? null
+                            : () async {
+                                final destination = selectedTable!;
+                                final confirmed = await showDialog<bool>(
+                                  context: sheetContext,
+                                  builder: (dialogContext) => AlertDialog(
+                                    title: const Text('Confirm Table Transfer'),
+                                    content: Text('Are you sure you want to transfer ' +
+                                      widget.customer + ' to ' + destination.customerName + '?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(dialogContext, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () => Navigator.pop(dialogContext, true),
+                                        child: const Text('Confirm Transfer'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true || !mounted) return;
+                                updateSheet(() => transferring = true);
+                                try {
+                                  await ref.read(tablesRepositoryProvider).transferTable(
+                                    salesOrder: salesOrder,
+                                    fromCustomer: widget.customer,
+                                    toCustomer: destination.customer,
+                                  );
+                                  ref.read(cartProvider.notifier).clear();
+                                  ref.invalidate(tablesProvider(''));
+                                  ref.invalidate(tablesProvider(destination.customerGroup));
+                                  if (!mounted || !sheetContext.mounted) return;
+                                  Navigator.pop(sheetContext);
+                                  context.go('/tables');
+                                } catch (error) {
+                                  if (!mounted || !sheetContext.mounted) return;
+                                  updateSheet(() => transferring = false);
+                                  await showDialog<void>(
+                                    context: sheetContext,
+                                    builder: (dialogContext) => AlertDialog(
+                                      title: const Text('Cannot transfer table'),
+                                      content: Text(error.toString()),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(dialogContext),
+                                          child: const Text('OK'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                              },
+                        child: transferring
+                            ? const SizedBox(height: 18, width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                            : const Text('Transfer'),
+                      )),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -91,50 +317,65 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72,
-        title: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+        toolbarHeight: 105,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.customer,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+              ),
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  Text(
-                    widget.customer,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _showTransferTable(),
+                      icon: const Icon(Icons.swap_horiz_rounded, size: 17),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Table Transfer'),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF00A99A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
+                        shape: const StadiumBorder(),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Select menu items',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.82),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: menu.asData == null
+                          ? null
+                          : () => _selectRoomCharge(menu.asData!.value.items),
+                      icon: const Icon(Icons.meeting_room_outlined, size: 17),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Room Charges'),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFED9418),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFFB7A186),
+                        disabledForegroundColor: Colors.white70,
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
+                        shape: const StadiumBorder(),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: menu.asData == null
-                  ? null
-                  : () => _selectRoomCharge(menu.asData!.value.items),
-              icon: const Icon(Icons.meeting_room_outlined, size: 18),
-              label: const Text('Room Charges'),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFED9418),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFFB7A186),
-                disabledForegroundColor: Colors.white70,
-                elevation: 1,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                shape: const StadiumBorder(),
-                textStyle: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       body: menu.when(
