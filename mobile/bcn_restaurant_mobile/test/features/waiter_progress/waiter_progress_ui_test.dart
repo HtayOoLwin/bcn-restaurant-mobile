@@ -89,6 +89,14 @@ void main() {
     expect(itemList, greaterThan(expandedStart));
   });
 
+  test('item Cancel button is visibly red and right aligned', () {
+    expect(source, contains('OutlinedButton.icon('));
+    expect(source, contains('Icons.delete_outline_rounded'));
+    expect(source, contains('Color(0xFFD32F2F)'));
+    expect(source, contains('crossAxisAlignment: CrossAxisAlignment.end'));
+    expect(source, contains('right: 0'));
+  });
+
   test('waiter can cancel only eligible order rows with confirmation', () {
     expect(source, contains('if (item.canCancel) ...['));
     expect(source, contains('Cancel Item Quantity'));
