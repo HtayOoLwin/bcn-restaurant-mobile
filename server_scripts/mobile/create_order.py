@@ -74,6 +74,14 @@ if not customer_row:
 if customer_row.disabled:
     frappe.throw("Customer / Table is disabled: " + customer)
 
+# Serialize creation with table transfers and other new orders.
+# Transfers lock the same Customer row before moving the active Sales Order.
+frappe.db.sql(
+    "SELECT name FROM `tabCustomer` WHERE name=%(name)s FOR UPDATE",
+    {"name": customer},
+    as_dict=True,
+)
+
 active_orders = frappe.get_all(
     "Sales Order",
     filters={
