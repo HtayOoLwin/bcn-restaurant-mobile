@@ -52,6 +52,37 @@ class WaiterProgressItem {
   final String? kitchenNote;
 }
 
+class WaiterRoomPreview {
+  const WaiterRoomPreview({
+    required this.checkIn,
+    required this.checkOut,
+    required this.elapsedSeconds,
+    required this.billableHours,
+    required this.hourlyRate,
+    required this.amount,
+    required this.isLive,
+  });
+
+  factory WaiterRoomPreview.fromJson(Map<String, dynamic> json) =>
+      WaiterRoomPreview(
+        checkIn: json['check_in']?.toString() ?? '',
+        checkOut: json['check_out']?.toString(),
+        elapsedSeconds: (json['elapsed_seconds'] as num?)?.toDouble() ?? 0,
+        billableHours: (json['billable_hours'] as num?)?.toDouble() ?? 0,
+        hourlyRate: (json['hourly_rate'] as num?)?.toDouble() ?? 0,
+        amount: (json['amount'] as num?)?.toDouble() ?? 0,
+        isLive: json['is_live'] == true,
+      );
+
+  final String checkIn;
+  final String? checkOut;
+  final double elapsedSeconds;
+  final double billableHours;
+  final double hourlyRate;
+  final double amount;
+  final bool isLive;
+}
+
 class WaiterProgressOrder {
   const WaiterProgressOrder({
     required this.name,
@@ -68,6 +99,7 @@ class WaiterProgressOrder {
     required this.grandTotal,
     required this.currency,
     required this.taxes,
+    this.roomPreview,
   });
 
   factory WaiterProgressOrder.fromJson(Map<String, dynamic> json) {
@@ -96,6 +128,11 @@ class WaiterProgressOrder {
       grandTotal: number('grand_total'),
       currency: json['currency']?.toString() ?? 'MMK',
       taxes: json['taxes'] as List? ?? const [],
+      roomPreview: json['room_preview'] is Map
+          ? WaiterRoomPreview.fromJson(
+              Map<String, dynamic>.from(json['room_preview'] as Map),
+            )
+          : null,
     );
   }
 
@@ -113,6 +150,7 @@ class WaiterProgressOrder {
   final double taxesTotal;
   final double grandTotal;
   final String currency;
+  final WaiterRoomPreview? roomPreview;
 }
 
 class WaiterProgressResponse {
