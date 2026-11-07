@@ -626,6 +626,76 @@ elif action == "DailyReport":
         ],
     }
 
+elif action == "StartCheckout":
+    # Pay and Credit both call this BEFORE any selection dialogs.
+    # Locking the Sales Order makes repeated taps and retries idempotent.
+    sales_order_name = (frappe.form_dict.get("sales_order") or "").strip()
+    if not sales_order_name:
+        frappe.throw("sales_order is required")
+    locked_rows = frappe.db.sql(
+        "SELECT name FROM `tabSales Order` WHERE name=%(name)s FOR UPDATE",
+        {"name": sales_order_name}, as_dict=True,
+    )
+    if not locked_rows:
+        frappe.throw("Sales Order not found")
+    so = frappe.get_doc("Sales Order", sales_order_name)
+    if so.company != COMPANY or so.currency != CURRENCY:
+        frappe.throw("Restaurant company/currency mismatch")
+
+    state = (so.get("custom_restaurant_status") or "").strip()
+    if so.docstatus == 0 and state == "Open":
+        if not so.items:
+            frappe.throw("Sales Order has no items")
+        check_in = frappe.utils.get_datetime(
+            so.get("custom_check_in") or so.creation
+        )
+        now = frappe.utils.now_datetime()
+        elapsed = (now - check_in).total_seconds()
+        if elapsed < 0:
+            frappe.throw("Check-out cannot be before check-in")
+        half_hours = max(2, int((elapsed + 1799.999999) // 1800))
+        billable = half_hours / 2.0
+        room_rows = []
+        if frappe.get_meta("Item").has_field("custom_is_room_charge"):
+            room_rows = [
+                row for row in so.items
+                if frappe.db.get_value(
+                    "Item", row.item_code, "custom_is_room_charge"
+                )
+            ]
+        if len(room_rows) > 1:
+            frappe.throw("Only one Room Charges item is allowed")
+        if room_rows:
+            if room_rows[0].uom != "Hour":
+                frappe.throw("Room Charges UOM must be Hour")
+            room_rows[0].qty = billable
+        so.custom_check_in = check_in
+        so.custom_check_out = now
+        so.custom_duration = elapsed / 3600.0
+        so.custom_billable_hours = billable if room_rows else 0
+        so.custom_bill_revision = int(so.get("custom_bill_revision") or 0) + 1
+        so.custom_restaurant_status = "Billing"
+        so.calculate_taxes_and_totals()
+        so.save(ignore_permissions=True)
+    elif so.docstatus == 0 and state == "Billing":
+        if not so.get("custom_check_out"):
+            frappe.throw("Billing order has no locked check-out time")
+    elif so.docstatus == 1 and state == "Payment Pending":
+        if not so.get("custom_check_out"):
+            frappe.throw("Payment Pending order has no check-out time")
+    else:
+        frappe.throw("Only an active restaurant order can start checkout")
+
+    frappe.response["message"] = {
+        "success": True,
+        "sales_order": so.name,
+        "check_out": str(so.get("custom_check_out")),
+        "billable_hours": float(so.get("custom_billable_hours") or 0),
+        "room_charges_locked": True,
+        "restaurant_status": so.custom_restaurant_status,
+        "grand_total": float(so.grand_total or 0),
+    }
+
 elif action == "Pay":
     sales_order_name = (frappe.form_dict.get("sales_order") or "").strip()
     if not sales_order_name:
@@ -660,40 +730,10 @@ elif action == "Pay":
             "restaurant_status": state, "duplicate": True,
         }
     elif so.docstatus == 0 and state in ["Open", "Billing"]:
-        if state == "Open":
-            if not so.items:
-                frappe.throw("Sales Order has no items")
-            check_in = frappe.utils.get_datetime(
-                so.get("custom_check_in") or so.creation
-            )
-            now = frappe.utils.now_datetime()
-            elapsed = (now - check_in).total_seconds()
-            if elapsed < 0:
-                frappe.throw("Check-out cannot be before check-in")
-            half_hours = max(2, int((elapsed + 1799.999999) // 1800))
-            billable = half_hours / 2.0
-            room_rows = []
-            if frappe.get_meta("Item").has_field("custom_is_room_charge"):
-                room_rows = [
-                    row for row in so.items
-                    if frappe.db.get_value(
-                        "Item", row.item_code, "custom_is_room_charge"
-                    )
-                ]
-            if len(room_rows) > 1:
-                frappe.throw("Only one Room Charges item is allowed")
-            if room_rows:
-                if room_rows[0].uom != "Hour":
-                    frappe.throw("Room Charges UOM must be Hour")
-                room_rows[0].qty = billable
-            so.custom_check_in = check_in
-            so.custom_check_out = now
-            so.custom_duration = elapsed / 3600.0
-            so.custom_billable_hours = billable if room_rows else 0
-            so.custom_bill_revision = int(so.get("custom_bill_revision") or 0) + 1
-            so.custom_restaurant_status = "Billing"
-            so.calculate_taxes_and_totals()
-            so.save(ignore_permissions=True)
+        # Checkout timestamp must already have been locked by StartCheckout.
+        # Do not recalculate it while selecting a Credit Customer or retrying Pay.
+        if state != "Billing" or not so.get("custom_check_out"):
+            frappe.throw("Start checkout before preparing payment")
         selected_customer = (frappe.form_dict.get("credit_customer") or "").strip()
         if selected_customer:
             customer = frappe.db.get_value(
