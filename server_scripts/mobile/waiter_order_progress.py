@@ -93,10 +93,64 @@ for order in orders:
         limit_page_length=1000,
     )
 
+    # Live room-charge preview is computed in memory, never saved to the SO.
+    # It uses the same 1-hour minimum / 30-minute rounding as StartCheckout.
+    preview_doc = None
+    room_preview = None
+    room_codes = []
+    if frappe.get_meta("Item").has_field("custom_is_room_charge"):
+        for row in item_rows:
+            if frappe.db.get_value("Item", row.item_code, "custom_is_room_charge"):
+                room_codes.append(row.item_code)
+    if len(room_codes) > 1:
+        frappe.throw("Only one Room Charges item is allowed per Sales Order")
+    if room_codes:
+        preview_doc = frappe.get_doc("Sales Order", order.name)
+        room_line = None
+        for item in preview_doc.items:
+            if item.item_code == room_codes[0]:
+                room_line = item
+                break
+        if room_line and room_line.uom != "Hour":
+            frappe.throw("Room Charges UOM must be Hour")
+        check_in = frappe.utils.get_datetime(
+            preview_doc.get("custom_check_in") or preview_doc.creation
+        )
+        check_out = preview_doc.get("custom_check_out")
+        effective_end = (
+            frappe.utils.get_datetime(check_out)
+            if check_out else frappe.utils.now_datetime()
+        )
+        elapsed = max(0, (effective_end - check_in).total_seconds())
+        half_hours = max(2, int((elapsed + 1799.999999) // 1800))
+        billable = half_hours / 2.0
+        if room_line:
+            if order.custom_restaurant_status == "Open" and not check_out:
+                room_line.qty = billable
+                preview_doc.calculate_taxes_and_totals()
+            else:
+                billable = frappe.utils.flt(room_line.qty)
+            room_preview = {
+                "check_in": str(check_in),
+                "check_out": str(check_out) if check_out else None,
+                "elapsed_seconds": float(elapsed),
+                "billable_hours": float(billable),
+                "hourly_rate": float(room_line.rate or 0),
+                "amount": float(room_line.amount or 0),
+                "is_live": bool(
+                    order.custom_restaurant_status == "Open" and not check_out
+                ),
+            }
+
+    item_snapshot = {}
+    if preview_doc and room_preview:
+        item_snapshot = {item.name: item for item in preview_doc.items}
+
     details = []
     total_qty = 0.0
     for row in item_rows:
-        qty = frappe.utils.flt(row.qty)
+        snap = item_snapshot.get(row.name, row)
+        qty = frappe.utils.flt(snap.qty)
         total_qty = total_qty + qty
         details.append(
             {
@@ -105,8 +159,8 @@ for order in orders:
                 "item_name": row.item_name or row.item_code,
                 "qty": float(qty),
                 "uom": row.uom,
-                "rate": float(row.rate or 0),
-                "amount": float(row.amount or 0),
+                "rate": float(snap.rate or 0),
+                "amount": float(snap.amount or 0),
                 "kitchen_counter": row.custom_kitchen_counter,
                 "kitchen_note": row.custom_kitchen_note,
                 "custom_foc": int(row.custom_foc or 0),
@@ -132,6 +186,8 @@ for order in orders:
         limit_page_length=100,
     )
     tax_details = []
+    if preview_doc and room_preview:
+        tax_data = preview_doc.taxes
     for tax in tax_data:
         amount = float(tax.tax_amount or 0)
         if abs(amount) <= 0.00001:
@@ -152,9 +208,16 @@ for order in orders:
             "customer": order.customer,
             "customer_name": order.customer_name or order.customer,
             "creation": order.creation,
-            "grand_total": float(order.grand_total or 0),
-            "net_total": float(order.net_total or 0),
-            "total_taxes_and_charges": float(order.total_taxes_and_charges or 0),
+            "grand_total": float(
+                preview_doc.grand_total if room_preview else order.grand_total or 0
+            ),
+            "net_total": float(
+                preview_doc.net_total if room_preview else order.net_total or 0
+            ),
+            "total_taxes_and_charges": float(
+                preview_doc.total_taxes_and_charges if room_preview else order.total_taxes_and_charges or 0
+            ),
+            "room_preview": room_preview,
             "currency": order.currency or "MMK",
             "taxes": tax_details,
             "total_qty": float(total_qty),
