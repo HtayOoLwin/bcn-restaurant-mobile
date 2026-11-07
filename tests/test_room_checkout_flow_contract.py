@@ -53,3 +53,18 @@ def test_preview_is_read_only_and_calculates_tax_and_room_total():
     assert '"is_live": bool(' in server
     assert "preview_doc.save(" not in server
     assert "frappe.db.set_value(" not in server
+
+
+def test_room_item_recognized_by_group_even_when_optional_flag_is_unset():
+    create = (SERVER / "create_order.py").read_text(encoding="utf-8")
+    progress = (SERVER / "waiter_order_progress.py").read_text(encoding="utf-8")
+    billing = (SERVER / "cashier_billing.py").read_text(encoding="utf-8")
+    assert '(item.item_group or "").strip().lower() == "room charges"' in create
+    assert 'item_group.strip().lower() == "room charges"' in progress
+    assert 'item_group.strip().lower() == "room charges"' in billing
+
+
+def test_room_preview_is_visible_on_collapsed_order_cards():
+    screen = (MOBILE / "features" / "waiter_progress" / "presentation" / "waiter_progress_screen.dart").read_text(encoding="utf-8")
+    card = screen.split("class _ProgressCardState", 1)[1].split("class _RoomChargePreviewCard", 1)[0]
+    assert card.index("if (widget.order.roomPreview != null)") < card.index("if (_expanded) ...[")
