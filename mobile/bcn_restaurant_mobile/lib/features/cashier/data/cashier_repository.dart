@@ -32,6 +32,19 @@ class CashierRepository {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  /// Freeze check-out and final room charges once, before Pay/Credit dialogs.
+  Future<Map<String, dynamic>> startCheckout(String salesOrder) async {
+    final data = await _apiClient.postMethod(
+      'bcn_cashier_billing',
+      data: {'action': 'StartCheckout', 'sales_order': salesOrder},
+    );
+    final result = Map<String, dynamic>.from(data as Map);
+    if (result['room_charges_locked'] != true) {
+      throw StateError('Server did not confirm room charges checkout lock.');
+    }
+    return result;
+  }
+
   Future<Map<String, dynamic>> preparePayment(
     String salesOrder, {
     String? creditCustomer,
