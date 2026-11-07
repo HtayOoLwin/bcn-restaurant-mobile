@@ -444,6 +444,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       return;
     }
     try {
+      // The Pay/Credit tap itself starts checkout. Credit customer selection
+      // happens only AFTER server-side checkout time and room rate are locked.
+      // Closing a dialog must never roll back or reset this check-out time.
+      await ref.read(cashierRepositoryProvider).startCheckout(bill.salesOrder);
+      ref.invalidate(cashierBillingProvider);
+      if (!mounted || !context.mounted) return;
+
       String? creditCustomer;
       if (creditFlow) {
         creditCustomer = await _chooseCreditCustomer(context);
