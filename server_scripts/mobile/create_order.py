@@ -212,7 +212,10 @@ if not is_duplicate:
             if requested_uom and requested_uom != "Hour":
                 frappe.throw("Room charge UOM must be Hour")
             if any(
-                bool(frappe.db.get_value("Item", row.item_code, "custom_is_room_charge"))
+                (
+                    frappe.get_meta("Item").has_field("custom_is_room_charge")
+                    and bool(frappe.db.get_value("Item", row.item_code, "custom_is_room_charge"))
+                )
                 or (frappe.db.get_value("Item", row.item_code, "item_group") or "").strip().lower() == "room charges"
                 for row in sales_order.items
             ):
