@@ -387,6 +387,17 @@ class _FakeCashierPaymentApiClient extends ApiClient {
     if (method != 'bcn_cashier_billing') {
       throw StateError('Unexpected POST method: $method');
     }
+    if (data?['action'] == 'StartCheckout') {
+      return {
+        'success': true,
+        'sales_order': 'SO-0001',
+        'check_out': '2026-09-08 11:00:00',
+        'billable_hours': 1.0,
+        'room_charges_locked': true,
+        'restaurant_status': 'Billing',
+        'grand_total': 1000,
+      };
+    }
     if (data?['action'] == 'Pay') {
       return {
         'sales_order': 'SO-0001',
