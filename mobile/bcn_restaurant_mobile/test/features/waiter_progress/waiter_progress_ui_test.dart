@@ -115,7 +115,7 @@ void main() {
   test('waiter can cancel only eligible order rows with confirmation', () {
     expect(source, contains('if (_cancelMode && item.canCancel) ...['));
     expect(source, contains("label: Text(_cancelMode ? 'Done' : 'Cancel Items')"));
-    expect(source, contains('No items can be cancelled.'));
+    expect(source, contains('No items can be cancelled for this order.'));
     expect(source, isNot(contains('if (widget.order.items.any((item) => item.canCancel))')));
     expect(source, contains('bool _cancelMode = false;'));
     expect(source, contains('Cancel Item Quantity'));
