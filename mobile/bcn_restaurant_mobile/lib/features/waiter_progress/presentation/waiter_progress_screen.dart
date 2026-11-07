@@ -613,7 +613,7 @@ class _RoomChargePreviewCard extends StatelessWidget {
   // their text without treating a timezone-free value as UTC.
   String _formatDateTime(String value) {
     final match = RegExp(
-      r'^(\\d{4})-(\\d{2})-(\\d{2})[ T](\\d{2}):(\\d{2}):(\\d{2})',
+      r'^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})',
     ).firstMatch(value.trim());
     if (match == null) return value;
     return '${match.group(3)}/${match.group(2)}/${match.group(1)} '
