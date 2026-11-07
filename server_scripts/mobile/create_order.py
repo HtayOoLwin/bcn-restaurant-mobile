@@ -199,7 +199,11 @@ if not is_duplicate:
         if item.item_group not in allowed_item_groups:
             frappe.throw("Item is not allowed in POS Profile DMT: " + item_code)
 
-        is_room_charge = bool(item.get("custom_is_room_charge"))
+        # The menu's Room Charges picker uses Item Group. Keep server-side
+        # identification consistent even when the optional custom flag is unset.
+        is_room_charge = bool(item.get("custom_is_room_charge")) or (
+            (item.item_group or "").strip().lower() == "room charges"
+        )
         if is_room_charge and (foc or parcel):
             frappe.throw("Room Charges cannot be FOC or Parcel")
         if is_room_charge:
@@ -207,7 +211,11 @@ if not is_duplicate:
                 frappe.throw("Room charge must be a non-stock Item: " + item_code)
             if requested_uom and requested_uom != "Hour":
                 frappe.throw("Room charge UOM must be Hour")
-            if any(bool(frappe.db.get_value("Item", row.item_code, "custom_is_room_charge")) for row in sales_order.items):
+            if any(
+                bool(frappe.db.get_value("Item", row.item_code, "custom_is_room_charge"))
+                or (frappe.db.get_value("Item", row.item_code, "item_group") or "").strip().lower() == "room charges"
+                for row in sales_order.items
+            ):
                 frappe.throw("Only one Room Charge Item is permitted per Sales Order")
             qty = 1.0  # provisional: Request for Bill calculates duration
         kitchen_counter = "" if is_room_charge else (item.get("custom_kitchen_counter") or "").strip()
