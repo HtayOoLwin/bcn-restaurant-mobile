@@ -376,6 +376,13 @@ class _ProgressCardState extends State<_ProgressCard> {
                 orderDetails,
                 if (_expanded) ...[
                   const Divider(height: 24),
+                  if (widget.order.roomPreview != null) ...[
+                    _RoomChargePreviewCard(
+                      preview: widget.order.roomPreview!,
+                      currency: widget.order.currency,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
@@ -406,7 +413,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                            'No items can be cancelled. Only unprinted quantities in Open orders are eligible.',
+                                            'No items can be cancelled for this order.',
                                           ),
                                         ),
                                       );
@@ -588,6 +595,79 @@ class _ProgressCardState extends State<_ProgressCard> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _RoomChargePreviewCard extends StatelessWidget {
+  const _RoomChargePreviewCard({
+    required this.preview,
+    required this.currency,
+  });
+
+  final WaiterRoomPreview preview;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final seconds = preview.elapsedSeconds.round().clamp(0, 86400000);
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final elapsedText =
+        '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8FF),
+        border: Border.all(color: const Color(0xFFB5D3F0)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.meeting_room_outlined,
+                  size: 19, color: Color(0xFF153D69)),
+              const SizedBox(width: 7),
+              const Expanded(
+                child: Text('Room Charges',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              Text(preview.isLive ? 'LIVE PREVIEW' : 'FINAL',
+                  style: TextStyle(
+                    color: preview.isLive
+                        ? const Color(0xFF156B51)
+                        : const Color(0xFF153D69),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  )),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text('Check-in: ${preview.checkIn}'),
+          if (!preview.isLive && preview.checkOut != null)
+            Text('Check-out: ${preview.checkOut}'),
+          Text('Elapsed: $elapsedText   ·   Billable: ${preview.billableHours} hr'),
+          Text('Rate: @ ${formatAmount(preview.hourlyRate)}'),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(preview.isLive ? 'Estimated Room Charges' : 'Final Room Charges',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(formatMoney(preview.amount, currency),
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          if (preview.isLive)
+            const Padding(
+              padding: EdgeInsets.only(top: 5),
+              child: Text('Preview only. Final amount locks when cashier taps Pay or Credit.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF516C86))),
+            ),
+        ],
       ),
     );
   }
