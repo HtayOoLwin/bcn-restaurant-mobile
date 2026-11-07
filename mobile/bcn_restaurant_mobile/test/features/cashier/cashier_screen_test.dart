@@ -118,7 +118,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(printer.calls, hasLength(2));
       expect(printer.calls[1].requestId, 'REQ-A');
-      expect(api.paymentActions, ['Pay', 'ConfirmPayment']);
+      expect(api.paymentActions, ['StartCheckout', 'Pay', 'ConfirmPayment']);
     });
 
     testWidgets('Successful payment prints even after bill leaves active list',
@@ -140,8 +140,9 @@ void main() {
       expect(api.paymentSalesOrders, [
         'SAL-ORD-2026-00005',
         'SAL-ORD-2026-00005',
+        'SAL-ORD-2026-00005',
       ]);
-      expect(api.paymentActions, ['Pay', 'ConfirmPayment']);
+      expect(api.paymentActions, ['StartCheckout', 'Pay', 'ConfirmPayment']);
       expect(printer.calls, hasLength(1));
       expect(printer.calls.single.salesOrder, 'SAL-ORD-2026-00005');
       expect(printer.calls.single.requestId, 'REQ-POST-PAY');
@@ -293,6 +294,17 @@ class _FakeApiClient extends ApiClient {
     final action = data?['action']?.toString() ?? '';
     paymentSalesOrders.add(data?['sales_order']?.toString() ?? '');
     paymentActions.add(action);
+    if (action == 'StartCheckout') {
+      return {
+        'success': true,
+        'sales_order': data?['sales_order'],
+        'check_out': '2026-09-07 10:00:00',
+        'billable_hours': 1.0,
+        'room_charges_locked': true,
+        'restaurant_status': 'Billing',
+        'grand_total': 10500,
+      };
+    }
     if (action == 'Pay') {
       return {
         'sales_order': data?['sales_order'],
