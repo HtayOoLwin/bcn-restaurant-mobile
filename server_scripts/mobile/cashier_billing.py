@@ -657,13 +657,15 @@ elif action == "StartCheckout":
         half_hours = max(2, int((elapsed + 1799.999999) // 1800))
         billable = half_hours / 2.0
         room_rows = []
-        if frappe.get_meta("Item").has_field("custom_is_room_charge"):
-            room_rows = [
-                row for row in so.items
-                if frappe.db.get_value(
-                    "Item", row.item_code, "custom_is_room_charge"
-                )
-            ]
+        has_room_flag = frappe.get_meta("Item").has_field("custom_is_room_charge")
+        for row in so.items:
+            item_group = frappe.db.get_value("Item", row.item_code, "item_group") or ""
+            flag = (
+                frappe.db.get_value("Item", row.item_code, "custom_is_room_charge")
+                if has_room_flag else False
+            )
+            if flag or item_group.strip().lower() == "room charges":
+                room_rows.append(row)
         if len(room_rows) > 1:
             frappe.throw("Only one Room Charges item is allowed")
         if room_rows:
