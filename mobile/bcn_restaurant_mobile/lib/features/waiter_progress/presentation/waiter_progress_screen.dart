@@ -374,16 +374,15 @@ class _ProgressCardState extends State<_ProgressCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 orderDetails,
-                // Keep room charges visible even when the order is collapsed.
-                if (widget.order.roomPreview != null) ...[
-                  const SizedBox(height: 10),
-                  _RoomChargePreviewCard(
-                    preview: widget.order.roomPreview!,
-                    currency: widget.order.currency,
-                  ),
-                ],
                 if (_expanded) ...[
                   const Divider(height: 24),
+                  if (widget.order.roomPreview != null) ...[
+                    _RoomChargePreviewCard(
+                      preview: widget.order.roomPreview!,
+                      currency: widget.order.currency,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
@@ -610,13 +609,27 @@ class _RoomChargePreviewCard extends StatelessWidget {
   final WaiterRoomPreview preview;
   final String currency;
 
+  // Frappe dates are already in the restaurant's local time. Reformat
+  // their text without treating a timezone-free value as UTC.
+  String _formatDateTime(String value) {
+    final match = RegExp(
+      r'^(\\d{4})-(\\d{2})-(\\d{2})[ T](\\d{2}):(\\d{2}):(\\d{2})',
+    ).firstMatch(value.trim());
+    if (match == null) return value;
+    return '${match.group(3)}/${match.group(2)}/${match.group(1)} '
+        '${match.group(4)}:${match.group(5)}:${match.group(6)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final seconds = preview.elapsedSeconds.round().clamp(0, 86400000);
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
+    final remainingSeconds = seconds % 60;
     final elapsedText =
-        '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+        '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${remainingSeconds.toString().padLeft(2, '0')}';
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -647,10 +660,10 @@ class _RoomChargePreviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text('Check-in: ${preview.checkIn}'),
+          Text('Check-in: ${_formatDateTime(preview.checkIn)}'),
           if (!preview.isLive && preview.checkOut != null)
-            Text('Check-out: ${preview.checkOut}'),
-          Text('Elapsed: $elapsedText   ·   Billable: ${preview.billableHours} hr'),
+            Text('Check-out: ${_formatDateTime(preview.checkOut!)}'),
+          Text('Time: $elapsedText   ·   Billable: ${preview.billableHours} hr'),
           Text('Rate: @ ${formatAmount(preview.hourlyRate)}'),
           const SizedBox(height: 6),
           Row(
@@ -662,12 +675,6 @@ class _RoomChargePreviewCard extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-          if (preview.isLive)
-            const Padding(
-              padding: EdgeInsets.only(top: 5),
-              child: Text('Preview only. Final amount locks when cashier taps Pay or Credit.',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF516C86))),
-            ),
         ],
       ),
     );
