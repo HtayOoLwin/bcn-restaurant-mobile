@@ -374,15 +374,16 @@ class _ProgressCardState extends State<_ProgressCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 orderDetails,
+                // Keep room charges visible even when the order is collapsed.
+                if (widget.order.roomPreview != null) ...[
+                  const SizedBox(height: 10),
+                  _RoomChargePreviewCard(
+                    preview: widget.order.roomPreview!,
+                    currency: widget.order.currency,
+                  ),
+                ],
                 if (_expanded) ...[
                   const Divider(height: 24),
-                  if (widget.order.roomPreview != null) ...[
-                    _RoomChargePreviewCard(
-                      preview: widget.order.roomPreview!,
-                      currency: widget.order.currency,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
