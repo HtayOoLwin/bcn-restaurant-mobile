@@ -98,10 +98,15 @@ for order in orders:
     preview_doc = None
     room_preview = None
     room_codes = []
-    if frappe.get_meta("Item").has_field("custom_is_room_charge"):
-        for row in item_rows:
-            if frappe.db.get_value("Item", row.item_code, "custom_is_room_charge"):
-                room_codes.append(row.item_code)
+    has_room_flag = frappe.get_meta("Item").has_field("custom_is_room_charge")
+    for row in item_rows:
+        item_group = frappe.db.get_value("Item", row.item_code, "item_group") or ""
+        flag = (
+            frappe.db.get_value("Item", row.item_code, "custom_is_room_charge")
+            if has_room_flag else False
+        )
+        if flag or item_group.strip().lower() == "room charges":
+            room_codes.append(row.item_code)
     if len(room_codes) > 1:
         frappe.throw("Only one Room Charges item is allowed per Sales Order")
     if room_codes:
