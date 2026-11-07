@@ -64,7 +64,10 @@ def test_room_item_recognized_by_group_even_when_optional_flag_is_unset():
     assert 'item_group.strip().lower() == "room charges"' in billing
 
 
-def test_room_preview_is_visible_on_collapsed_order_cards():
+def test_room_preview_only_visible_in_expanded_order_cards():
     screen = (MOBILE / "features" / "waiter_progress" / "presentation" / "waiter_progress_screen.dart").read_text(encoding="utf-8")
     card = screen.split("class _ProgressCardState", 1)[1].split("class _RoomChargePreviewCard", 1)[0]
-    assert card.index("if (widget.order.roomPreview != null)") < card.index("if (_expanded) ...[")
+    assert card.index("if (_expanded) ...[") < card.index("if (widget.order.roomPreview != null)")
+    assert "Text('Check-in: ${_formatDateTime(preview.checkIn)}')" in screen
+    assert "Text('Time: $elapsedText" in screen
+    assert "Preview only. Final amount locks" not in screen
