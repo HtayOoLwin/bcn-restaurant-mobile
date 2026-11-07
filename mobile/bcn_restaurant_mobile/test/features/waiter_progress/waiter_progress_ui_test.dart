@@ -97,6 +97,15 @@ void main() {
     expect(source, contains('right: 0'));
   });
 
+  test('Order Progress shows a live room charge preview', () {
+    expect(source, contains('widget.order.roomPreview'));
+    expect(source, contains('class _RoomChargePreviewCard'));
+    expect(source, contains('LIVE PREVIEW'));
+    expect(source, contains('Estimated Room Charges'));
+    expect(source, contains('Final Room Charges'));
+    expect(source, contains('formatMoney(preview.amount, currency)'));
+  });
+
   test('printed items require an explicit warning and no ticket print', () {
     expect(source, contains('Kitchen Already Printed'));
     expect(source, contains('No cancellation ticket will be printed.'));
