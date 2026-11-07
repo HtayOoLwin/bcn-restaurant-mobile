@@ -6,12 +6,10 @@
 # - list submitted Billing Sales Orders that have a Draft Sales Invoice
 # - include latest BCN Print Job status and DMT payment modes
 #
-# POST action=Pay:
-# - only a submitted Billing Sales Order can be paid
-# - submit its existing Draft Sales Invoice with update_stock enabled
-# - create submitted Payment Entries for tender allocations
-# - close the restaurant Sales Order after successful payment
-# - successful response-timeout retries resolve existing final documents
+# POST action=StartCheckout: freeze check-out, room hours and totals once.
+# POST action=Pay: prepare the frozen Billing Sales Order and Draft Sales Invoice.
+# POST action=ConfirmPayment: complete the selected Cash / Credit tender.
+# Duplicate checkout calls keep the original check-out time and room charges.
 #
 # No manual commit/rollback is used.
 
@@ -649,7 +647,10 @@ elif action == "StartCheckout":
         check_in = frappe.utils.get_datetime(
             so.get("custom_check_in") or so.creation
         )
-        now = frappe.utils.now_datetime()
+        # Preserve a previously stored checkout time under all circumstances.
+        now = frappe.utils.get_datetime(
+            so.get("custom_check_out") or frappe.utils.now_datetime()
+        )
         elapsed = (now - check_in).total_seconds()
         if elapsed < 0:
             frappe.throw("Check-out cannot be before check-in")
