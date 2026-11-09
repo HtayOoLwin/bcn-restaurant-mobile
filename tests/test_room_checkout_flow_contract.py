@@ -71,3 +71,14 @@ def test_room_preview_only_visible_in_expanded_order_cards():
     assert "Text('Check-in: ${_formatDateTime(preview.checkIn)}')" in screen
     assert "Text('Time: $elapsedText" in screen
     assert "Preview only. Final amount locks" not in screen
+
+
+def test_cashier_discount_is_applied_before_split_tender_allocation():
+    server = (SERVER / "cashier_billing.py").read_text(encoding="utf-8")
+    confirm = server.split('elif action == "ConfirmPayment":', 1)[1]
+    assert 'discount_amount = float(frappe.form_dict.get("discount_amount") or 0)' in confirm
+    assert 'sales_invoice.apply_discount_on = "Grand Total"' in confirm
+    assert 'sales_invoice.discount_amount = discount_amount' in confirm
+    assert 'expected_grand = frozen_grand - discount_amount' in confirm
+    assert confirm.index('sales_invoice.discount_amount = discount_amount') < confirm.index('allocation_result = allocate_tenders(tenders, paid_due)')
+    assert confirm.index('sales_invoice.calculate_taxes_and_totals()', confirm.index('sales_invoice.discount_amount = discount_amount')) < confirm.index('grand_total = float(sales_invoice.grand_total or 0)')
