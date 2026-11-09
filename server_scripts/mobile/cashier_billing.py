@@ -786,6 +786,7 @@ elif action == "ConfirmPayment":
     raw_payments = frappe.form_dict.get("payments")
     payment_type = (frappe.form_dict.get("payment_type") or "Paid").strip()
     credit_amount = float(frappe.form_dict.get("credit_amount") or 0)
+    discount_amount = float(frappe.form_dict.get("discount_amount") or 0)
     credit_remark = (frappe.form_dict.get("credit_remark") or "").strip()
     if payment_type not in ("Paid", "Credit", "Partial Credit"):
         frappe.throw("Invalid cashier payment_type")
@@ -888,7 +889,22 @@ elif action == "ConfirmPayment":
             frozen_grand,
         )
 
+        # The mobile payment sheet already subtracts Discount Amount from the
+        # frozen bill. Persist that same discount on the Draft Sales Invoice
+        # BEFORE validating tenders or submitting the invoice.
+        # Keep the submitted Sales Order (and its room charges) untouched.
+        if not (0 <= discount_amount < frozen_grand):
+            frappe.throw("Discount must be zero or less than the original invoice total")
+        sales_invoice.apply_discount_on = "Grand Total"
+        sales_invoice.discount_amount = discount_amount
+        sales_invoice.calculate_taxes_and_totals()
         grand_total = float(sales_invoice.grand_total or 0)
+        expected_grand = frozen_grand - discount_amount
+        if abs(grand_total - expected_grand) > AMOUNT_TOLERANCE:
+            frappe.throw(
+                "Discounted invoice total does not match net payable: "
+                + str(grand_total) + " vs " + str(expected_grand)
+            )
         if payment_type == "Credit":
             if tenders:
                 frappe.throw("Full Credit must not include payment tenders")
