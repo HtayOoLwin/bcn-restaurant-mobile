@@ -26,5 +26,9 @@ void main() {
     expect(report, contains("'Parcel'"));
     expect(report, contains('unlinked_qty'));
     expect(report, contains('getItemSalesReport'));
+    expect(report, contains("labelText: 'Search Item'"));
+    expect(report, contains("labelText: 'Item Group'"));
+    expect(report, contains("'item_group'"));
+    expect(report, contains("'item_code'"));
   });
 }
