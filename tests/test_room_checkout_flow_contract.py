@@ -82,3 +82,16 @@ def test_cashier_discount_is_applied_before_split_tender_allocation():
     assert 'expected_grand = frozen_grand - discount_amount' in confirm
     assert confirm.index('sales_invoice.discount_amount = discount_amount') < confirm.index('allocation_result = allocate_tenders(tenders, paid_due)')
     assert confirm.index('sales_invoice.calculate_taxes_and_totals()', confirm.index('sales_invoice.discount_amount = discount_amount')) < confirm.index('grand_total = float(sales_invoice.grand_total or 0)')
+
+
+def test_all_foc_zero_total_confirm_payment_skips_tender_allocation():
+    server = (SERVER / "cashier_billing.py").read_text(encoding="utf-8")
+    confirm = server.split('elif action == "ConfirmPayment":', 1)[1]
+    assert 'all_foc = bool(sales_order.items) and all(' in confirm
+    assert 'bool(row.get("custom_foc")) for row in sales_order.items' in confirm
+    assert 'allow_empty=payment_type == "Credit" or free_foc' in confirm
+    assert 'if tenders or credit_amount > AMOUNT_TOLERANCE or discount_amount != 0:' in confirm
+    assert 'if abs(grand_total) > AMOUNT_TOLERANCE:' in confirm
+    assert 'allocations = []' in confirm
+    assert 'elif payment_type == "Credit":' in confirm
+    assert '"custom_foc": int(bool(item.get("custom_foc")))' in server
