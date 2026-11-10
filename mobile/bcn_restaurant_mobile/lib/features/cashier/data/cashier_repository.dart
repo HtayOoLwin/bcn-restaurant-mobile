@@ -32,6 +32,14 @@ class CashierRepository {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  Future<Map<String, dynamic>> getItemSalesReport(String date) async {
+    final data = await _apiClient.getMethod(
+      'bcn_cashier_billing',
+      queryParameters: {'action': 'ItemSalesReport', 'date': date},
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   /// Freeze check-out and final room charges once, before Pay/Credit dialogs.
   Future<Map<String, dynamic>> startCheckout(String salesOrder) async {
     final data = await _apiClient.postMethod(
