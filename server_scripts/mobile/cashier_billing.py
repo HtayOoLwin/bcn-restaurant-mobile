@@ -540,6 +540,23 @@ elif action == "ItemSalesReport":
                 break
             page_start += 500
 
+    # Resolve Item Group from Item Master in batches.
+    item_codes = []
+    for row in item_rows:
+        item_code = (row.item_code or "").strip()
+        if item_code and item_code not in item_codes:
+            item_codes.append(item_code)
+    item_group_map = {}
+    for chunk_start in range(0, len(item_codes), 100):
+        master_rows = frappe.get_all(
+            "Item",
+            filters={"name": ["in", item_codes[chunk_start:chunk_start + 100]]},
+            fields=["name", "item_group"],
+            limit_page_length=100,
+        )
+        for master_row in master_rows:
+            item_group_map[master_row.name] = master_row.item_group or ""
+
     source_names = []
     for row in item_rows:
         source_name = (row.so_detail or "").strip()
@@ -576,10 +593,12 @@ elif action == "ItemSalesReport":
         linked = bool(source)
         foc = bool(source.custom_foc) if linked else False
         parcel = bool(source.custom_parcel) if linked else False
-        key = (row.item_code or "", row.item_name or "", row.uom or "")
+        item_group = item_group_map.get((row.item_code or "").strip(), "")
+        key = (row.item_code or "", row.item_name or "", row.uom or "", item_group)
         if key not in groups:
             groups[key] = {
-                "item_code": key[0], "item_name": key[1], "uom": key[2],
+                "item_code": key[0], "item_name": key[1],
+                "uom": key[2], "item_group": key[3],
                 "total_qty": 0.0, "sales_qty": 0.0,
                 "foc_qty": 0.0, "parcel_qty": 0.0,
                 "sales_amount": 0.0, "unlinked_qty": 0.0, "avg_rate": 0.0,
@@ -608,6 +627,7 @@ elif action == "ItemSalesReport":
             "time": str(invoice.posting_time or ""),
             "item_code": row.item_code or "",
             "item_name": row.item_name or row.item_code or "",
+            "item_group": item_group,
             "qty": qty, "uom": row.uom or "",
             "rate": float(row.rate or 0), "amount": amount,
             "foc": foc, "parcel": parcel, "flags_linked": linked,
@@ -622,6 +642,9 @@ elif action == "ItemSalesReport":
         )
         summary.append(group)
     summary.sort(key=lambda row: (-row["sales_amount"], row["item_name"]))
+    available_item_groups = sorted(set(
+        row["item_group"] for row in summary if row["item_group"]
+    ))
 
     frappe.response["message"] = {
         "date": report_date, "currency": CURRENCY,
@@ -631,6 +654,7 @@ elif action == "ItemSalesReport":
         "parcel_qty": parcel_qty, "unlinked_qty": unlinked_qty,
         "total_amount": total_amount,
         "amount_basis": "Sales Invoice Item net_amount; excludes invoice-level discounts and taxes",
+        "item_groups": available_item_groups,
         "summary": summary, "details": details,
     }
 
