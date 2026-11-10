@@ -20,6 +20,15 @@ class _CashierItemSalesReportScreenState
   late Future<Map<String, dynamic>> _report;
   bool _showDetails = false;
   String _filter = 'All';
+  String _selectedItemGroup = '';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   String _dateValue(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-'
@@ -60,6 +69,19 @@ class _CashierItemSalesReportScreenState
   }
 
   bool _matches(Map<String, dynamic> row, bool details) {
+    final itemGroup = row['item_group']?.toString() ?? '';
+    if (_selectedItemGroup.isNotEmpty && itemGroup != _selectedItemGroup) {
+      return false;
+    }
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      final searchable = [
+        row['item_code'],
+        row['item_name'],
+        row['item_group'],
+      ].map((value) => (value ?? '').toString().toLowerCase()).join(' ');
+      if (!searchable.contains(query)) return false;
+    }
     if (_filter == 'All') return true;
     if (_filter == 'FOC') {
       return details ? row['foc'] == true : _number(row['foc_qty']) > 0;
@@ -112,7 +134,7 @@ class _CashierItemSalesReportScreenState
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(row['item_name']?.toString() ?? '',
               style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text('${row['item_code'] ?? ''} · ${row['uom'] ?? ''}',
+          Text('${row['item_group'] ?? ''} · ${row['item_code'] ?? ''} · ${row['uom'] ?? ''}',
               style: const TextStyle(fontSize: 12, color: Colors.black54)),
           const SizedBox(height: 10),
           Wrap(spacing: 20, runSpacing: 10, children: [
@@ -156,7 +178,7 @@ class _CashierItemSalesReportScreenState
                 style: const TextStyle(fontWeight: FontWeight.bold)),
           ]),
           const SizedBox(height: 4),
-          Text('${row['invoice'] ?? ''} · ${row['customer'] ?? ''}',
+          Text('${row['invoice'] ?? ''} · ${row['customer'] ?? ''} · ${row['item_group'] ?? ''}',
               style: const TextStyle(fontSize: 12, color: Colors.black54)),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center,
@@ -223,6 +245,26 @@ class _CashierItemSalesReportScreenState
                 .map((row) => Map<String, dynamic>.from(row))
                 .where((row) => _matches(row, _showDetails))
                 .toList();
+            final itemGroups = ((result['item_groups'] as List?) ?? const [])
+                .map((value) => value.toString())
+                .where((value) => value.isNotEmpty)
+                .toSet()
+                .toList()..sort();
+            final selectedGroup = itemGroups.contains(_selectedItemGroup)
+                ? _selectedItemGroup : '';
+            final filteredDetails = ((result['details'] as List?) ?? const [])
+                .whereType<Map>()
+                .map((row) => Map<String, dynamic>.from(row))
+                .where((row) => _matches(row, true))
+                .toList();
+            final shownQty = filteredDetails.fold<double>(
+                0, (sum, row) => sum + _number(row['qty']));
+            final shownFoc = filteredDetails.fold<double>(
+                0, (sum, row) => sum + (row['foc'] == true ? _number(row['qty']) : 0));
+            final shownParcel = filteredDetails.fold<double>(
+                0, (sum, row) => sum + (row['parcel'] == true ? _number(row['qty']) : 0));
+            final shownAmount = filteredDetails.fold<double>(
+                0, (sum, row) => sum + _number(row['amount']));
 
             return ListView(padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
               children: [
@@ -230,19 +272,58 @@ class _CashierItemSalesReportScreenState
                   final width = (constraints.maxWidth - 8) / 2;
                   return Wrap(spacing: 8, runSpacing: 8, children: [
                     SizedBox(width: width, child: _metric('Sales Amount',
-                        formatMoney(_number(result['total_amount']), currency),
+                        formatMoney(shownAmount, currency),
                         Icons.account_balance_wallet_outlined)),
                     SizedBox(width: width, child: _metric('Total Qty',
-                        formatAmount(_number(result['total_qty'])),
+                        formatAmount(shownQty),
                         Icons.inventory_2_outlined)),
                     SizedBox(width: width, child: _metric('FOC Qty',
-                        formatAmount(_number(result['foc_qty'])),
+                        formatAmount(shownFoc),
                         Icons.card_giftcard)),
                     SizedBox(width: width, child: _metric('Parcel Qty',
-                        formatAmount(_number(result['parcel_qty'])),
+                        formatAmount(shownParcel),
                         Icons.shopping_bag_outlined)),
                   ]);
                 }),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    labelText: 'Search Item',
+                    hintText: 'Item Name / Item Code / Item Group',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isEmpty ? null : IconButton(
+                      tooltip: 'Clear Search',
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                      icon: const Icon(Icons.clear),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: selectedGroup,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Item Group',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.category_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: '', child: Text('All Item Groups')),
+                    for (final group in itemGroups)
+                      DropdownMenuItem(value: group, child: Text(
+                        group, overflow: TextOverflow.ellipsis,
+                      )),
+                  ],
+                  onChanged: (value) => setState(
+                    () => _selectedItemGroup = value ?? '',
+                  ),
+                ),
                 const SizedBox(height: 14),
                 SegmentedButton<bool>(
                   segments: const [
