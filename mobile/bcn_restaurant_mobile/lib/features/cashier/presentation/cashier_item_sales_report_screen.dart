@@ -124,6 +124,8 @@ class _CashierItemSalesReportScreenState
                 formatAmount(_number(row['foc_qty']))),
             _numberColumn('PC Qty',
                 formatAmount(_number(row['parcel_qty']))),
+            _numberColumn('Avg Rate',
+                formatMoney(_number(row['avg_rate']), currency)),
             _numberColumn('Sales Amount',
                 formatMoney(_number(row['sales_amount']), currency), bold: true),
           ]),
