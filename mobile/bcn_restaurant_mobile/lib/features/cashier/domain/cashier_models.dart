@@ -32,6 +32,7 @@ class CashierBillItem {
     required this.rate,
     required this.amount,
     required this.netAmount,
+    this.isFoc = false,
   });
 
   factory CashierBillItem.fromJson(Map<String, dynamic> json) {
@@ -45,6 +46,8 @@ class CashierBillItem {
       rate: _asDouble(json['rate']),
       amount: _asDouble(json['amount']),
       netAmount: _asDouble(json['net_amount']),
+      isFoc: json['custom_foc'] == true || json['custom_foc'] == 1 ||
+          json['custom_foc']?.toString().toLowerCase() == 'true',
     );
   }
 
@@ -56,6 +59,7 @@ class CashierBillItem {
   final double rate;
   final double amount;
   final double netAmount;
+  final bool isFoc;
 }
 
 class CashierBillTax {

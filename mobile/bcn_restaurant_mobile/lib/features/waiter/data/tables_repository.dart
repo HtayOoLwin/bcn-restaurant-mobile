@@ -53,7 +53,13 @@ class TablesRepository {
   Future<TablesResponse> getTables(String customerGroup) async {
     final data = await _apiClient.getMethod(
       'bcn_mobile_tables',
-      queryParameters: {'customer_group': customerGroup},
+      // Fetch current Customer.customer_name after an ERPNext rename/edit.
+      // A unique query prevents intermediate HTTP caches from returning an
+      // older takeaway table list.
+      queryParameters: {
+        'customer_group': customerGroup,
+        '_refresh': DateTime.now().millisecondsSinceEpoch,
+      },
     );
     return TablesResponse.fromJson(Map<String, dynamic>.from(data as Map));
   }

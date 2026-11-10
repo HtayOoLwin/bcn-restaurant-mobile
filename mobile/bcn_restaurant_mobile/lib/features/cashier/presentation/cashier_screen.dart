@@ -553,7 +553,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         ? _parseTender(creditAmountController.text)
         : 0;
     double amountDue() => (bill.grandTotal - discountAmount()).clamp(0, double.infinity).toDouble();
-    bool discountValid() => discountAmount() >= 0 && discountAmount() < bill.grandTotal && !discountController.text.contains('-');
+    // Only a genuinely all-FOC Sales Order can use zero-tender checkout.
+    final allFocOrder = bill.items.isNotEmpty &&
+        bill.items.every((item) => item.isFoc);
+    bool discountValid() => discountAmount() >= 0 &&
+        (bill.grandTotal <= 0.01
+            ? discountAmount() == 0
+            : discountAmount() < bill.grandTotal) &&
+        !discountController.text.contains('-');
 
     void setControllerAmount(TextEditingController? controller, double amount) {
       if (controller == null) return;
@@ -692,6 +699,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                     !splitModeNames.contains(partialCreditName) ||
                     (creditAmount > 0.0001 && creditAmount < payable - 0.0001));
             final validDiscount = discountValid();
+            final isFreeFoc = allFocOrder && bill.grandTotal.abs() <= 0.01 &&
+                payable.abs() <= 0.01 && discountAmount() == 0;
             final remaining = totalTendered + creditAmount < payable
                 ? payable - totalTendered - creditAmount
                 : 0.0;
@@ -700,14 +709,15 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 : 0.0;
             final nonCashOver = nonCashTotal + creditAmount > payable + 0.0001;
             final overWithoutCash = change > 0 && cashTendered <= 0;
-            final canPay =
-                validDiscount && creditRemarkValid && creditValid &&
-                payable > 0 &&
-                (selectedPaymentType == creditPaymentType ||
-                    (tenders.isNotEmpty && remaining <= 0.0001)) &&
-                !nonCashOver &&
-                !overWithoutCash &&
-                !busy;
+            final canPay = isFreeFoc
+                ? totalTendered <= 0.0001 && !busy
+                : validDiscount && creditRemarkValid && creditValid &&
+                    payable > 0 &&
+                    (selectedPaymentType == creditPaymentType ||
+                        (tenders.isNotEmpty && remaining <= 0.0001)) &&
+                    !nonCashOver &&
+                    !overWithoutCash &&
+                    !busy;
 
             return SafeArea(
               child: Padding(
@@ -761,6 +771,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       ),
                       const SizedBox(height: 8),
                       _AmountSummaryRow(label: 'Net Payable', value: formatMoney(payable, bill.currency), emphasize: true),
+                      if (isFreeFoc) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          'All items are FOC. No payment is required.',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                      if (!isFreeFoc) ...[
                       const SizedBox(height: 20),
                       Text(
                         'Payment Type',
@@ -1023,6 +1041,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         ),
                       if (selectedPaymentType == 'Split' && creditAmount > 0)
                         _AmountSummaryRow(label: 'Credit Outstanding', value: formatMoney(creditAmount, bill.currency)),
+                      ], // Hide payment and credit inputs for free FOC orders.
                       _AmountSummaryRow(
                         label: 'Total Tendered',
                         value: formatMoney(totalTendered, bill.currency),
@@ -1063,13 +1082,15 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                       .read(cashierRepositoryProvider)
                                       .confirmPayment(
                                         salesOrder: bill.salesOrder,
-                                        payments: tenders,
+                                        payments: isFreeFoc ? const [] : tenders,
                                         discountAmount: discountAmount(),
-                                        paymentType: selectedPaymentType == creditPaymentType
+                                        paymentType: isFreeFoc
+                                            ? 'Paid'
+                                            : selectedPaymentType == creditPaymentType
                                             ? creditPaymentType
                                             : creditAmount > 0 ? 'Partial Credit' : 'Paid',
-                                        creditAmount: creditAmount,
-                                        creditRemark: creditSelected ? creditRemarkController.text.trim() : '',
+                                        creditAmount: isFreeFoc ? 0 : creditAmount,
+                                        creditRemark: isFreeFoc ? '' : (creditSelected ? creditRemarkController.text.trim() : ''),
                                       );
                                   if (mounted) {
                                     setState(() {
@@ -1108,8 +1129,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          entries.isNotEmpty
-                                              ? 'Payment completed · $entries$changeText'
+                                          isFreeFoc
+                                              ? 'FOC order confirmed · No payment required'
+                                              : entries.isNotEmpty
+                                                  ? 'Payment completed · $entries$changeText'
                                               : creditSelected
                                                   ? 'Credit invoice submitted · Outstanding ${formatMoney(creditAmount, bill.currency)}'
                                                   : 'Payment completed$changeText',
@@ -1138,9 +1161,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         label: Text(
                           busy
                               ? 'Processing…'
-                              : selectedPaymentType == creditPaymentType
-                                  ? 'Confirm Credit'
-                                  : 'Confirm Payment',
+                              : isFreeFoc
+                                  ? 'Confirm FOC Order'
+                                  : selectedPaymentType == creditPaymentType
+                                      ? 'Confirm Credit'
+                                      : 'Confirm Payment',
                         ),
                       ),
                     ],

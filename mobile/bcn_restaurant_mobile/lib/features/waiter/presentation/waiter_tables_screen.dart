@@ -34,7 +34,8 @@ class WaiterTablesScreen extends ConsumerStatefulWidget {
   ConsumerState<WaiterTablesScreen> createState() => _WaiterTablesScreenState();
 }
 
-class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
+class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
+    with WidgetsBindingObserver {
   String customerGroup = '';
   String _searchQuery = '';
   final _searchController = TextEditingController();
@@ -43,6 +44,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -60,7 +62,17 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // A Customer name may have been edited in ERPNext while the app was away.
+    if (state == AppLifecycleState.resumed && mounted) {
+      ref.invalidate(tablesProvider(customerGroup));
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _autoRefreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
