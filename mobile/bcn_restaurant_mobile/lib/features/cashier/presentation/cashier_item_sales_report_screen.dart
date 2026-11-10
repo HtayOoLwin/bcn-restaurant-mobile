@@ -20,7 +20,7 @@ class _CashierItemSalesReportScreenState
   late Future<Map<String, dynamic>> _report;
   bool _showDetails = false;
   String _filter = 'All';
-  String _selectedItemGroup = '';
+  String _selectedCounter = '';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -69,8 +69,8 @@ class _CashierItemSalesReportScreenState
   }
 
   bool _matches(Map<String, dynamic> row, bool details) {
-    final itemGroup = row['item_group']?.toString() ?? '';
-    if (_selectedItemGroup.isNotEmpty && itemGroup != _selectedItemGroup) {
+    final counterName = row['counter']?.toString() ?? '';
+    if (_selectedCounter.isNotEmpty && counterName != _selectedCounter) {
       return false;
     }
     final query = _searchQuery.trim().toLowerCase();
@@ -78,7 +78,7 @@ class _CashierItemSalesReportScreenState
       final searchable = [
         row['item_code'],
         row['item_name'],
-        row['item_group'],
+        row['counter'],
       ].map((value) => (value ?? '').toString().toLowerCase()).join(' ');
       if (!searchable.contains(query)) return false;
     }
@@ -134,7 +134,7 @@ class _CashierItemSalesReportScreenState
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(row['item_name']?.toString() ?? '',
               style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text('${row['item_group'] ?? ''} · ${row['item_code'] ?? ''} · ${row['uom'] ?? ''}',
+          Text('${row['counter'] ?? ''} · ${row['item_code'] ?? ''} · ${row['uom'] ?? ''}',
               style: const TextStyle(fontSize: 12, color: Colors.black54)),
           const SizedBox(height: 10),
           Wrap(spacing: 20, runSpacing: 10, children: [
@@ -178,7 +178,7 @@ class _CashierItemSalesReportScreenState
                 style: const TextStyle(fontWeight: FontWeight.bold)),
           ]),
           const SizedBox(height: 4),
-          Text('${row['invoice'] ?? ''} · ${row['customer'] ?? ''} · ${row['item_group'] ?? ''}',
+          Text('${row['invoice'] ?? ''} · ${row['customer'] ?? ''} · ${row['counter'] ?? ''}',
               style: const TextStyle(fontSize: 12, color: Colors.black54)),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center,
@@ -245,13 +245,13 @@ class _CashierItemSalesReportScreenState
                 .map((row) => Map<String, dynamic>.from(row))
                 .where((row) => _matches(row, _showDetails))
                 .toList();
-            final itemGroups = ((result['item_groups'] as List?) ?? const [])
+            final counterNames = ((result['counters'] as List?) ?? const [])
                 .map((value) => value.toString())
                 .where((value) => value.isNotEmpty)
                 .toSet()
                 .toList()..sort();
-            final selectedGroup = itemGroups.contains(_selectedItemGroup)
-                ? _selectedItemGroup : '';
+            final selectedCounter = counterNames.contains(_selectedCounter)
+                ? _selectedCounter : '';
             final filteredDetails = ((result['details'] as List?) ?? const [])
                 .whereType<Map>()
                 .map((row) => Map<String, dynamic>.from(row))
@@ -290,7 +290,7 @@ class _CashierItemSalesReportScreenState
                   controller: _searchController,
                   decoration: InputDecoration(
                     labelText: 'Search Item',
-                    hintText: 'Item Name / Item Code / Item Group',
+                    hintText: 'Item Name / Item Code / Kitchen Counter',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isEmpty ? null : IconButton(
                       tooltip: 'Clear Search',
@@ -306,22 +306,22 @@ class _CashierItemSalesReportScreenState
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: selectedGroup,
+                  value: selectedCounter,
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Item Group',
+                    labelText: 'Kitchen Counter',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.category_outlined),
                   ),
                   items: [
-                    const DropdownMenuItem(value: '', child: Text('All Item Groups')),
-                    for (final group in itemGroups)
+                    const DropdownMenuItem(value: '', child: Text('All Counters')),
+                    for (final group in counterNames)
                       DropdownMenuItem(value: group, child: Text(
                         group, overflow: TextOverflow.ellipsis,
                       )),
                   ],
                   onChanged: (value) => setState(
-                    () => _selectedItemGroup = value ?? '',
+                    () => _selectedCounter = value ?? '',
                   ),
                 ),
                 const SizedBox(height: 14),
