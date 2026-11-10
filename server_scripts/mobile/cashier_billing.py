@@ -582,7 +582,7 @@ elif action == "ItemSalesReport":
                 "item_code": key[0], "item_name": key[1], "uom": key[2],
                 "total_qty": 0.0, "sales_qty": 0.0,
                 "foc_qty": 0.0, "parcel_qty": 0.0,
-                "sales_amount": 0.0, "unlinked_qty": 0.0,
+                "sales_amount": 0.0, "unlinked_qty": 0.0, "avg_rate": 0.0,
             }
         entry = groups[key]
         entry["total_qty"] += qty
@@ -615,6 +615,11 @@ elif action == "ItemSalesReport":
 
     summary = []
     for group in groups.values():
+        # Average net item amount per unit; FOC quantities are included.
+        group["avg_rate"] = (
+            group["sales_amount"] / group["total_qty"]
+            if abs(group["total_qty"]) > 0.00001 else 0.0
+        )
         summary.append(group)
     summary.sort(key=lambda row: (-row["sales_amount"], row["item_name"]))
 
