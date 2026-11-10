@@ -540,7 +540,8 @@ elif action == "ItemSalesReport":
                 break
             page_start += 500
 
-    # Resolve Item Group from Item Master in batches.
+    # Use the counter captured on the Sales Order Item at order time.
+    # Fallback to the current Item Group routing for legacy order rows.
     item_codes = []
     for row in item_rows:
         item_code = (row.item_code or "").strip()
@@ -556,6 +557,20 @@ elif action == "ItemSalesReport":
         )
         for master_row in master_rows:
             item_group_map[master_row.name] = master_row.item_group or ""
+    group_counter_map = {}
+    item_group_names = []
+    for item_group in item_group_map.values():
+        if item_group and item_group not in item_group_names:
+            item_group_names.append(item_group)
+    for chunk_start in range(0, len(item_group_names), 100):
+        group_rows = frappe.get_all(
+            "Item Group",
+            filters={"name": ["in", item_group_names[chunk_start:chunk_start + 100]]},
+            fields=["name", "custom_oc_counter"],
+            limit_page_length=100,
+        )
+        for group_row in group_rows:
+            group_counter_map[group_row.name] = group_row.custom_oc_counter or ""
 
     source_names = []
     for row in item_rows:
@@ -568,7 +583,7 @@ elif action == "ItemSalesReport":
         source_rows = frappe.get_all(
             "Sales Order Item",
             filters={"name": ["in", source_names[chunk_start:chunk_start + 100]]},
-            fields=["name", "custom_foc", "custom_parcel"],
+            fields=["name", "custom_foc", "custom_parcel", "custom_kitchen_counter"],
             limit_page_length=100,
         )
         for source in source_rows:
@@ -594,11 +609,13 @@ elif action == "ItemSalesReport":
         foc = bool(source.custom_foc) if linked else False
         parcel = bool(source.custom_parcel) if linked else False
         item_group = item_group_map.get((row.item_code or "").strip(), "")
-        key = (row.item_code or "", row.item_name or "", row.uom or "", item_group)
+        saved_counter = (source.custom_kitchen_counter or "").strip() if linked else ""
+        counter = saved_counter or group_counter_map.get(item_group, "")
+        key = (row.item_code or "", row.item_name or "", row.uom or "", counter)
         if key not in groups:
             groups[key] = {
                 "item_code": key[0], "item_name": key[1],
-                "uom": key[2], "item_group": key[3],
+                "uom": key[2], "counter": key[3],
                 "total_qty": 0.0, "sales_qty": 0.0,
                 "foc_qty": 0.0, "parcel_qty": 0.0,
                 "sales_amount": 0.0, "unlinked_qty": 0.0, "avg_rate": 0.0,
@@ -627,7 +644,7 @@ elif action == "ItemSalesReport":
             "time": str(invoice.posting_time or ""),
             "item_code": row.item_code or "",
             "item_name": row.item_name or row.item_code or "",
-            "item_group": item_group,
+            "counter": counter,
             "qty": qty, "uom": row.uom or "",
             "rate": float(row.rate or 0), "amount": amount,
             "foc": foc, "parcel": parcel, "flags_linked": linked,
@@ -642,8 +659,8 @@ elif action == "ItemSalesReport":
         )
         summary.append(group)
     summary.sort(key=lambda row: (-row["sales_amount"], row["item_name"]))
-    available_item_groups = sorted(set(
-        row["item_group"] for row in summary if row["item_group"]
+    available_counters = sorted(set(
+        row["counter"] for row in summary if row["counter"]
     ))
 
     frappe.response["message"] = {
@@ -654,7 +671,7 @@ elif action == "ItemSalesReport":
         "parcel_qty": parcel_qty, "unlinked_qty": unlinked_qty,
         "total_amount": total_amount,
         "amount_basis": "Sales Invoice Item net_amount; excludes invoice-level discounts and taxes",
-        "item_groups": available_item_groups,
+        "counters": available_counters,
         "summary": summary, "details": details,
     }
 
