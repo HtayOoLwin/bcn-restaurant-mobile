@@ -13,6 +13,70 @@ const _paymentGreen = Color(0xFF0B6B3A);
 
 void main() {
   group('CashierScreen payment and Android receipt printing', () {
+    testWidgets('All FOC zero-value order can confirm without tenders',
+        (tester) async {
+      final response = _billingResponse(restaurantStatus: 'Billing');
+      final bill = (response['bills'] as List).first as Map<String, dynamic>;
+      bill['grand_total'] = 0;
+      bill['net_total'] = 0;
+      bill['total_taxes_and_charges'] = 0;
+      bill['items'] = [
+        {
+          'item_code': 'TEST-FOC',
+          'item_name': 'FOC Item',
+          'description': '',
+          'qty': 1,
+          'uom': 'Nos',
+          'rate': 0,
+          'amount': 0,
+          'net_amount': 0,
+          'custom_foc': 1,
+        },
+      ];
+      final api = _FakeApiClient(billingResponse: response);
+      await _pumpCashier(tester, api: api,
+          printer: _FakePrintGateway(), requestIds: ['REQ-FOC']);
+      await tester.tap(find.text('Pay'));
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm FOC Order'), findsOneWidget);
+      expect(find.text('All items are FOC. No payment is required.'),
+          findsOneWidget);
+      await tester.tap(find.text('Confirm FOC Order'));
+      await tester.pumpAndSettle();
+      expect(api.paymentActions, ['StartCheckout', 'Pay', 'ConfirmPayment']);
+      expect(api.lastConfirmData?['payments'], '[]');
+      expect(api.lastConfirmData?['payment_type'], 'Paid');
+      expect(api.lastConfirmData?['credit_amount'], 0);
+    });
+
+    testWidgets('Zero-value order without all FOC flags cannot checkout',
+        (tester) async {
+      final response = _billingResponse(restaurantStatus: 'Billing');
+      final bill = (response['bills'] as List).first as Map<String, dynamic>;
+      bill['grand_total'] = 0;
+      bill['net_total'] = 0;
+      bill['items'] = [
+        {
+          'item_code': 'TEST-NORMAL',
+          'item_name': 'Normal Item',
+          'description': '',
+          'qty': 1,
+          'uom': 'Nos',
+          'rate': 0,
+          'amount': 0,
+          'net_amount': 0,
+          'custom_foc': 0,
+        },
+      ];
+      final api = _FakeApiClient(billingResponse: response);
+      await _pumpCashier(tester, api: api,
+          printer: _FakePrintGateway(), requestIds: ['REQ-ZERO']);
+      await tester.tap(find.text('Pay'));
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm FOC Order'), findsNothing);
+      expect(_filledButton(tester, 'Confirm Payment').onPressed, isNull);
+    });
+
     testWidgets('Billing order shows Pay and Credit before and after expansion',
         (tester) async {
       final api = _FakeApiClient(
@@ -261,6 +325,7 @@ class _FakeApiClient extends ApiClient {
   final bool removeBillAfterPayment;
   final List<String> paymentSalesOrders = [];
   final List<String> paymentActions = [];
+  Map<String, dynamic>? lastConfirmData;
 
   @override
   Future<bool> hasSession() async => false;
@@ -316,6 +381,7 @@ class _FakeApiClient extends ApiClient {
     if (action != 'ConfirmPayment') {
       throw StateError('Unexpected cashier action: $action');
     }
+    lastConfirmData = data;
     if (removeBillAfterPayment) {
       billingResponse = {
         'bills': const [],
