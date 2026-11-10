@@ -585,18 +585,18 @@ elif action == "ItemSalesReport":
                 "sales_amount": 0.0, "unlinked_qty": 0.0, "avg_rate": 0.0,
             }
         entry = groups[key]
-        entry["total_qty"] += qty
-        entry["sales_amount"] += amount
+        entry["total_qty"] = entry["total_qty"] + qty
+        entry["sales_amount"] = entry["sales_amount"] + amount
         if foc:
-            entry["foc_qty"] += qty
+            entry["foc_qty"] = entry["foc_qty"] + qty
             foc_qty += qty
         elif linked:
-            entry["sales_qty"] += qty
+            entry["sales_qty"] = entry["sales_qty"] + qty
         else:
-            entry["unlinked_qty"] += qty
+            entry["unlinked_qty"] = entry["unlinked_qty"] + qty
             unlinked_qty += qty
         if parcel:
-            entry["parcel_qty"] += qty
+            entry["parcel_qty"] = entry["parcel_qty"] + qty
             parcel_qty += qty
         total_qty += qty
         total_amount += amount
