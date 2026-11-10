@@ -17,6 +17,7 @@ import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
 import 'cashier_daily_report_screen.dart';
+import 'cashier_item_sales_report_screen.dart';
 
 final cashierRepositoryProvider = Provider<CashierRepository>(
   (ref) => CashierRepository(ref.watch(apiClientProvider)),
@@ -98,6 +99,17 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               onPressed: () => context.go('/tables'),
               icon: const Icon(Icons.table_restaurant),
             ),
+          IconButton(
+            tooltip: 'Item Sales Report',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => CashierItemSalesReportScreen(
+                  repository: ref.read(cashierRepositoryProvider),
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.inventory_2_outlined),
+          ),
           IconButton(
             tooltip: 'Daily Sales Report',
             onPressed: () => Navigator.of(context).push(
