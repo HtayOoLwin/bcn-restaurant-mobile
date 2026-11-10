@@ -815,7 +815,20 @@ elif action == "ConfirmPayment":
     if sales_order.currency != CURRENCY:
         frappe.throw("Restaurant checkout requires MMK Sales Order currency")
     profile = frappe.get_doc("POS Profile", POS_PROFILE)
-    tenders = parse_tenders(raw_payments, profile, allow_empty=payment_type == "Credit")
+    # Never accept zero tender for a normal order. All line flags and the
+    # frozen Sales Order grand total must both establish an FOC-only order.
+    all_foc = bool(sales_order.items) and all(
+        bool(row.get("custom_foc")) for row in sales_order.items
+    )
+    free_foc = (
+        all_foc
+        and abs(float(sales_order.grand_total or 0)) <= AMOUNT_TOLERANCE
+    )
+    tenders = parse_tenders(
+        raw_payments,
+        profile,
+        allow_empty=payment_type == "Credit" or free_foc,
+    )
     restaurant_status = (
         sales_order.get("custom_restaurant_status") or ""
     ).strip()
@@ -894,7 +907,12 @@ elif action == "ConfirmPayment":
         # frozen bill. Persist that same discount on the Draft Sales Invoice
         # BEFORE validating tenders or submitting the invoice.
         # Keep the submitted Sales Order (and its room charges) untouched.
-        if not (0 <= discount_amount < frozen_grand):
+        if free_foc:
+            if payment_type != "Paid":
+                frappe.throw("FOC checkout must use Paid without credit")
+            if tenders or credit_amount > AMOUNT_TOLERANCE or discount_amount != 0:
+                frappe.throw("FOC checkout must not include tender, credit or discount")
+        elif not (0 <= discount_amount < frozen_grand):
             frappe.throw("Discount must be zero or less than the original invoice total")
         sales_invoice.apply_discount_on = "Grand Total"
         sales_invoice.discount_amount = discount_amount
@@ -906,7 +924,15 @@ elif action == "ConfirmPayment":
                 "Discounted invoice total does not match net payable: "
                 + str(grand_total) + " vs " + str(expected_grand)
             )
-        if payment_type == "Credit":
+        if free_foc:
+            # No money is collected: submit the zero-value Sales Invoice,
+            # skip Payment Entry creation, and close the order normally.
+            if abs(grand_total) > AMOUNT_TOLERANCE:
+                frappe.throw("FOC invoice total must be zero")
+            expected_credit = 0.0
+            allocations = []
+            change_amount = 0.0
+        elif payment_type == "Credit":
             if tenders:
                 frappe.throw("Full Credit must not include payment tenders")
             if credit_amount > AMOUNT_TOLERANCE and abs(credit_amount - grand_total) > AMOUNT_TOLERANCE:
