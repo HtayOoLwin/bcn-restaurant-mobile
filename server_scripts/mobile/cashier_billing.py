@@ -478,6 +478,157 @@ if action == "Customers":
         ]
     }
 
+elif action == "ItemSalesReport":
+    # Read-only item sales summary and invoice-level detail for one date.
+    # FOC and Parcel belong to Sales Order Item, not Item Master.
+    report_date = (frappe.form_dict.get("date") or "").strip()
+    if len(report_date) != 10:
+        frappe.throw("date is required in YYYY-MM-DD format")
+    try:
+        parsed_date = frappe.utils.getdate(report_date)
+    except Exception:
+        frappe.throw("Invalid report date")
+    if str(parsed_date) != report_date:
+        frappe.throw("Invalid report date")
+
+    invoice_rows = []
+    page_start = 0
+    page_size = 500
+    while True:
+        page = frappe.get_all(
+            "Sales Invoice",
+            filters={
+                "company": COMPANY,
+                "docstatus": 1,
+                "posting_date": report_date,
+                "is_return": 0,
+            },
+            fields=["name", "customer", "customer_name", "posting_time", "currency"],
+            order_by="posting_time asc, name asc",
+            start=page_start,
+            page_length=page_size,
+        )
+        invoice_rows.extend(page)
+        if len(page) < page_size:
+            break
+        page_start += page_size
+
+    invoice_map = {}
+    invoice_names = []
+    for invoice in invoice_rows:
+        invoice_map[invoice.name] = invoice
+        invoice_names.append(invoice.name)
+
+    item_rows = []
+    for chunk_start in range(0, len(invoice_names), 100):
+        chunk = invoice_names[chunk_start:chunk_start + 100]
+        page_start = 0
+        while True:
+            page = frappe.get_all(
+                "Sales Invoice Item",
+                filters={"parent": ["in", chunk], "parenttype": "Sales Invoice"},
+                fields=[
+                    "parent", "item_code", "item_name", "qty", "uom",
+                    "rate", "net_amount", "so_detail", "sales_order",
+                ],
+                order_by="parent asc, idx asc",
+                start=page_start,
+                page_length=500,
+            )
+            item_rows.extend(page)
+            if len(page) < 500:
+                break
+            page_start += 500
+
+    source_names = []
+    for row in item_rows:
+        source_name = (row.so_detail or "").strip()
+        if source_name and source_name not in source_names:
+            source_names.append(source_name)
+
+    source_map = {}
+    for chunk_start in range(0, len(source_names), 100):
+        source_rows = frappe.get_all(
+            "Sales Order Item",
+            filters={"name": ["in", source_names[chunk_start:chunk_start + 100]]},
+            fields=["name", "custom_foc", "custom_parcel"],
+            limit_page_length=100,
+        )
+        for source in source_rows:
+            source_map[source.name] = source
+
+    groups = {}
+    details = []
+    total_qty = 0.0
+    foc_qty = 0.0
+    parcel_qty = 0.0
+    total_amount = 0.0
+    unlinked_qty = 0.0
+
+    for row in item_rows:
+        invoice = invoice_map.get(row.parent)
+        if not invoice:
+            continue
+        qty = float(row.qty or 0)
+        amount = float(row.net_amount or 0)
+        source = source_map.get((row.so_detail or "").strip())
+        # Do not silently classify unlinked invoice items as normal sales.
+        linked = bool(source)
+        foc = bool(source.custom_foc) if linked else False
+        parcel = bool(source.custom_parcel) if linked else False
+        key = (row.item_code or "", row.item_name or "", row.uom or "")
+        if key not in groups:
+            groups[key] = {
+                "item_code": key[0], "item_name": key[1], "uom": key[2],
+                "total_qty": 0.0, "sales_qty": 0.0,
+                "foc_qty": 0.0, "parcel_qty": 0.0,
+                "sales_amount": 0.0, "unlinked_qty": 0.0,
+            }
+        entry = groups[key]
+        entry["total_qty"] += qty
+        entry["sales_amount"] += amount
+        if foc:
+            entry["foc_qty"] += qty
+            foc_qty += qty
+        elif linked:
+            entry["sales_qty"] += qty
+        else:
+            entry["unlinked_qty"] += qty
+            unlinked_qty += qty
+        if parcel:
+            entry["parcel_qty"] += qty
+            parcel_qty += qty
+        total_qty += qty
+        total_amount += amount
+
+        details.append({
+            "invoice": row.parent,
+            "customer": invoice.customer_name or invoice.customer or "",
+            "sales_order": row.sales_order or "",
+            "time": str(invoice.posting_time or ""),
+            "item_code": row.item_code or "",
+            "item_name": row.item_name or row.item_code or "",
+            "qty": qty, "uom": row.uom or "",
+            "rate": float(row.rate or 0), "amount": amount,
+            "foc": foc, "parcel": parcel, "flags_linked": linked,
+        })
+
+    summary = []
+    for group in groups.values():
+        summary.append(group)
+    summary.sort(key=lambda row: (-row["sales_amount"], row["item_name"]))
+
+    frappe.response["message"] = {
+        "date": report_date, "currency": CURRENCY,
+        "invoice_count": len(invoice_rows),
+        "item_count": len(summary),
+        "total_qty": total_qty, "foc_qty": foc_qty,
+        "parcel_qty": parcel_qty, "unlinked_qty": unlinked_qty,
+        "total_amount": total_amount,
+        "amount_basis": "Sales Invoice Item net_amount; excludes invoice-level discounts and taxes",
+        "summary": summary, "details": details,
+    }
+
 elif action == "DailyReport":
     report_date = (frappe.form_dict.get("date") or "").strip()
     if not report_date or len(report_date) != 10:
