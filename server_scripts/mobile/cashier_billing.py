@@ -368,6 +368,7 @@ def build_bill_row(order, has_print_job_doctype, get_linked_draft_sales_invoice_
                 "rate": float(item.rate or 0),
                 "amount": float(item.amount or 0),
                 "net_amount": float(item.net_amount or 0),
+                "custom_foc": int(bool(item.get("custom_foc"))),
             }
         )
 
