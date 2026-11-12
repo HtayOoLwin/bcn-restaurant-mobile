@@ -80,7 +80,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     super.dispose();
   }
 
-  Future<void> _showReports(BuildContext context) async {
+  Future<void> _showReports() async {
     final report = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -159,7 +159,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           ),
           IconButton(
             tooltip: 'Reports',
-            onPressed: () => _showReports(context),
+            onPressed: _showReports,
             icon: const Icon(Icons.bar_chart_outlined),
           ),
           IconButton(
