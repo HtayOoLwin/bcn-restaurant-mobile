@@ -80,6 +80,65 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     super.dispose();
   }
 
+  Future<void> _showReports(BuildContext context) async {
+    final report = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                child: Text(
+                  'Reports',
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_today_outlined),
+                title: const Text('Daily Sales Report'),
+                subtitle: const Text('Daily sales and payment summary'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(sheetContext).pop('daily'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: const Text('Item Sales Report'),
+                subtitle: const Text('Sales quantity and amount by item'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(sheetContext).pop('item'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!mounted || report == null) return;
+    if (report == 'daily') {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CashierDailyReportScreen(
+            repository: ref.read(cashierRepositoryProvider),
+          ),
+        ),
+      );
+    } else if (report == 'item') {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CashierItemSalesReportScreen(
+            repository: ref.read(cashierRepositoryProvider),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
@@ -98,47 +157,48 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             onPressed: () => context.push('/cashier/credits'),
             icon: const Icon(Icons.account_balance_wallet_outlined),
           ),
-          if (bootstrap?.permissions.waiter == true)
-            IconButton(
-              tooltip: 'Waiter',
-              onPressed: () => context.go('/tables'),
-              icon: const Icon(Icons.table_restaurant),
-            ),
           IconButton(
-            tooltip: 'Item Sales Report',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => CashierItemSalesReportScreen(
-                  repository: ref.read(cashierRepositoryProvider),
-                ),
-              ),
-            ),
-            icon: const Icon(Icons.inventory_2_outlined),
-          ),
-          IconButton(
-            tooltip: 'Daily Sales Report',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => CashierDailyReportScreen(
-                  repository: ref.read(cashierRepositoryProvider),
-                ),
-              ),
-            ),
-            icon: const Icon(Icons.assessment_outlined),
+            tooltip: 'Reports',
+            onPressed: () => _showReports(context),
+            icon: const Icon(Icons.bar_chart_outlined),
           ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: () => ref.invalidate(cashierBillingProvider),
             icon: const Icon(Icons.refresh),
           ),
-          IconButton(
-            tooltip: 'Settings',
-            onPressed: () async {
-              await context.push('/settings');
-              if (!mounted) return;
-              ref.invalidate(cashierBillingProvider);
+          PopupMenuButton<String>(
+            tooltip: 'More options',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (selection) async {
+              if (selection == 'waiter') {
+                if (!context.mounted) return;
+                context.go('/tables');
+              } else if (selection == 'settings') {
+                await context.push('/settings');
+                if (!mounted) return;
+                ref.invalidate(cashierBillingProvider);
+              }
             },
-            icon: const Icon(Icons.settings),
+            itemBuilder: (context) => [
+              if (bootstrap?.permissions.waiter == true)
+                const PopupMenuItem(
+                  value: 'waiter',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.table_restaurant_outlined),
+                    title: Text('Waiter'),
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'settings',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.settings_outlined),
+                  title: Text('Settings'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
