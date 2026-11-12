@@ -397,7 +397,7 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
                   );
                 }
                 return DropdownButtonFormField<String>(
-                  value: modes.any((m) => m.name == _mode) ? _mode : null,
+                  initialValue: modes.any((m) => m.name == _mode) ? _mode : null,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Mode of Payment',
