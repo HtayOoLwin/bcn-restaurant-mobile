@@ -258,11 +258,27 @@ class _ReceivePaymentDialog extends StatefulWidget {
 class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
   final _amount = TextEditingController();
   final _reference = TextEditingController();
-  String _mode = 'Cash';
+  String? _mode;
+  late Future<List<CreditPaymentMode>> _modes;
+  List<CreditPaymentMode> _availableModes = const [];
   bool _busy = false;
   String? _errorMessage;
   late final String _requestId =
       'credit-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(0x7fffffff)}';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadModes();
+  }
+
+  void _loadModes() {
+    setState(() {
+      _mode = null;
+      _availableModes = const [];
+      _modes = widget.repository.paymentModes();
+    });
+  }
 
   @override
   void dispose() {
@@ -278,8 +294,13 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
       setState(() => _errorMessage = 'Enter an amount greater than 0 and not above outstanding.');
       return;
     }
-    if (_mode != 'Cash' && _reference.text.trim().isEmpty) {
-      setState(() => _errorMessage = 'Payment reference is required.');
+    final selectedMode = _availableModes.where((m) => m.name == _mode).firstOrNull;
+    if (selectedMode == null) {
+      setState(() => _errorMessage = 'Please select a Mode of Payment.');
+      return;
+    }
+    if (selectedMode.requiresReference && _reference.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Bank payment reference is required.');
       return;
     }
     setState(() {
@@ -290,7 +311,7 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
       final response = await widget.repository.receive(
         customer: widget.customer,
         amount: amount,
-        modeOfPayment: _mode,
+        modeOfPayment: selectedMode.name,
         requestId: _requestId,
         referenceNo: _reference.text.trim(),
       );
@@ -332,15 +353,71 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _mode,
-              decoration: const InputDecoration(labelText: 'Mode of Payment'),
-              items: const ['Cash', 'Bank', 'KBZPay']
-                  .map((mode) => DropdownMenuItem(value: mode, child: Text(mode)))
-                  .toList(),
-              onChanged: _busy ? null : (value) => setState(() => _mode = value ?? 'Cash'),
+            FutureBuilder<List<CreditPaymentMode>>(
+              future: _modes,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Loading payment modes...'),
+                      ],
+                    ),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Could not load payment modes: ${snapshot.error}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _busy ? null : _loadModes,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  );
+                }
+                final modes = snapshot.data ?? const <CreditPaymentMode>[];
+                _availableModes = modes;
+                if (modes.isEmpty) {
+                  return const Text(
+                    'No Cash/Bank payment modes configured in ERPNext.',
+                  );
+                }
+                return DropdownButtonFormField<String>(
+                  value: modes.any((m) => m.name == _mode) ? _mode : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Mode of Payment',
+                  ),
+                  hint: const Text('Select payment mode'),
+                  items: modes
+                      .map((mode) => DropdownMenuItem(
+                            value: mode.name,
+                            child: Text(mode.name),
+                          ))
+                      .toList(),
+                  onChanged: _busy
+                      ? null
+                      : (value) => setState(() => _mode = value),
+                );
+              },
             ),
-            if (_mode != 'Cash') ...[
+            if (_availableModes.any(
+              (m) => m.name == _mode && m.requiresReference,
+            )) ...[
               const SizedBox(height: 12),
               TextField(
                 controller: _reference,
@@ -366,7 +443,7 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _busy ? null : _submit,
+          onPressed: _busy || _mode == null ? null : _submit,
           child: Text(_busy ? 'Processing...' : 'Confirm Payment'),
         ),
       ],
