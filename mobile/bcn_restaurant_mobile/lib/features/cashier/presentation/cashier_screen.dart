@@ -93,6 +93,11 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               : 'Cashier',
         ),
         actions: [
+          IconButton(
+            tooltip: 'Credit Customers',
+            onPressed: () => context.push('/cashier/credits'),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+          ),
           if (bootstrap?.permissions.waiter == true)
             IconButton(
               tooltip: 'Waiter',
