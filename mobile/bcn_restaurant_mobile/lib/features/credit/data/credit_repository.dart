@@ -26,14 +26,14 @@ class CreditRepository {
   }
 
   Future<Map<String, dynamic>> receive({
-    required String invoice,
+    required String customer,
     required double amount,
     required String modeOfPayment,
     required String requestId,
     String referenceNo = '',
   }) async {
     final data = await _api.postMethod('bcn_receive_credit_payment', data: {
-      'invoice': invoice,
+      'customer': customer,
       'amount': amount,
       'mode_of_payment': modeOfPayment,
       'request_id': requestId,
