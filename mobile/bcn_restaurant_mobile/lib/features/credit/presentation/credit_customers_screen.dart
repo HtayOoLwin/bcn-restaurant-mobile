@@ -320,7 +320,7 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _mode,
+              initialValue: _mode,
               decoration: const InputDecoration(labelText: 'Mode of Payment'),
               items: const ['Cash', 'Bank', 'KBZPay']
                   .map((mode) => DropdownMenuItem(value: mode, child: Text(mode)))
