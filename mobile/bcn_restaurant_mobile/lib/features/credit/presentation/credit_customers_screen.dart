@@ -184,6 +184,30 @@ class _CreditDetailsScreenState extends ConsumerState<_CreditDetailsScreen> {
                       ),
                     ),
                   ),
+                  if (invoices.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          icon: const Icon(Icons.payments_outlined),
+                          label: const Text('Receive Customer Payment'),
+                          onPressed: () async {
+                            final paid = await showDialog<bool>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => _ReceivePaymentDialog(
+                                customer: widget.customer.customer,
+                                outstanding: outstanding,
+                                currency: widget.customer.currency,
+                                repository: ref.read(creditRepositoryProvider),
+                              ),
+                            );
+                            if (paid == true && mounted) _reload();
+                          },
+                        ),
+                      ),
+                    ),
                   if (invoices.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(32),
@@ -202,25 +226,7 @@ class _CreditDetailsScreenState extends ConsumerState<_CreditDetailsScreen> {
                             Text('Due date: ${invoice.dueDate}'),
                             Text('Total: ${formatMoney(invoice.grandTotal, invoice.currency)}'),
                             Text('Outstanding: ${formatMoney(invoice.outstanding, invoice.currency)}'),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                icon: const Icon(Icons.payments_outlined),
-                                label: const Text('Receive Payment'),
-                                onPressed: () async {
-                                  final paid = await showDialog<bool>(
-                                    context: context,
-                                    barrierDismissible: false,
-                                    builder: (_) => _ReceivePaymentDialog(
-                                      invoice: invoice,
-                                      repository: ref.read(creditRepositoryProvider),
-                                    ),
-                                  );
-                                  if (paid == true && mounted) _reload();
-                                },
-                              ),
-                            ),
+
                           ],
                         ),
                       ),
@@ -234,8 +240,15 @@ class _CreditDetailsScreenState extends ConsumerState<_CreditDetailsScreen> {
 }
 
 class _ReceivePaymentDialog extends StatefulWidget {
-  const _ReceivePaymentDialog({required this.invoice, required this.repository});
-  final CreditInvoice invoice;
+  const _ReceivePaymentDialog({
+    required this.customer,
+    required this.outstanding,
+    required this.currency,
+    required this.repository,
+  });
+  final String customer;
+  final double outstanding;
+  final String currency;
   final CreditRepository repository;
 
   @override
@@ -261,7 +274,7 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
   Future<void> _submit() async {
     final amount = double.tryParse(_amount.text.replaceAll(',', '').trim());
     if (amount == null || !amount.isFinite || amount <= 0 ||
-        amount > widget.invoice.outstanding) {
+        amount > widget.outstanding) {
       setState(() => _errorMessage = 'Enter an amount greater than 0 and not above outstanding.');
       return;
     }
@@ -275,7 +288,7 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
     });
     try {
       final response = await widget.repository.receive(
-        invoice: widget.invoice.name,
+        customer: widget.customer,
         amount: amount,
         modeOfPayment: _mode,
         requestId: _requestId,
@@ -303,13 +316,13 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
   Widget build(BuildContext context) {
     final amount = double.tryParse(_amount.text.replaceAll(',', '').trim()) ?? 0;
     return AlertDialog(
-      title: Text('Receive · ${widget.invoice.name}'),
+      title: const Text('Receive Customer Payment'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Outstanding: ${formatMoney(widget.invoice.outstanding, widget.invoice.currency)}'),
+            Text('Outstanding: ${formatMoney(widget.outstanding, widget.currency)}'),
             const SizedBox(height: 12),
             TextField(
               controller: _amount,
@@ -337,8 +350,8 @@ class _ReceivePaymentDialogState extends State<_ReceivePaymentDialog> {
             ],
             const SizedBox(height: 12),
             Text('Remaining: ${formatMoney(
-              (widget.invoice.outstanding - amount).clamp(0, double.infinity),
-              widget.invoice.currency,
+              (widget.outstanding - amount).clamp(0, double.infinity),
+              widget.currency,
             )}'),
             if (_errorMessage != null) ...[
               const SizedBox(height: 8),
