@@ -306,7 +306,7 @@ class _CashierItemSalesReportScreenState
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: selectedCounter,
+                  initialValue: selectedCounter,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Kitchen Counter',
