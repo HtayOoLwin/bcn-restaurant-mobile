@@ -25,6 +25,17 @@ class CreditRepository {
         .toList();
   }
 
+  Future<List<CreditPaymentMode>> paymentModes() async {
+    final data = Map<String, dynamic>.from(
+      await _api.getMethod('bcn_get_credit_payment_modes') as Map,
+    );
+    return (data['modes'] as List? ?? const [])
+        .map((row) => CreditPaymentMode.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ))
+        .toList();
+  }
+
   Future<Map<String, dynamic>> receive({
     required String customer,
     required double amount,
@@ -41,6 +52,24 @@ class CreditRepository {
     });
     return Map<String, dynamic>.from(data as Map);
   }
+}
+
+class CreditPaymentMode {
+  const CreditPaymentMode({
+    required this.name,
+    required this.accountType,
+  });
+
+  factory CreditPaymentMode.fromJson(Map<String, dynamic> json) =>
+      CreditPaymentMode(
+        name: json['name']?.toString() ?? '',
+        accountType: json['account_type']?.toString() ?? '',
+      );
+
+  final String name;
+  final String accountType;
+
+  bool get requiresReference => accountType == 'Bank';
 }
 
 double _number(dynamic value) =>
