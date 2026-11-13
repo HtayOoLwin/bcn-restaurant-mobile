@@ -280,25 +280,25 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                       ),
                     TableRow(
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerLow,
+                        color: const Color(0xFF205F91),
                       ),
                       children: [
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                           child: Text('Total',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
                           child: Text(formatAmount(qty),
                             textAlign: TextAlign.right,
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                           child: Text(formatAmount(total),
                             textAlign: TextAlign.right,
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                         ),
                       ],
                     ),
