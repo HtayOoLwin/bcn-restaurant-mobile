@@ -119,13 +119,19 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
               }).toList();
           final qty = rows.fold<double>(0, (s, r) => s + _num(r['qty']));
           final total = rows.fold<double>(0, (s, r) => s + _num(r['amount']));
-          return ListView(padding: const EdgeInsets.fromLTRB(12, 0, 12, 24), children: [
+          return ListView(padding: const EdgeInsets.fromLTRB(12, 20, 12, 24), children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text('Counter',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            ),
             DropdownButtonFormField<String>(
               key: ValueKey('counter-$_counter'),
               initialValue: counters.contains(_counter) ? _counter : '',
               isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'Counter', border: OutlineInputBorder()),
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
               items: [
                 const DropdownMenuItem(value: '', child: Text('All Counters')),
                 for (final name in counters)
@@ -141,14 +147,19 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                 });
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text('Item Group',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            ),
             DropdownButtonFormField<String>(
               key: ValueKey('group-$_counter-$_itemGroup'),
               initialValue: groups.contains(_itemGroup) ? _itemGroup : '',
               isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'Item Group',
                 border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               ),
               items: [
                 const DropdownMenuItem(value: '', child: Text('All Item Groups')),
@@ -166,7 +177,7 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                 });
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             TextField(
               decoration: const InputDecoration(
                 labelText: 'Search Item', prefixIcon: Icon(Icons.search),
