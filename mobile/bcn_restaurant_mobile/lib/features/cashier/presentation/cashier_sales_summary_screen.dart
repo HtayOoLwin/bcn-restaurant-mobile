@@ -257,8 +257,10 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(row['item_name']?.toString() ?? '',
-                                  style: const TextStyle(fontWeight: FontWeight.w500)),
+                                Text(
+                                  '${row['item_name']?.toString() ?? ''} @${formatAmount(_num(row['rate']))}',
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
                                 if (_num(row['foc_qty']) != 0)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 3),
