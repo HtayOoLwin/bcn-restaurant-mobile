@@ -18,6 +18,7 @@ import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
 import 'cashier_daily_report_screen.dart';
 import 'cashier_item_sales_report_screen.dart';
+import 'cashier_sales_summary_screen.dart';
 
 final cashierRepositoryProvider = Provider<CashierRepository>(
   (ref) => CashierRepository(ref.watch(apiClientProvider)),
@@ -107,6 +108,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 onTap: () => Navigator.of(sheetContext).pop('daily'),
               ),
               ListTile(
+                leading: const Icon(Icons.summarize_outlined),
+                title: const Text('Sales Summary by Item'),
+                subtitle: const Text('Total Qty, FOC Qty and sales amount'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(sheetContext).pop('summary'),
+              ),
+              ListTile(
                 leading: const Icon(Icons.inventory_2_outlined),
                 title: const Text('Item Sales Report'),
                 subtitle: const Text('Sales quantity and amount by item'),
@@ -124,6 +132,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => CashierDailyReportScreen(
+            repository: ref.read(cashierRepositoryProvider),
+          ),
+        ),
+      );
+    } else if (report == 'summary') {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CashierSalesSummaryScreen(
             repository: ref.read(cashierRepositoryProvider),
           ),
         ),
