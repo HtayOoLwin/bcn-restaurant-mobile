@@ -104,7 +104,6 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
             ));
           }
           final data = snapshot.data ?? <String, dynamic>{};
-          final currency = data['currency']?.toString() ?? 'MMK';
           final counters = (data['counters'] as List? ?? const [])
               .map((e) => e.toString()).where((e) => e.isNotEmpty).toSet().toList()..sort();
           final groups = (data['item_groups'] as List? ?? const [])
@@ -119,7 +118,6 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                     (r['item_code'] ?? '').toString().toLowerCase().contains(q);
               }).toList();
           final qty = rows.fold<double>(0, (s, r) => s + _num(r['qty']));
-          final foc = rows.fold<double>(0, (s, r) => s + _num(r['foc_qty']));
           final total = rows.fold<double>(0, (s, r) => s + _num(r['amount']));
           return ListView(padding: const EdgeInsets.fromLTRB(12, 0, 12, 24), children: [
             DropdownButtonFormField<String>(
@@ -127,7 +125,7 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
               initialValue: counters.contains(_counter) ? _counter : '',
               isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'Sales Counter', border: OutlineInputBorder()),
+                labelText: 'Counter', border: OutlineInputBorder()),
               items: [
                 const DropdownMenuItem(value: '', child: Text('All Counters')),
                 for (final name in counters)
@@ -176,25 +174,6 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
               onChanged: (value) => setState(() => _search = value),
             ),
             const SizedBox(height: 10),
-            Card(child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(children: [
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Text('Total Qty (includes FOC)'),
-                  Text(formatAmount(qty),
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                ]),
-                if (foc != 0)
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('FOC Qty'), Text(formatAmount(foc)),
-                  ]),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Text('Total Amount'),
-                  Text(formatMoney(total, currency),
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                ]),
-              ]),
-            )),
             if (data['foc_detection_available'] != true)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
@@ -207,26 +186,118 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
             if (rows.isEmpty)
               const Padding(padding: EdgeInsets.all(20),
                 child: Center(child: Text('No sales items for these filters.'))),
-            for (final row in rows)
-              Card(child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(row['item_name']?.toString() ?? '',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text('Qty: ${formatAmount(_num(row['qty']))}'),
-                    Text(formatMoney(_num(row['amount']), currency),
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  ]),
-                  if (_num(row['foc_qty']) != 0)
-                    Padding(padding: const EdgeInsets.only(top: 4),
-                      child: Text('FOC Qty: ${formatAmount(_num(row['foc_qty']))}',
-                        style: const TextStyle(color: Colors.deepOrange, fontSize: 12))),
-                ]),
-              )),
+            if (rows.isNotEmpty)
+              Card(
+                margin: EdgeInsets.zero,
+                clipBehavior: Clip.antiAlias,
+                child: Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(5),
+                    1: FixedColumnWidth(54),
+                    2: FlexColumnWidth(3),
+                  },
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  border: TableBorder(
+                    horizontalInside: BorderSide(
+                      color: Theme.of(context).dividerColor,
+                      width: 0.5,
+                    ),
+                  ),
+                  children: [
+                    TableRow(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      ),
+                      children: const [
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                          child: Text('Item Name',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 13),
+                          child: Text('Qty',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                          child: Text('Amount',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    for (final row in rows)
+                      TableRow(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(row['item_name']?.toString() ?? '',
+                                  style: const TextStyle(fontWeight: FontWeight.w500)),
+                                if (_num(row['foc_qty']) != 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 3),
+                                    child: Text(
+                                      'FOC Qty: ${formatAmount(_num(row['foc_qty']))}',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.tertiary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                            child: Text(
+                              formatAmount(_num(row['qty'])),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            child: Text(
+                              formatAmount(_num(row['amount'])),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
+                      ),
+                    TableRow(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      ),
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          child: Text('Total',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+                          child: Text(formatAmount(qty),
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          child: Text(formatAmount(total),
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 8),
-            const Text('Qty includes FOC Qty; do not add FOC Qty again.',
+            const Text('Amount (MMK) · Qty includes FOC; do not add FOC Qty again.',
               style: TextStyle(fontSize: 12, color: Colors.black54)),
           ]);
         },
