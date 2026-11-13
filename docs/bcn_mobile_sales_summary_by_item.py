@@ -1,7 +1,7 @@
 # Server Script API: bcn_mobile_sales_summary_by_item
 # Script Type: API | Allow Guest: No
 # Company: Doh Myoh Taw BBQ & Restaurant
-# Summary grouping: Item Code + Item Group, selected date
+# Summary grouping: Item Code + Item Group + Selling Rate, selected date
 # Mobile filters: date, Sales Counter, Item Group; options defaults to All.
 #
 # Qty includes FOC. FOC Qty is a subset, not added to Qty again.
@@ -82,7 +82,7 @@ for start in range(0, len(invoice_names), 200):
     batch = invoice_names[start:start + 200]
     fields = [
         "name", "parent", "item_code", "item_name",
-        "item_group", "qty", "amount", "so_detail"
+        "item_group", "qty", "rate", "amount", "so_detail"
     ]
     for field in si_foc_fields:
         if field not in fields:
@@ -164,12 +164,14 @@ for item in invoice_items:
 
     code = item.item_code or ""
     group = item.item_group or ""
-    key = (code, group)
+    rate = frappe.utils.flt(item.rate, 2)
+    key = (code, group, rate)
     if key not in summary:
         summary[key] = {
             "item_code": code,
             "item_name": item.item_name or code,
             "item_group": group,
+            "rate": rate,
             "qty": 0.0,
             "foc_qty": 0.0,
             "amount": 0.0
