@@ -12,10 +12,9 @@ class CashierSalesSummaryScreen extends StatefulWidget {
 }
 
 class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
-  DateTime _from = DateTime.now();
-  DateTime _to = DateTime.now();
-  String _option = 'All';
+  DateTime _selectedDate = DateTime.now();
   String _counter = '';
+  String _itemGroup = '';
   String _search = '';
   late Future<Map<String, dynamic>> _report;
 
@@ -36,29 +35,24 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
 
   void _load() {
     _report = widget.repository.getSalesSummaryByItem(
-      fromDate: _iso(_from),
-      toDate: _iso(_to),
-      options: _option,
+      date: _iso(_selectedDate),
       salesCounter: _counter,
+      itemGroup: _itemGroup,
     );
   }
 
-  Future<void> _pick(bool start) async {
+  Future<void> _pickDate() async {
     final chosen = await showDatePicker(
       context: context,
-      initialDate: start ? _from : _to,
+      initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
     if (chosen == null || !mounted) return;
     setState(() {
-      if (start) {
-        _from = chosen;
-        if (_from.isAfter(_to)) _to = chosen;
-      } else {
-        _to = chosen;
-        if (_to.isBefore(_from)) _from = chosen;
-      }
+      _selectedDate = chosen;
+      _counter = '';
+      _itemGroup = '';
       _load();
     });
   }
@@ -76,40 +70,27 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
       ],
     ),
     body: Column(children: [
-      Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(children: [
-          Expanded(child: OutlinedButton.icon(
-            onPressed: () => _pick(true),
-            icon: const Icon(Icons.calendar_month),
-            label: Text('From: ${_display(_from)}'),
-          )),
-          const SizedBox(width: 8),
-          Expanded(child: OutlinedButton.icon(
-            onPressed: () => _pick(false),
-            icon: const Icon(Icons.calendar_month),
-            label: Text('To: ${_display(_to)}'),
-          )),
-        ]),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: DropdownButtonFormField<String>(
-          initialValue: _option,
-          decoration: const InputDecoration(
-            labelText: 'Options', border: OutlineInputBorder()),
-          items: const [
-            DropdownMenuItem(value: 'All', child: Text('All')),
-            DropdownMenuItem(value: 'Sales', child: Text('Sales')),
-            DropdownMenuItem(value: 'Return', child: Text('Return')),
-          ],
-          onChanged: (value) {
-            if (value == null) return;
-            setState(() { _option = value; _load(); });
-          },
+      Card(
+        margin: const EdgeInsets.all(12),
+        color: const Color(0xFF205F91),
+        child: InkWell(
+          onTap: _pickDate,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              const Icon(Icons.calendar_month, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(child: Text(_display(_selectedDate),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ))),
+              const Icon(Icons.arrow_drop_down, color: Colors.white),
+            ]),
+          ),
         ),
       ),
-      const SizedBox(height: 8),
       Expanded(child: FutureBuilder<Map<String, dynamic>>(
         future: _report,
         builder: (context, snapshot) {
@@ -126,6 +107,9 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
           final currency = data['currency']?.toString() ?? 'MMK';
           final counters = (data['counters'] as List? ?? const [])
               .map((e) => e.toString()).where((e) => e.isNotEmpty).toSet().toList()..sort();
+          final groups = (data['item_groups'] as List? ?? const [])
+              .map((e) => e.toString()).where((e) => e.isNotEmpty)
+              .toSet().toList()..sort();
           final rows = (data['rows'] as List? ?? const [])
               .whereType<Map>().map((r) => Map<String, dynamic>.from(r))
               .where((r) {
@@ -139,7 +123,7 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
           final total = rows.fold<double>(0, (s, r) => s + _num(r['amount']));
           return ListView(padding: const EdgeInsets.fromLTRB(12, 0, 12, 24), children: [
             DropdownButtonFormField<String>(
-              key: ValueKey(_counter),
+              key: ValueKey('counter-$_counter'),
               initialValue: counters.contains(_counter) ? _counter : '',
               isExpanded: true,
               decoration: const InputDecoration(
@@ -152,7 +136,36 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
               ],
               onChanged: (value) {
                 if (value == null) return;
-                setState(() { _counter = value; _load(); });
+                setState(() {
+                  _counter = value;
+                  _itemGroup = '';
+                  _load();
+                });
+              },
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              key: ValueKey('group-$_counter-$_itemGroup'),
+              initialValue: groups.contains(_itemGroup) ? _itemGroup : '',
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Item Group',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem(value: '', child: Text('All Item Groups')),
+                for (final group in groups)
+                  DropdownMenuItem(
+                    value: group,
+                    child: Text(group, overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _itemGroup = value;
+                  _load();
+                });
               },
             ),
             const SizedBox(height: 8),
