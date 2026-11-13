@@ -206,25 +206,34 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                   children: [
                     TableRow(
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: const Color(0xFF205F91),
                       ),
                       children: const [
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 13),
                           child: Text('Item Name',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            )),
                         ),
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4, vertical: 13),
                           child: Text('Qty',
                             textAlign: TextAlign.right,
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            )),
                         ),
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 13),
                           child: Text('Amount',
                             textAlign: TextAlign.right,
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            )),
                         ),
                       ],
                     ),
@@ -245,7 +254,7 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                                     child: Text(
                                       'FOC Qty: ${formatAmount(_num(row['foc_qty']))}',
                                       style: TextStyle(
-                                        color: Theme.of(context).colorScheme.tertiary,
+                                        color: const Color(0xFF16834B),
                                         fontSize: 12,
                                       ),
                                     ),
