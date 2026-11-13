@@ -41,18 +41,18 @@ class CashierRepository {
   }
 
   Future<Map<String, dynamic>> getSalesSummaryByItem({
-    required String fromDate,
-    required String toDate,
-    String options = 'All',
+    required String date,
     String salesCounter = '',
+    String itemGroup = '',
   }) async {
     final data = await _apiClient.getMethod(
       'bcn_mobile_sales_summary_by_item',
       queryParameters: {
-        'from_date': fromDate,
-        'to_date': toDate,
-        'options': options,
+        'from_date': date,
+        'to_date': date,
+        'options': 'All',
         if (salesCounter.isNotEmpty) 'sales_counter': salesCounter,
+        if (itemGroup.isNotEmpty) 'item_group': itemGroup,
       },
     );
     return Map<String, dynamic>.from(data as Map);
