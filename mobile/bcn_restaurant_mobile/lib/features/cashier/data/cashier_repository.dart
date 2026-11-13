@@ -40,6 +40,24 @@ class CashierRepository {
     return Map<String, dynamic>.from(data as Map);
   }
 
+  Future<Map<String, dynamic>> getSalesSummaryByItem({
+    required String fromDate,
+    required String toDate,
+    String options = 'All',
+    String salesCounter = '',
+  }) async {
+    final data = await _apiClient.getMethod(
+      'bcn_mobile_sales_summary_by_item',
+      queryParameters: {
+        'from_date': fromDate,
+        'to_date': toDate,
+        'options': options,
+        if (salesCounter.isNotEmpty) 'sales_counter': salesCounter,
+      },
+    );
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   /// Freeze check-out and final room charges once, before Pay/Credit dialogs.
   Future<Map<String, dynamic>> startCheckout(String salesOrder) async {
     final data = await _apiClient.postMethod(
