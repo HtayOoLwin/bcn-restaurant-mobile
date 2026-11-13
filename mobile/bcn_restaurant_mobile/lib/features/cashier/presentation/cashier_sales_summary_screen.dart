@@ -26,13 +26,10 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
   }
 
   String _iso(DateTime d) =>
-      d.year.toString().padLeft(4, '0') + '-' +
-      d.month.toString().padLeft(2, '0') + '-' +
-      d.day.toString().padLeft(2, '0');
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   String _display(DateTime d) =>
-      d.day.toString().padLeft(2, '0') + '/' +
-      d.month.toString().padLeft(2, '0') + '/' + d.year.toString();
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   double _num(dynamic n) =>
       n is num ? n.toDouble() : double.tryParse(n.toString()) ?? 0;
@@ -85,13 +82,13 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
           Expanded(child: OutlinedButton.icon(
             onPressed: () => _pick(true),
             icon: const Icon(Icons.calendar_month),
-            label: Text('From: ' + _display(_from)),
+            label: Text('From: ${_display(_from)}'),
           )),
           const SizedBox(width: 8),
           Expanded(child: OutlinedButton.icon(
             onPressed: () => _pick(false),
             icon: const Icon(Icons.calendar_month),
-            label: Text('To: ' + _display(_to)),
+            label: Text('To: ${_display(_to)}'),
           )),
         ]),
       ),
@@ -122,7 +119,7 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
           if (snapshot.hasError) {
             return Center(child: Padding(
               padding: const EdgeInsets.all(18),
-              child: Text('Unable to load Sales Summary: ' + snapshot.error.toString()),
+              child: Text('Unable to load Sales Summary: ${snapshot.error}'),
             ));
           }
           final data = snapshot.data ?? <String, dynamic>{};
@@ -205,13 +202,13 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text('Qty: ' + formatAmount(_num(row['qty']))),
+                    Text('Qty: ${formatAmount(_num(row['qty']))}'),
                     Text(formatMoney(_num(row['amount']), currency),
                       style: const TextStyle(fontWeight: FontWeight.w600)),
                   ]),
                   if (_num(row['foc_qty']) != 0)
                     Padding(padding: const EdgeInsets.only(top: 4),
-                      child: Text('FOC Qty: ' + formatAmount(_num(row['foc_qty'])),
+                      child: Text('FOC Qty: ${formatAmount(_num(row['foc_qty']))}',
                         style: const TextStyle(color: Colors.deepOrange, fontSize: 12))),
                 ]),
               )),
@@ -223,3 +220,4 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
       )),
     ]),
   );
+}
