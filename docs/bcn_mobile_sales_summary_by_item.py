@@ -1,7 +1,8 @@
 # Server Script API: bcn_mobile_sales_summary_by_item
 # Script Type: API | Allow Guest: No
 # Company: Doh Myoh Taw BBQ & Restaurant
-# Summary grouping: Item Code + Item Group, over the requested date range
+# Summary grouping: Item Code + Item Group, selected date
+# Mobile filters: date, Sales Counter, Item Group; options defaults to All.
 #
 # Qty includes FOC. FOC Qty is a subset, not added to Qty again.
 # This script identifies FOC from item-level explicit flags; zero price alone
@@ -33,6 +34,7 @@ from_date = frappe.form_dict.get("from_date") or frappe.utils.today()
 to_date = frappe.form_dict.get("to_date") or from_date
 options = frappe.form_dict.get("options") or "All"
 selected_counter = (frappe.form_dict.get("sales_counter") or "").strip()
+selected_group = (frappe.form_dict.get("item_group") or "").strip()
 
 if options not in ("All", "Sales", "Return"):
     frappe.throw("Options must be All, Sales or Return")
@@ -144,12 +146,20 @@ for start in range(0, len(group_names), 200):
 
 summary = {}
 counter_names = []
+available_groups = []
 for item in invoice_items:
     counter = counter_map.get(item.item_group, "-")
     if counter not in counter_names:
         counter_names.append(counter)
 
+    # Item Group choices correspond to the selected Sales Counter.
+    if not selected_counter or counter == selected_counter:
+        if item.item_group and item.item_group not in available_groups:
+            available_groups.append(item.item_group)
+
     if selected_counter and counter != selected_counter:
+        continue
+    if selected_group and item.item_group != selected_group:
         continue
 
     code = item.item_code or ""
@@ -193,6 +203,7 @@ for row in rows:
     total_amount = total_amount + row["amount"]
 
 counter_names.sort()
+available_groups.sort()
 
 frappe.response["message"] = {
     "success": True,
@@ -202,7 +213,9 @@ frappe.response["message"] = {
     "to_date": str(to_date),
     "options": options,
     "sales_counter": selected_counter,
+    "item_group": selected_group,
     "counters": counter_names,
+    "item_groups": available_groups,
     "rows": rows,
     "total_qty": frappe.utils.flt(total_qty, 2),
     "total_foc_qty": frappe.utils.flt(total_foc_qty, 2),
