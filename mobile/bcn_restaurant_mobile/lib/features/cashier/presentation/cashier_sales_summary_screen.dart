@@ -185,6 +185,15 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                 ]),
               ]),
             )),
+            if (data['foc_detection_available'] != true)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'FOC mapping is not configured or not detected in ERPNext. '
+                  'Verify the Sales Order/Sales Invoice FOC flag before relying on FOC Qty.',
+                  style: TextStyle(color: Colors.deepOrange, fontSize: 12),
+                ),
+              ),
             if (rows.isEmpty)
               const Padding(padding: EdgeInsets.all(20),
                 child: Center(child: Text('No sales items for these filters.'))),
