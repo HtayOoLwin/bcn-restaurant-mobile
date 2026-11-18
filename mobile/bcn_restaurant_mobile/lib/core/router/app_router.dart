@@ -6,6 +6,7 @@ import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/cashier/presentation/cashier_screen.dart';
+import '../../features/credit/presentation/credit_customers_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
 import '../../features/room/presentation/room_timer_demo_screen.dart';
 import '../../features/printing/domain/windows_print_status.dart';
@@ -85,6 +86,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/cashier',
         builder: (context, state) => const CashierScreen(),
+      ),
+      GoRoute(
+        path: '/cashier/credits',
+        builder: (context, state) => const CreditCustomersScreen(),
       ),
       GoRoute(
         path: '/printer-settings',
