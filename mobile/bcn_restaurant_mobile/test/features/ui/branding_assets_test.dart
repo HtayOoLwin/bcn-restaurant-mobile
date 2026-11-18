@@ -9,12 +9,29 @@ void main() {
     final icon = File(
       'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
     ).readAsStringSync();
+    final roundIcon = File(
+      'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
+    ).readAsStringSync();
+    final foreground = File(
+      'android/app/src/main/res/drawable/ic_launcher_foreground.xml',
+    ).readAsStringSync();
+    final colors = File(
+      'android/app/src/main/res/values/colors.xml',
+    ).readAsStringSync();
 
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:roundIcon="@mipmap/ic_launcher_round"'));
-    expect(icon, contains('@color/ic_launcher_background'));
-    expect(icon, contains('@drawable/ic_launcher_foreground'));
-    expect(icon, contains('android:inset="20%"'));
+
+    for (final adaptiveIcon in [icon, roundIcon]) {
+      expect(adaptiveIcon, contains('<adaptive-icon'));
+      expect(adaptiveIcon, contains('@color/bcn_launcher_blue'));
+      expect(adaptiveIcon, contains('@drawable/ic_launcher_foreground'));
+    }
+    expect(colors, contains('name="bcn_launcher_blue"'));
+    for (final side in ['left', 'right', 'top', 'bottom']) {
+      expect(foreground, contains('android:$side="20dp"'));
+    }
+    expect(foreground, contains('@drawable/bcn_splash_mark'));
   });
 
   test('OurCity loading and login screens use OurCity assets', () {
