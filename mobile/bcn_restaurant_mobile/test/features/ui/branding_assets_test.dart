@@ -12,26 +12,20 @@ void main() {
     final roundIcon = File(
       'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
     ).readAsStringSync();
-    final foreground = File(
-      'android/app/src/main/res/drawable/ic_launcher_foreground.xml',
-    ).readAsStringSync();
-    final colors = File(
-      'android/app/src/main/res/values/colors.xml',
-    ).readAsStringSync();
+    final pubspec = File('pubspec.yaml').readAsStringSync();
 
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
     expect(manifest, contains('android:roundIcon="@mipmap/ic_launcher_round"'));
 
     for (final adaptiveIcon in [icon, roundIcon]) {
       expect(adaptiveIcon, contains('<adaptive-icon'));
-      expect(adaptiveIcon, contains('@color/bcn_launcher_blue'));
+      expect(adaptiveIcon, contains('<background android:drawable='));
       expect(adaptiveIcon, contains('@drawable/ic_launcher_foreground'));
     }
-    expect(colors, contains('name="bcn_launcher_blue"'));
-    for (final side in ['left', 'right', 'top', 'bottom']) {
-      expect(foreground, contains('android:$side="20dp"'));
-    }
-    expect(foreground, contains('@drawable/bcn_splash_mark'));
+    expect(pubspec, contains('image_path_android: "assets/images/OurCityLogo.png"'));
+    expect(pubspec, contains('adaptive_icon_foreground: "assets/images/OurCityLogo.png"'));
+    expect(pubspec, contains('adaptive_icon_background: "#6B3A14"'));
+    expect(File('assets/images/OurCityLogo.png').existsSync(), isTrue);
   });
 
   test('OurCity loading and login screens use OurCity assets', () {
