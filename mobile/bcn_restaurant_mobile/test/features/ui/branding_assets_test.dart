@@ -3,57 +3,29 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('OurCity launcher uses valid adaptive icon resources', () {
+  test('OurCity launcher uses an adaptive icon and inset foreground', () {
     final manifest =
         File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     final icon = File(
       'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
     ).readAsStringSync();
+    final roundIcon = File(
+      'android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml',
+    ).readAsStringSync();
+    final pubspec = File('pubspec.yaml').readAsStringSync();
 
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
-    expect(icon, contains('<adaptive-icon'));
-    expect(icon, contains('@drawable/ic_launcher_foreground'));
+    expect(manifest, contains('android:roundIcon="@mipmap/ic_launcher_round"'));
 
-    // Supports either the app's blue launcher resource or locally regenerated
-    // Flutter launcher icon resources. Both must reference a declared color.
-    final usesBlue = icon.contains('@color/bcn_launcher_blue');
-    final usesGenerated = icon.contains('@color/ic_launcher_background');
-    expect(
-      usesBlue || usesGenerated,
-      isTrue,
-      reason: 'Adaptive icon must reference a supported background color.',
-    );
-
-    final colors = File('android/app/src/main/res/values/colors.xml');
-    if (usesBlue) {
-      expect(colors.existsSync(), isTrue);
-      expect(colors.readAsStringSync(), contains('name="bcn_launcher_blue"'));
-    } else {
-      final colorResources = [
-        'android/app/src/main/res/values/colors.xml',
-        'android/app/src/main/res/values/ic_launcher_background.xml',
-      ].where((path) => File(path).existsSync()).map(
-        (path) => File(path).readAsStringSync(),
-      ).join('\n');
-      expect(
-        colorResources,
-        contains('name="ic_launcher_background"'),
-        reason: 'The generated background color resource must be defined.',
-      );
+    for (final adaptiveIcon in [icon, roundIcon]) {
+      expect(adaptiveIcon, contains('<adaptive-icon'));
+      expect(adaptiveIcon, contains('<background android:drawable='));
+      expect(adaptiveIcon, contains('@drawable/ic_launcher_foreground'));
     }
-
-    if (icon.contains('<inset')) {
-      expect(icon, contains('android:inset="20%"'));
-    } else {
-      final foreground = File(
-        'android/app/src/main/res/drawable/ic_launcher_foreground.xml',
-      );
-      expect(foreground.existsSync(), isTrue);
-      final xml = foreground.readAsStringSync();
-      expect(xml, contains('<layer-list'));
-      expect(xml, contains('android:left="20dp"'));
-      expect(xml, contains('android:top="20dp"'));
-    }
+    expect(pubspec, contains('image_path_android: "assets/images/OurCityLogo.png"'));
+    expect(pubspec, contains('adaptive_icon_foreground: "assets/images/OurCityLogo.png"'));
+    expect(pubspec, contains('adaptive_icon_background: "#6B3A14"'));
+    expect(File('assets/images/OurCityLogo.png').existsSync(), isTrue);
   });
 
   test('OurCity loading and login screens use OurCity assets', () {

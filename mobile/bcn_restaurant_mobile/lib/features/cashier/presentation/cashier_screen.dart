@@ -17,7 +17,6 @@ import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../data/cashier_repository.dart';
 import '../domain/cashier_models.dart';
 import 'cashier_daily_report_screen.dart';
-import 'cashier_item_sales_report_screen.dart';
 import 'cashier_sales_summary_screen.dart';
 
 final cashierRepositoryProvider = Provider<CashierRepository>(
@@ -114,13 +113,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(sheetContext).pop('summary'),
               ),
-              ListTile(
-                leading: const Icon(Icons.inventory_2_outlined),
-                title: const Text('Item Sales Report'),
-                subtitle: const Text('Sales quantity and amount by item'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(sheetContext).pop('item'),
-              ),
             ],
           ),
         ),
@@ -140,14 +132,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => CashierSalesSummaryScreen(
-            repository: ref.read(cashierRepositoryProvider),
-          ),
-        ),
-      );
-    } else if (report == 'item') {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => CashierItemSalesReportScreen(
             repository: ref.read(cashierRepositoryProvider),
           ),
         ),

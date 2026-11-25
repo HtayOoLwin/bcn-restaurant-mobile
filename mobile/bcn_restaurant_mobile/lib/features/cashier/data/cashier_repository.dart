@@ -32,14 +32,6 @@ class CashierRepository {
     return Map<String, dynamic>.from(data as Map);
   }
 
-  Future<Map<String, dynamic>> getItemSalesReport(String date) async {
-    final data = await _apiClient.getMethod(
-      'bcn_cashier_billing',
-      queryParameters: {'action': 'ItemSalesReport', 'date': date},
-    );
-    return Map<String, dynamic>.from(data as Map);
-  }
-
   Future<Map<String, dynamic>> getSalesSummaryByItem({
     required String date,
     String salesCounter = '',
