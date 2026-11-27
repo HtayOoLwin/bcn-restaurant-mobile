@@ -246,16 +246,40 @@ class _DesktopShell extends ConsumerWidget {
     Widget nav(IconData icon, String title, String destination, bool selected) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 4),
-        child: ListTile(
-          leading: Icon(icon, size: 22),
-          title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-          selected: selected,
-          selectedTileColor: const Color(0xFF397FBB),
-          selectedColor: Colors.white,
-          iconColor: Colors.white,
-          textColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          onTap: () => navigate(destination),
+        child: Material(
+          color: selected ? const Color(0xFF397FBB) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => navigate(destination),
+            hoverColor: Colors.white.withValues(alpha: 0.08),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 4,
+                  height: 44,
+                  child: ColoredBox(
+                    color: selected ? Colors.white : Colors.transparent,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(icon, size: 22, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(title, style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  )),
+                ),
+                if (selected)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Icon(Icons.chevron_right, color: Colors.white, size: 16),
+                  ),
+              ],
+            ),
+          ),
         ),
       );
     }
@@ -318,6 +342,9 @@ class _DesktopShell extends ConsumerWidget {
                           tooltip: 'Settings',
                           isSelected: path == '/settings',
                           color: Colors.white,
+                          style: IconButton.styleFrom(
+                            backgroundColor: path == '/settings' ? const Color(0xFF397FBB) : Colors.transparent,
+                          ),
                           selectedIcon: const Icon(Icons.settings, color: Colors.white),
                           icon: const Icon(Icons.settings_outlined),
                           onPressed: () => navigate('/settings'),
