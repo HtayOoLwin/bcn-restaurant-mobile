@@ -123,7 +123,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
           ],
         ),
         actions: [
-          if (bootstrap?.permissions.cashier == true)
+          if (!desktop && bootstrap?.permissions.cashier == true)
             IconButton(
               tooltip: 'Cashier',
               onPressed: () => context.go('/cashier'),
