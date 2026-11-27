@@ -1,0 +1,467 @@
+# Server Script API: bcn_sync_offline_order
+# POST only; Allow Guest OFF. Deploy to test site first.
+# Based on create_order.py; requires BCN Offline Order Sync DocType.
+# Do not add intermediate commits: Sales Order and receipt must be atomic.
+
+COMPANY = "Doh Myot Taw BBQ & Restaurant"
+POS_PROFILE = "DMT"
+PRICE_LIST = "Standard Selling"
+CURRENCY = "MMK"
+
+current_user = frappe.session.user
+if not current_user or current_user == "Guest":
+    frappe.throw("Authentication is required.")
+
+role_rows = frappe.get_all(
+    "Has Role",
+    filters={
+        "parent": current_user,
+        "parenttype": "User",
+    },
+    fields=["role"],
+    limit_page_length=200,
+)
+
+roles = []
+for role_row in role_rows:
+    if role_row.role and role_row.role not in roles:
+        roles.append(role_row.role)
+
+allowed_user = (
+    current_user == "Administrator"
+    or "Admin" in roles
+    or "System Manager" in roles
+    or "Waiter" in roles
+    or "Restaurant Manager" in roles
+)
+
+if not allowed_user:
+    frappe.throw("You are not allowed to create restaurant orders.")
+
+profile = frappe.get_doc("POS Profile", POS_PROFILE)
+COMPANY = (profile.company or "").strip()
+if not COMPANY:
+    frappe.throw("POS Profile DMT must have a Company.")
+SYNC_DOCTYPE = "BCN Offline Order Sync"
+if not frappe.db.exists("DocType", SYNC_DOCTYPE):
+    frappe.throw("Missing DocType: " + SYNC_DOCTYPE)
+
+action = (frappe.form_dict.get("action") or "submit").strip().lower()
+if action not in ("ping", "status", "submit"):
+    frappe.throw("Unsupported action.")
+
+if action == "ping":
+    frappe.response["message"] = {"ready": True, "backend_version": 1}
+else:
+    client_order_id = (frappe.form_dict.get("client_order_id") or "").strip()
+    if not client_order_id or len(client_order_id) > 140:
+        frappe.throw("Invalid Client Order ID.")
+    for char in client_order_id:
+        if char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_:.":
+            frappe.throw("Invalid Client Order ID.")
+
+    if action == "status":
+        receipt = frappe.db.get_value(
+            SYNC_DOCTYPE, client_order_id,
+            ["company", "request_user", "sales_order", "grand_total"],
+            as_dict=True,
+        )
+        if receipt and (receipt.company != COMPANY or receipt.request_user != current_user):
+            frappe.throw("Request not accessible.")
+        frappe.response["message"] = {
+            "found": bool(receipt),
+            "sales_order": receipt.sales_order if receipt else "",
+            "grand_total": float(receipt.grand_total or 0) if receipt else 0,
+        }
+    else:
+        customer = (frappe.form_dict.get("customer") or "").strip()
+        expected_session = (frappe.form_dict.get("session") or "").strip()
+        raw_items = frappe.form_dict.get("items")
+        remarks = (frappe.form_dict.get("remarks") or "").strip()
+        room_charge_item = (frappe.form_dict.get("room_charge_item") or "").strip()
+        if not customer:
+            frappe.throw("Customer / Table is required.")
+        if room_charge_item:
+            frappe.throw("Offline room charges require manual review.")
+        items = json.loads(raw_items) if raw_items else []
+        if not isinstance(items, list) or not items or len(items) > 200:
+            frappe.throw("Order must contain 1 to 200 items.")
+        for payload in items:
+            if not isinstance(payload, dict):
+                frappe.throw("Invalid item row.")
+            if frappe.utils.flt(payload.get("qty")) <= 0:
+                frappe.throw("Quantity must be greater than zero.")
+        payload_json = json.dumps({
+            "customer": customer,
+            "session": expected_session,
+            "items": items,
+            "remarks": remarks,
+        }, sort_keys=True)
+
+        customer_row = frappe.db.get_value(
+            "Customer",
+            customer,
+            ["name", "customer_name", "customer_group", "disabled"],
+            as_dict=True,
+        )
+
+        if not customer_row:
+            frappe.throw("Customer / Table not found: " + customer)
+
+        if customer_row.disabled:
+            frappe.throw("Customer / Table is disabled: " + customer)
+
+        # Serialize with the online create-order and transfer APIs.
+        frappe.db.sql(
+            "SELECT name FROM `tabCustomer` WHERE name=%(name)s FOR UPDATE",
+            {"name": customer}, as_dict=True,
+        )
+        # Current read under lock. The receipt's primary key is the request ID.
+        receipts = frappe.db.sql(
+            "SELECT name, company, request_user, customer, sales_order, payload_json, grand_total "
+            "FROM `tabBCN Offline Order Sync` WHERE name=%(id)s FOR UPDATE",
+            {"id": client_order_id}, as_dict=True,
+        )
+        if receipts:
+            receipt = receipts[0]
+            if receipt.company != COMPANY or receipt.request_user != current_user or receipt.customer != customer:
+                frappe.throw("Request not accessible.")
+            if receipt.payload_json != payload_json:
+                frappe.throw("Request ID already used with different order data.")
+            frappe.response["message"] = {
+                "success": True, "sales_order": receipt.sales_order,
+                "session": receipt.sales_order,
+                "grand_total": float(receipt.grand_total or 0),
+                "duplicate": True,
+            }
+        else:
+            active_orders = frappe.db.sql(
+                "SELECT name, docstatus, custom_restaurant_status, custom_client_order_id "
+                "FROM `tabSales Order` WHERE company=%(company)s AND customer=%(customer)s "
+                "AND docstatus IN (0,1) AND custom_restaurant_status IN ('Open','Billing','Payment Pending') "
+                "FOR UPDATE",
+                {"company": COMPANY, "customer": customer}, as_dict=True,
+            )
+            if len(active_orders) > 1:
+                frappe.throw("SYNC CONFLICT: multiple active orders. Review ERPNext.")
+            if expected_session:
+                if not active_orders or active_orders[0].name != expected_session:
+                    frappe.throw("SYNC CONFLICT: original Sales Order is no longer active for this table.")
+                if active_orders[0].docstatus != 0 or active_orders[0].custom_restaurant_status != "Open":
+                    frappe.throw("SYNC CONFLICT: original Sales Order is not Open.")
+            elif active_orders:
+                frappe.throw("SYNC CONFLICT: table already has an active order. Review before linking.")
+            is_new_order = not bool(active_orders)
+            if is_new_order:
+                sales_order = frappe.new_doc("Sales Order")
+            else:
+                sales_order = frappe.get_doc("Sales Order", active_orders[0].name)
+                if (sales_order.get("custom_client_order_id") or "").strip() == client_order_id:
+                    frappe.throw("SYNC CONFLICT: request already appears on Sales Order without receipt. Review manually.")
+            if remarks:
+                previous_remarks = (sales_order.get("remarks") or "").strip()
+                sales_order.remarks = previous_remarks + "\n" + remarks if previous_remarks else remarks
+
+            today = frappe.utils.nowdate()
+
+            if is_new_order:
+                sales_order.company = COMPANY
+                sales_order.customer = customer
+                sales_order.transaction_date = today
+                sales_order.delivery_date = today
+                sales_order.selling_price_list = PRICE_LIST
+                sales_order.price_list_currency = CURRENCY
+                sales_order.currency = CURRENCY
+                sales_order.conversion_rate = 1
+                sales_order.plc_conversion_rate = 1
+                sales_order.custom_restaurant_status = "Open"
+                sales_order.custom_check_in = frappe.utils.now_datetime()
+
+                if profile.warehouse:
+                    sales_order.set_warehouse = profile.warehouse
+
+            allowed_item_groups = []
+            for group_row in profile.item_groups:
+                if (
+                    group_row.item_group
+                    and group_row.item_group not in allowed_item_groups
+                ):
+                    allowed_item_groups.append(group_row.item_group)
+
+            if not allowed_item_groups:
+                frappe.throw("POS Profile DMT has no Item Groups.")
+
+            for payload in items:
+                item_code = (payload.get("item_code") or "").strip()
+                qty = frappe.utils.flt(payload.get("qty"))
+                requested_uom = (payload.get("uom") or "").strip()
+                kitchen_note = (payload.get("kitchen_note") or "").strip()
+                foc_value = payload.get("foc", payload.get("custom_foc", 0))
+                parcel_value = payload.get("parcel", payload.get("custom_parcel", 0))
+                foc = str(foc_value or "0").strip().lower() in ("1", "true", "yes")
+                parcel = str(parcel_value or "0").strip().lower() in ("1", "true", "yes")
+
+                if not item_code:
+                    frappe.throw("Item Code is required.")
+
+                if qty <= 0:
+                    frappe.throw("Quantity must be greater than zero for " + item_code)
+
+                if not frappe.db.exists("Item", item_code):
+                    frappe.throw("Item " + item_code + " not found")
+
+                item = frappe.get_doc("Item", item_code)
+
+                if item.disabled:
+                    frappe.throw("Item is disabled: " + item_code)
+
+                if not item.is_sales_item:
+                    frappe.throw("Item is not available for sale: " + item_code)
+
+                if item.item_group not in allowed_item_groups:
+                    frappe.throw("Item is not allowed in POS Profile DMT: " + item_code)
+
+                # The menu's Room Charges picker uses Item Group. Keep server-side
+                # identification consistent even when the optional custom flag is unset.
+                is_room_charge = bool(item.get("custom_is_room_charge")) or (
+                    (item.item_group or "").strip().lower() == "room charges"
+                )
+                if is_room_charge:
+                    frappe.throw("Offline room charges require manual review.")
+                if is_room_charge and (foc or parcel):
+                    frappe.throw("Room Charges cannot be FOC or Parcel")
+                if is_room_charge:
+                    if item.is_stock_item:
+                        frappe.throw("Room charge must be a non-stock Item: " + item_code)
+                    if requested_uom and requested_uom != "Hour":
+                        frappe.throw("Room charge UOM must be Hour")
+                    if any(
+                        (
+                            frappe.get_meta("Item").has_field("custom_is_room_charge")
+                            and bool(frappe.db.get_value("Item", row.item_code, "custom_is_room_charge"))
+                        )
+                        or (frappe.db.get_value("Item", row.item_code, "item_group") or "").strip().lower() == "room charges"
+                        for row in sales_order.items
+                    ):
+                        frappe.throw("Only one Room Charge Item is permitted per Sales Order")
+                    qty = 1.0  # provisional: Request for Bill calculates duration
+                kitchen_counter = "" if is_room_charge else (item.get("custom_kitchen_counter") or "").strip()
+                uom = "Hour" if is_room_charge else (requested_uom or item.stock_uom)
+
+                conversion_factor = 1.0
+                if uom != item.stock_uom:
+                    factor_row = frappe.db.get_value(
+                        "UOM Conversion Detail",
+                        {"parent": item_code, "parenttype": "Item", "uom": uom},
+                        "conversion_factor",
+                    )
+                    conversion_factor = frappe.utils.flt(factor_row)
+                    if conversion_factor <= 0:
+                        frappe.throw("UOM " + uom + " is not configured for " + item_code)
+
+                price_rows = frappe.get_all(
+                    "Item Price",
+                    filters={"price_list": PRICE_LIST, "item_code": item_code},
+                    fields=["price_list_rate", "uom"],
+                    order_by="modified desc",
+                    limit_page_length=100,
+                )
+                rate = None
+                for price in price_rows:
+                    price_uom = (price.uom or item.stock_uom).strip()
+                    if price_uom == uom:
+                        rate = frappe.utils.flt(price.price_list_rate)
+                        break
+                if rate is None:
+                    frappe.throw("No " + PRICE_LIST + " Item Price for " + item_code + " / " + uom)
+
+                selling_rate = rate
+                if foc:
+                    rate = 0.0
+
+                description = item.description or item.item_name or item_code
+                matching_row = None
+
+                for existing_row in sales_order.items:
+                    existing_note = (
+                        existing_row.get("custom_kitchen_note") or ""
+                    ).strip()
+                    existing_counter = (
+                        existing_row.get("custom_kitchen_counter") or ""
+                    ).strip()
+
+                    if (
+                        existing_row.item_code == item_code
+                        and existing_row.uom == uom
+                        and existing_note == kitchen_note
+                        and existing_counter == kitchen_counter
+                        and bool(existing_row.get("custom_foc")) == foc
+                        and bool(existing_row.get("custom_parcel")) == parcel
+                    ):
+                        matching_row = existing_row
+                        break
+
+                if matching_row:
+                    matching_row.qty = frappe.utils.flt(matching_row.qty) + qty
+                    matching_row.rate = rate
+                    matching_row.price_list_rate = selling_rate
+                    matching_row.discount_percentage = 100 if foc else 0
+                    matching_row.discount_amount = selling_rate if foc else 0
+                    matching_row.conversion_factor = conversion_factor
+                    matching_row.custom_kitchen_counter = kitchen_counter
+                    matching_row.custom_foc = 1 if foc else 0
+                    matching_row.custom_parcel = 1 if parcel else 0
+                else:
+                    # Validate and append a NEW row separately; this path differs
+                    # from increasing the quantity of an existing SO Item.
+                    try:
+                        sales_order.append(
+                            "items",
+                            {
+                                "item_code": item_code,
+                                "item_name": item.item_name,
+                                "description": description,
+                                "qty": qty,
+                                "uom": uom,
+                                "stock_uom": item.stock_uom,
+                                "conversion_factor": conversion_factor,
+                                "rate": rate,
+                                "price_list_rate": selling_rate,
+                                "discount_percentage": 100 if foc else 0,
+                                "discount_amount": selling_rate if foc else 0,
+                                "custom_foc": 1 if foc else 0,
+                                "custom_parcel": 1 if parcel else 0,
+                                "delivery_date": frappe.utils.getdate(today),
+                                "custom_kitchen_note": kitchen_note,
+                                "custom_kitchen_counter": kitchen_counter,
+                                "custom_printed_qty": 0,
+                            },
+                        )
+                    except Exception as error:
+                        frappe.throw("CREATE ORDER NEW ITEM [" + item_code + "]: " + str(error))
+
+            # Both flags must be persisted per line, never on the Sales Order header.
+            # Detect missing/misnamed child custom fields instead of silently losing Parcel.
+            for order_line in sales_order.items:
+                if not order_line.meta.has_field("custom_foc"):
+                    frappe.throw("Sales Order Item is missing custom_foc Check field")
+                if not order_line.meta.has_field("custom_parcel"):
+                    frappe.throw("Sales Order Item is missing custom_parcel Check field")
+
+            # Re-apply zero-priced FOC rows on every additional order.
+            # ERPNext can recalculate item prices when quantities change.
+            for order_line in sales_order.items:
+                if bool(order_line.get("custom_foc")):
+                    order_line.discount_percentage = 100
+                    order_line.discount_amount = frappe.utils.flt(order_line.price_list_rate or 0)
+                    order_line.rate = 0
+                    order_line.amount = 0
+                    order_line.net_rate = 0
+                    order_line.net_amount = 0
+
+            if not sales_order.items:
+                frappe.throw("Sales Order has no items.")
+
+            if profile.taxes_and_charges and not sales_order.taxes_and_charges:
+                sales_order.taxes_and_charges = profile.taxes_and_charges
+
+            if sales_order.taxes_and_charges and not sales_order.taxes:
+                # Read the selected template directly. The ERPNext Python method
+                # erpnext.accounts.services.taxes.get_taxes_and_charges is not
+                # available on every deployed ERPNext version.
+                tax_template = frappe.get_doc(
+                    "Sales Taxes and Charges Template",
+                    sales_order.taxes_and_charges,
+                )
+                if tax_template.company and tax_template.company != COMPANY:
+                    frappe.throw("Sales Tax Template Company (" + tax_template.company + ") does not match POS Profile Company (" + COMPANY + "). Check POS Profile DMT Taxes and Charges.")
+
+                for template_row in tax_template.taxes:
+                    tax_values = {
+                        "charge_type": template_row.charge_type,
+                        "account_head": template_row.account_head,
+                        "description": template_row.description,
+                        "rate": template_row.rate,
+                        "tax_amount": template_row.tax_amount,
+                        "row_id": template_row.row_id,
+                        "included_in_print_rate": template_row.included_in_print_rate,
+                        "cost_center": template_row.cost_center,
+                    }
+                    sales_order.append("taxes", tax_values)
+
+            try:
+                sales_order.calculate_taxes_and_totals()
+            except Exception as error:
+                frappe.throw("CREATE ORDER TOTALS: " + str(error))
+            # Fail rather than silently charge for an FOC row.
+            for order_line in sales_order.items:
+                if bool(order_line.get("custom_foc")) and (
+                    abs(frappe.utils.flt(order_line.rate)) > 0.01
+                    or abs(frappe.utils.flt(order_line.amount)) > 0.01
+                ):
+                    frappe.throw("FOC row must remain 0 MMK: " + order_line.item_code)
+            # Store the waiter and timestamp for this order submission (including
+            # additions to an existing Draft Sales Order). Never overwrite these
+            # values on an idempotent duplicate request.
+            # The matching Custom Fields are required on Sales Order:
+            # custom_last_ordered_by (Link -> User)
+            # custom_last_ordered_at (Datetime)
+            if not sales_order.meta.has_field("custom_last_ordered_by"):
+                frappe.throw("Sales Order custom_last_ordered_by field is required")
+            if not sales_order.meta.has_field("custom_last_ordered_at"):
+                frappe.throw("Sales Order custom_last_ordered_at field is required")
+            sales_order.custom_last_ordered_by = current_user
+            sales_order.custom_last_ordered_at = frappe.utils.now_datetime()
+
+            sales_order.custom_client_order_id = client_order_id
+            sales_order.custom_restaurant_status = "Open"
+            if not sales_order.get("custom_check_in"):
+                sales_order.custom_check_in = sales_order.creation or frappe.utils.now_datetime()
+            sales_order.flags.ignore_permissions = True
+
+            try:
+                if is_new_order:
+                    sales_order.insert(ignore_permissions=True)
+                else:
+                    sales_order.save(ignore_permissions=True)
+            except Exception as error:
+                frappe.throw("CREATE ORDER SAVE: " + str(error))
+
+            # Confirm that FOC and Parcel checkboxes survived ERPNext validation/save.
+            saved_rows = frappe.get_all(
+                "Sales Order Item",
+                filters={"parent": sales_order.name, "parenttype": "Sales Order"},
+                fields=["name", "item_code", "custom_foc", "custom_parcel"],
+                limit_page_length=500,
+            )
+            for order_line in sales_order.items:
+                found = False
+                for saved_line in saved_rows:
+                    if saved_line.name == order_line.name:
+                        found = True
+                        if bool(saved_line.custom_foc) != bool(order_line.get("custom_foc")):
+                            frappe.throw("FOC checkbox not saved for " + order_line.item_code)
+                        if bool(saved_line.custom_parcel) != bool(order_line.get("custom_parcel")):
+                            frappe.throw("Parcel checkbox not saved for " + order_line.item_code)
+                        break
+                if not found:
+                    frappe.throw("Sales Order Item row missing after save: " + order_line.item_code)
+
+
+            receipt = frappe.new_doc(SYNC_DOCTYPE)
+            receipt.request_id = client_order_id
+            receipt.company = COMPANY
+            receipt.request_user = current_user
+            receipt.customer = customer
+            receipt.sales_order = sales_order.name
+            receipt.payload_json = payload_json
+            receipt.grand_total = float(sales_order.grand_total or 0)
+            receipt.insert(ignore_permissions=True)
+
+            frappe.response["message"] = {
+                "success": True,
+                "sales_order": sales_order.name,
+                "session": sales_order.name,
+                "grand_total": float(sales_order.grand_total or 0),
+                "duplicate": False,
+            }
