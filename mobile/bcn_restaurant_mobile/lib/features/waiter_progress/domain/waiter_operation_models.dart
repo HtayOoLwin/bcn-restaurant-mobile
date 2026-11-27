@@ -10,6 +10,8 @@ class WaiterProgressItem {
     required this.canCancel,
     required this.cancelableQty,
     required this.printedQty,
+    this.onlineQty,
+    this.offlineQty = 0,
     this.foc = false,
     this.parcel = false,
     this.kitchenCounter,
@@ -29,6 +31,8 @@ class WaiterProgressItem {
       canCancel: json['can_cancel'] == true,
       cancelableQty: (json['cancelable_qty'] as num?)?.toDouble() ?? 0,
       printedQty: (json['printed_qty'] as num?)?.toDouble() ?? 0,
+      onlineQty: (json['_online_qty'] as num?)?.toDouble(),
+      offlineQty: (json['_offline_qty'] as num?)?.toDouble() ?? 0,
       foc: json['custom_foc'] == true || json['custom_foc'] == 1 || json['custom_foc'] == '1',
       parcel: json['custom_parcel'] == true || json['custom_parcel'] == 1 || json['custom_parcel'] == '1',
       kitchenCounter: json['kitchen_counter']?.toString(),
@@ -36,6 +40,8 @@ class WaiterProgressItem {
     );
   }
 
+  final double? onlineQty;
+  final double offlineQty;
   final String rowName;
   final String itemName;
   final double qty;
@@ -100,6 +106,9 @@ class WaiterProgressOrder {
     required this.currency,
     required this.taxes,
     this.roomPreview,
+    this.localPreview = false,
+    this.pendingAmount = 0,
+    this.cached = false,
   });
 
   factory WaiterProgressOrder.fromJson(Map<String, dynamic> json) {
@@ -128,6 +137,9 @@ class WaiterProgressOrder {
       grandTotal: number('grand_total'),
       currency: json['currency']?.toString() ?? 'MMK',
       taxes: json['taxes'] as List? ?? const [],
+      localPreview: json['_local_preview'] == true,
+      cached: json['_offline_cached'] == true,
+      pendingAmount: (json['_pending_amount'] as num?)?.toDouble() ?? 0,
       roomPreview: json['room_preview'] is Map
           ? WaiterRoomPreview.fromJson(
               Map<String, dynamic>.from(json['room_preview'] as Map),
@@ -151,6 +163,9 @@ class WaiterProgressOrder {
   final double grandTotal;
   final String currency;
   final WaiterRoomPreview? roomPreview;
+  final bool localPreview;
+  final bool cached;
+  final double pendingAmount;
 }
 
 class WaiterProgressResponse {
