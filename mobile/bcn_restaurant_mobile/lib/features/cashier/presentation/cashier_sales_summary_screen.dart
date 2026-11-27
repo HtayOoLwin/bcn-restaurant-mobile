@@ -136,9 +136,32 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
                         spacing: 10, runSpacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          OutlinedButton.icon(onPressed: _pickDate,
-                            icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                            label: Text(_display(_selectedDate))),
+                          SizedBox(
+                            width: 170,
+                            child: Semantics(
+                              button: true,
+                              label: 'Report date',
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: _pickDate,
+                                child: InputDecorator(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Report Date',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.all(10),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF315F8E)),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text(_display(_selectedDate), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                      const Icon(Icons.arrow_drop_down),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                           SizedBox(width: 170, child: DropdownButtonFormField<String>(
                             key: ValueKey('desktop-counter-$_counter'),
                             initialValue: counters.contains(_counter) ? _counter : '',
