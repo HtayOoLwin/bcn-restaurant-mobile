@@ -281,6 +281,99 @@ class _CreditDetailsScreenState extends ConsumerState<_CreditDetailsScreen> {
             }
             final invoices = snapshot.data ?? const <CreditInvoice>[];
             final outstanding = invoices.fold<double>(0, (sum, inv) => sum + inv.outstanding);
+            final desktop = Theme.of(context).platform == TargetPlatform.windows &&
+                MediaQuery.sizeOf(context).width >= 900;
+            if (desktop) {
+              return Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      Expanded(flex: 2, child: _CreditMetric(
+                        label: 'Remaining Credit',
+                        value: formatMoney(outstanding, widget.customer.currency),
+                        icon: Icons.account_balance_wallet_outlined,
+                        color: const Color(0xFFB4232D), background: const Color(0xFFFCE7E8),
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(child: _CreditMetric(
+                        label: 'Unpaid Invoices', value: invoices.length.toString(),
+                        icon: Icons.receipt_long_outlined,
+                        color: const Color(0xFF155484), background: const Color(0xFFE3EFFC),
+                      )),
+                    ]),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: Card(
+                        color: Colors.white, margin: EdgeInsets.zero, clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(children: [
+                                Expanded(child: Text('Outstanding Invoices (${invoices.length})',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
+                                IconButton(tooltip: 'Refresh', onPressed: _reload, icon: const Icon(Icons.refresh)),
+                              ]),
+                            ),
+                            _invoiceRow('Invoice No.', 'Invoice Date', 'Due Date', 'Total', 'Outstanding', header: true),
+                            Expanded(child: invoices.isEmpty
+                              ? const Center(child: Text('No outstanding invoices'))
+                              : ListView.builder(
+                                  itemCount: invoices.length,
+                                  itemBuilder: (context, index) {
+                                    final invoice = invoices[index];
+                                    return _invoiceRow(
+                                      invoice.name, invoice.postingDate, invoice.dueDate,
+                                      formatMoney(invoice.grandTotal, invoice.currency),
+                                      formatMoney(invoice.outstanding, invoice.currency),
+                                      alternate: index.isOdd,
+                                    );
+                                  },
+                                )),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFDCE7F1))),
+                      child: Row(children: [
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Text('Remaining Credit', style: TextStyle(fontSize: 12, color: Color(0xFF617B94))),
+                          Text(formatMoney(outstanding, widget.customer.currency), style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFFB4232D))),
+                        ])),
+                        const SizedBox(width: 12),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF15803D),
+                            foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
+                          icon: const Icon(Icons.payments_outlined),
+                          label: const Text('Receive Customer Payment'),
+                          onPressed: invoices.isEmpty || outstanding <= 0 ? null : () async {
+                            final paid = await showDialog<bool>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => _ReceivePaymentDialog(
+                                customer: widget.customer.customer,
+                                outstanding: outstanding,
+                                currency: widget.customer.currency,
+                                repository: ref.read(creditRepositoryProvider),
+                              ),
+                            );
+                            if (paid == true && mounted) _reload();
+                          },
+                        ),
+                      ]),
+                    ),
+                  ],
+                ),
+              );
+            }
             return RefreshIndicator(
               onRefresh: () async {
                 _reload();
@@ -352,6 +445,31 @@ class _CreditDetailsScreenState extends ConsumerState<_CreditDetailsScreen> {
           },
         ),
       );
+  Widget _invoiceRow(String name, String date, String due, String total, String outstanding,
+      {bool header = false, bool alternate = false}) {
+    Widget cell(String value, int flex, {bool numeric = false, bool balance = false}) => Expanded(
+      flex: flex,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5),
+        child: Tooltip(
+          message: value,
+          child: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis,
+            textAlign: numeric ? TextAlign.right : TextAlign.left,
+            style: TextStyle(fontSize: 12,
+              fontWeight: header || balance ? FontWeight.w700 : FontWeight.w500,
+              color: header ? Colors.white : balance ? const Color(0xFFB4232D) : const Color(0xFF173A5E))),
+        ),
+      ),
+    );
+    return Container(
+      color: header ? const Color(0xFF205F91) : alternate ? const Color(0xFFF4F7FB) : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      child: Row(children: [
+        cell(name, 4), cell(date, 2), cell(due, 2),
+        cell(total, 3, numeric: true), cell(outstanding, 3, numeric: true, balance: true),
+      ]),
+    );
+  }
 }
 
 class _ReceivePaymentDialog extends StatefulWidget {
