@@ -6,6 +6,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cart/domain/cart_controller.dart';
+import '../../cart/presentation/cart_screen.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../../waiter/domain/table_models.dart';
 import '../data/menu_repository.dart';
@@ -406,6 +407,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
     final windowWidth = MediaQuery.sizeOf(context).width;
     final desktop = Theme.of(context).platform == TargetPlatform.windows && windowWidth >= 900;
+    final inlineCart = desktop && windowWidth >= 1200;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: desktop ? 64 : 105,
@@ -564,6 +566,10 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                           );
                         })),
                   ])),
+                  if (inlineCart) ...[
+                    const VerticalDivider(width: 1),
+                    const SizedBox(width: 310, child: CartScreen(embedded: true)),
+                  ],
                 ],
               );
             });
@@ -655,7 +661,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           );
         },
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: inlineCart ? null : SafeArea(
         top: false,
         child: Container(
           color: Colors.white,
