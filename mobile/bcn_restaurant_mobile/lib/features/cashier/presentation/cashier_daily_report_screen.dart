@@ -174,13 +174,32 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Row(
                 children: [
-                  const Text('Report date', style: TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: _chooseDate,
-                    icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                    label: Text(_displayDate(_selectedDate)),
-                  ),
+                          SizedBox(
+                            width: 170,
+                            child: Semantics(
+                              button: true,
+                              label: 'Report date',
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: _chooseDate,
+                                child: InputDecorator(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Report Date',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.all(10),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF315F8E)),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text(_displayDate(_selectedDate), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                      const Icon(Icons.arrow_drop_down),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                   const SizedBox(width: 8),
                   TextButton(onPressed: () => setState(() {
                     _selectedDate = DateTime.now();
