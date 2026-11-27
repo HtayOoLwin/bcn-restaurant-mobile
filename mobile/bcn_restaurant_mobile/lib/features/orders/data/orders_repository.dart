@@ -9,7 +9,7 @@ class OrdersRepository {
 
   final ApiClient _apiClient;
 
-  Future<OrderResult> createOrder(CartState cart) async {
+  Future<OrderResult> createOrder(CartState cart, {bool allowOffline = false}) async {
     final customer = cart.customer;
     if (customer == null || customer.isEmpty) {
       throw StateError('Customer/table is missing from the cart.');
@@ -50,6 +50,19 @@ class OrdersRepository {
     }
     if (cart.remarks.isNotEmpty) {
       payload['remarks'] = cart.remarks;
+    }
+
+    if (allowOffline && !await _apiClient.canReachServer()) {
+      await _apiClient.saveOfflineOrder(clientOrderId, {
+        'payload': payload,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+        'estimated_total': cart.grandTotal,
+        'status': 'pending',
+      });
+      return OrderResult(
+        salesOrder: '', session: '', grandTotal: cart.grandTotal,
+        preparationSummary: 'Pending sync', duplicate: false,
+      );
     }
 
     final data = await _apiClient.postMethod(
