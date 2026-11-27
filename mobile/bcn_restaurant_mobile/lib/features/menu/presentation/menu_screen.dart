@@ -6,6 +6,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cart/domain/cart_controller.dart';
+import '../../cart/presentation/cart_screen.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../../waiter/domain/table_models.dart';
 import '../data/menu_repository.dart';
@@ -403,11 +404,13 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     final cart = ref.watch(cartProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
+    final desktop = Theme.of(context).platform == TargetPlatform.windows &&
+        MediaQuery.sizeOf(context).width >= 680;
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 105,
+        toolbarHeight: desktop ? 64 : 105,
         titleSpacing: 0,
-        title: Padding(
+        title: desktop ? Text(widget.customer, style: const TextStyle(fontWeight: FontWeight.w800)) : Padding(
           padding: const EdgeInsets.only(right: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,6 +468,11 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
             ],
           ),
         ),
+        actions: desktop ? [
+          TextButton.icon(onPressed: _showTransferTable, icon: const Icon(Icons.swap_horiz, color: Colors.white), label: const Text('Table Transfer', style: TextStyle(color: Colors.white))),
+          TextButton.icon(onPressed: menu.asData == null ? null : () => _selectRoomCharge(menu.asData!.value.items), icon: const Icon(Icons.meeting_room_outlined, color: Colors.white), label: const Text('Room Charges', style: TextStyle(color: Colors.white))),
+          const SizedBox(width: 12),
+        ] : null,
       ),
       body: menu.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -488,6 +496,64 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
             return matchesCategory && matchesSearch;
           }).toList();
 
+          if (desktop) {
+            return LayoutBuilder(builder: (context, constraints) {
+              final showCart = constraints.maxWidth >= 980;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: 150,
+                    child: Material(
+                      color: Colors.white,
+                      child: ListView(
+                        padding: const EdgeInsets.all(8),
+                        children: [
+                          const Padding(padding: EdgeInsets.all(8), child: Text('Categories', style: TextStyle(fontWeight: FontWeight.w800))),
+                          for (final category in categories)
+                            ListTile(
+                              dense: true,
+                              selected: _selectedCategory == category,
+                              selectedTileColor: const Color(0xFFE3EFFC),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              title: Text(category, style: const TextStyle(fontSize: 13)),
+                              onTap: () => setState(() => _selectedCategory = category),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Column(children: [
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: const InputDecoration(hintText: 'Search menu items', prefixIcon: Icon(Icons.search), isDense: true),
+                        onChanged: (value) => setState(() => _searchQuery = value),
+                      ),
+                    ),
+                    Expanded(child: visibleItems.isEmpty
+                      ? const Center(child: Text('No matching items.'))
+                      : LayoutBuilder(builder: (context, grid) {
+                          final columns = (grid.maxWidth / 240).floor().clamp(1, 5).toInt();
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(10),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: columns, mainAxisExtent: 285, crossAxisSpacing: 10, mainAxisSpacing: 10),
+                            itemCount: visibleItems.length,
+                            itemBuilder: (context, index) => _MenuItemCard(
+                              key: ValueKey(visibleItems[index].itemCode), item: visibleItems[index], compact: true),
+                          );
+                        })),
+                  ])),
+                  if (showCart) ...[
+                    const VerticalDivider(width: 1),
+                    const SizedBox(width: 340, child: CartScreen(embedded: true)),
+                  ],
+                ],
+              );
+            });
+          }
           return Column(
             children: [
               Container(
@@ -575,7 +641,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           );
         },
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: desktop && MediaQuery.sizeOf(context).width >= 980 ? null : SafeArea(
         top: false,
         child: Container(
           color: Colors.white,
@@ -630,7 +696,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 }
 
 class _MenuItemCard extends ConsumerStatefulWidget {
-  const _MenuItemCard({super.key, required this.item});
+  const _MenuItemCard({super.key, required this.item, this.compact = false});
+  final bool compact;
 
   final MenuItemModel item;
 
@@ -700,7 +767,26 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
       padding: const EdgeInsets.all(10),
       child: Column(
         children: [
-          Row(
+          if (widget.compact)
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: imageUri.hasScheme ? Image.network(imageUri.toString(), fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const Icon(Icons.restaurant_menu, color: Color(0xFF5E7D9C))) : const Icon(Icons.restaurant_menu, color: Color(0xFF5E7D9C)),
+                )),
+                Text(item.itemName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                Text('${formatMoney(selected.rate, item.currency)} / ${selected.uom}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF173A5E))),
+                if (hasMultipleUoms) DropdownButton<String>(
+                  isExpanded: true, isDense: true, value: selected.uom,
+                  items: [for (final option in options) DropdownMenuItem(value: option.uom, child: Text(option.uom))],
+                  onChanged: (value) { if (value != null) setState(() => _selectedUom = value); },
+                ),
+                Align(alignment: Alignment.centerRight, child: _QuantityControl(item: selectedItem, quantity: quantity, foc: _foc, parcel: _parcel)),
+              ],
+            ))
+          else Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               ClipRRect(
@@ -807,7 +893,7 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
           ),
           if (item.itemGroup.trim().toLowerCase() != 'room charges') ...[
             const SizedBox(height: 8),
-            Row(children: [
+            Wrap(spacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
               FilterChip(
                 label: Text('FOC', style: TextStyle(
                   color: _foc ? Colors.white : const Color(0xFF3F4853),
