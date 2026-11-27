@@ -78,7 +78,7 @@ class ApiClient {
   }
 
   String? _cacheKey(String method, Map<String, dynamic>? query) {
-    if (method == 'bcn_mobile_bootstrap' || method == 'bcn_mobile_menu') return 'cache:$method';
+    if (method == 'bcn_mobile_bootstrap' || method == 'bcn_mobile_menu' || method == 'bcn_waiter_order_progress') return 'cache:$method';
     if (method == 'bcn_mobile_tables') return 'cache:$method:${query?['customer_group'] ?? ''}';
     return null;
   }
@@ -152,7 +152,9 @@ class ApiClient {
     final value = jsonDecode(raw) as Map;
     final saved = DateTime.tryParse(value['saved_at']?.toString() ?? '');
     if (saved == null || DateTime.now().toUtc().difference(saved) > const Duration(hours: 24)) return null;
-    return value['data'];
+    final data = value['data'];
+    if (data is Map) return {...data, '_offline_cached': true};
+    return data;
   }
 
   Future<dynamic> postMethod(
