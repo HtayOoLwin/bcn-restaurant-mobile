@@ -317,23 +317,28 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           child: Card(
                             color: Colors.white,
                             margin: EdgeInsets.zero,
-                            child: ListView(
+                            child: Padding(
                               padding: const EdgeInsets.all(12),
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.all(8),
-                                  child: Text('Bill Details', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-                                ),
-                                _BillCard(
-                                  key: ValueKey(selected.salesOrder),
-                                  desktopDetails: true,
-                                  bill: selected,
-                                  onPayment: () => _prepareAndOpenPayment(
-                                    context: this.context, billing: data, bill: selected, creditFlow: false),
-                                  onCredit: () => _prepareAndOpenPayment(
-                                    context: this.context, billing: data, bill: selected, creditFlow: true),
-                                ),
-                              ],
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(bottom: 8),
+                                    child: Text('Bill Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                                  ),
+                                  Expanded(
+                                    child: _BillCard(
+                                      key: ValueKey(selected.salesOrder),
+                                      desktopDetails: true,
+                                      bill: selected,
+                                      onPayment: () => _prepareAndOpenPayment(
+                                        context: this.context, billing: data, bill: selected, creditFlow: false),
+                                      onCredit: () => _prepareAndOpenPayment(
+                                        context: this.context, billing: data, bill: selected, creditFlow: true),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -1448,6 +1453,67 @@ class _BillCardState extends State<_BillCard> {
         bill.restaurantStatus.trim().toLowerCase() == 'payment pending';
     final cardColor = isBilling ? _billingCardColor : _openCardColor;
     const statusForeground = Color(0xFF0B6B3A);
+
+    if (widget.desktopDetails) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            Expanded(child: Text(bill.customerName, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+            const SizedBox(width: 8),
+            Flexible(child: Tooltip(message: bill.salesOrder, child: Text(bill.salesOrder,
+              maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF153D69), fontWeight: FontWeight.w600)))),
+          ]),
+          const Divider(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(color: const Color(0xFFECF3FA), borderRadius: BorderRadius.circular(6)),
+            child: Row(children: [
+              const SizedBox(width: 48, child: Text('Qty', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF153D69)))),
+              Expanded(child: Text('Items (${bill.items.length})', style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF153D69)))),
+              const Text('Amount', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF153D69))),
+            ]),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              children: [
+                for (final item in bill.items)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(width: 48, child: Text(formatQuantity(item.qty),
+                          style: const TextStyle(color: Color(0xFF153D69), fontWeight: FontWeight.w700))),
+                        Expanded(child: Text(item.itemName)),
+                        const SizedBox(width: 8),
+                        Text(formatMoney(item.amount, bill.currency), textAlign: TextAlign.right),
+                      ],
+                    ),
+                  ),
+                const Divider(height: 12),
+                _AmountSummaryRow(label: 'Subtotal', value: formatMoney(bill.netTotal, bill.currency)),
+                ...bill.taxes.map((tax) => _AmountSummaryRow(
+                  label: tax.rate == 0 ? tax.description : '${tax.description} ${formatQuantity(tax.rate)}%',
+                  value: formatMoney(tax.taxAmount, bill.currency),
+                )),
+              ],
+            ),
+          ),
+          const Divider(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(color: const Color(0xFFEAF1F8), borderRadius: BorderRadius.circular(8)),
+            child: _AmountSummaryRow(label: 'Grand Total', value: formatMoney(bill.grandTotal, bill.currency), emphasize: true),
+          ),
+          const SizedBox(height: 8),
+          _actionButtons(isBilling),
+        ],
+      );
+    }
 
     final orderDetails = InkWell(
       borderRadius: BorderRadius.circular(10),
