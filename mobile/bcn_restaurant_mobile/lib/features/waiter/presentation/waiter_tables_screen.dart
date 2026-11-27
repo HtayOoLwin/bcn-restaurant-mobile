@@ -344,6 +344,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
       ),
     );
     return screen;
+  }
 }
 
 class _TableCard extends StatelessWidget {
