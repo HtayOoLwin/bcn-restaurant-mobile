@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../printing/domain/known_print_job_controller.dart';
 import '../data/auth_repository.dart';
@@ -34,9 +35,12 @@ class AuthController extends AsyncNotifier<AuthState> {
     try {
       final bootstrap = await _repository.getBootstrap();
       return AuthState.authenticated(bootstrap);
-    } catch (_) {
-      await _repository.logout();
-      return const AuthState.unauthenticated();
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        // Do not delete pending orders on temporary network failure.
+        return const AuthState.unauthenticated();
+      }
+      rethrow;
     }
   }
 
