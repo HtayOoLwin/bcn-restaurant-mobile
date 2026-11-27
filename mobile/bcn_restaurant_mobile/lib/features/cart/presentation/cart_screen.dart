@@ -214,6 +214,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       Text(formatQuantity(line.qty), style: const TextStyle(fontWeight: FontWeight.w700)),
                       IconButton(visualDensity: VisualDensity.compact, tooltip: 'Increase', onPressed: submitting ? null : () => controller.add(line.item, foc: line.foc, parcel: line.parcel), icon: const Icon(Icons.add_circle, size: 20, color: Color(0xFF15803D))),
                       Expanded(child: Text([line.item.uom, if (line.foc) 'FOC', if (line.parcel) 'Parcel'].join(' · '), style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'Remove item (all quantities)',
+                        onPressed: submitting ? null : () => controller.removeLine(line),
+                        icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFC62828)),
+                      ),
                     ]),
                     TextFormField(
                       initialValue: line.kitchenNote,
