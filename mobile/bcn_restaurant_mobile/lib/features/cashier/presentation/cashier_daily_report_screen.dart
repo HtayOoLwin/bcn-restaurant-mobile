@@ -20,6 +20,7 @@ class CashierDailyReportScreen extends ConsumerStatefulWidget {
 
 class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScreen> {
   DateTime _selectedDate = DateTime.now();
+  String _invoiceSearch = '';
   late Future<Map<String, dynamic>> _report;
   final Set<String> _printingInvoices = {};
   final Map<String, String> _unconfirmedRequestIds = {};
@@ -154,6 +155,7 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
 
   @override
   Widget build(BuildContext context) {
+    final desktop = Theme.of(context).platform == TargetPlatform.windows && MediaQuery.sizeOf(context).width >= 900;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Daily Sales Report'),
@@ -167,7 +169,30 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
       ),
       body: Column(
         children: [
-          Container(
+          if (desktop)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  const Text('Report date', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: _chooseDate,
+                    icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                    label: Text(_displayDate(_selectedDate)),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(onPressed: () => setState(() {
+                    _selectedDate = DateTime.now();
+                    _load();
+                  }), child: const Text('Today')),
+                  const Spacer(),
+                  OutlinedButton.icon(onPressed: () => setState(_load),
+                    icon: const Icon(Icons.refresh, size: 18), label: const Text('Refresh')),
+                ],
+              ),
+            )
+          else Container(
             margin: const EdgeInsets.all(10),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -206,13 +231,23 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
                 final currency = data['currency']?.toString() ?? 'MMK';
                 num amount(String key) => (data[key] as num?) ?? 0;
                 final invoices = (data['invoices'] as List? ?? const []);
+                final visibleInvoices = desktop
+                    ? invoices.where((raw) {
+                        if (raw is! Map) return false;
+                        final query = _invoiceSearch.trim().toLowerCase();
+                        return ['name', 'customer', 'sales_order'].any(
+                          (key) => (raw[key]?.toString() ?? '').toLowerCase().contains(query),
+                        );
+                      }).toList()
+                    : invoices;
                 return Column(children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
 
                     LayoutBuilder(builder: (context, constraints) {
-                      final width = (constraints.maxWidth - 10) / 2;
+                      final columns = desktop && constraints.maxWidth >= 720 ? 4 : 2;
+                      final width = (constraints.maxWidth - 10 * (columns - 1)) / columns;
                       return Wrap(spacing: 10, runSpacing: 10, children: [
                         SizedBox(width: width, child: _metric(
                           'Total Sales', amount('total_sales'), currency,
@@ -234,10 +269,10 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
                     }),
                     const SizedBox(height: 12),
                     Card(
-                      color: const Color(0xFFDDEBFA),
+                      color: desktop ? Colors.white : const Color(0xFFDDEBFA),
                       surfaceTintColor: Colors.transparent,
                       child: Padding(
-                      padding: const EdgeInsets.all(14),
+                      padding: EdgeInsets.all(desktop ? 10 : 14),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const Text('Payment Method Summary',
@@ -258,14 +293,45 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
                   Expanded(child: ListView(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
                     children: [
-                    const Text('Sales Invoice List',
+                    if (desktop)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(children: [
+                          Expanded(child: Text('Sales Invoices (${visibleInvoices.length})',
+                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold))),
+                          SizedBox(width: 250, child: TextField(
+                            decoration: const InputDecoration(
+                              hintText: 'Search invoice or customer',
+                              prefixIcon: Icon(Icons.search, size: 18),
+                              isDense: true,
+                            ),
+                            onChanged: (value) => setState(() => _invoiceSearch = value),
+                          )),
+                        ]),
+                      )
+                    else const Text('Sales Invoice List',
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                    if (desktop && invoices.isNotEmpty && visibleInvoices.isEmpty)
+                      const Padding(padding: EdgeInsets.all(20), child: Text('No matching invoices.')),
+                    if (desktop && visibleInvoices.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(color: const Color(0xFFE3EFFC), borderRadius: BorderRadius.circular(8)),
+                        child: const Row(children: [
+                          SizedBox(width: 32),
+                          Expanded(flex: 3, child: Text('Invoice No.', style: TextStyle(fontWeight: FontWeight.w700))),
+                          Expanded(flex: 2, child: Text('Customer', style: TextStyle(fontWeight: FontWeight.w700))),
+                          Expanded(flex: 2, child: Text('Status', style: TextStyle(fontWeight: FontWeight.w700))),
+                          Expanded(flex: 2, child: Text('Amount', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700))),
+                          SizedBox(width: 48),
+                        ]),
+                      ),
                     if (invoices.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(20),
                         child: Text('No submitted Sales Invoices for this date.'),
                       ),
-                    for (final raw in invoices)
+                    for (final raw in visibleInvoices)
                       if (raw is Map)
                         Builder(builder: (context) {
                           final grand = (raw['grand_total'] as num?) ?? 0;
@@ -286,14 +352,20 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
                             color: Colors.white,
                             child: ExpansionTile(
                               leading: const Icon(Icons.receipt_long, color: Color(0xFF205F91)),
-                              title: Row(children: [
+                              dense: desktop,
+                              title: desktop ? Row(children: [
+                                Expanded(flex: 3, child: Text(raw['name']?.toString() ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
+                                Expanded(flex: 2, child: Text(raw['customer']?.toString() ?? '', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                Expanded(flex: 2, child: Text(status, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: statusColor))),
+                                Expanded(flex: 2, child: Text(formatMoney(grand, currency), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700))),
+                              ]) : Row(children: [
                                 Expanded(child: Text(raw['name']?.toString() ?? '',
                                     maxLines: 1, overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.bold))),
                                 Text(status, style: TextStyle(fontSize: 11,
                                     fontWeight: FontWeight.bold, color: statusColor)),
                               ]),
-                              subtitle: Row(children: [
+                              subtitle: desktop ? null : Row(children: [
                                 Expanded(child: Text(raw['customer']?.toString() ?? '',
                                     maxLines: 1, overflow: TextOverflow.ellipsis)),
                                 Text(formatMoney(grand, currency),
