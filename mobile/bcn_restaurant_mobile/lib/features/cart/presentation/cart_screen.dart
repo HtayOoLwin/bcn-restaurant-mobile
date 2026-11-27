@@ -52,7 +52,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             offline ? 'Order saved offline' : result.duplicate ? 'Order already received' : 'Order placed',
           ),
           content: Text(
-            (offline ? 'Local order: ${cart.clientOrderId}\nPending sync — not sent to kitchen.\n' : 'Sales Order: ${result.salesOrder}\n') +
+            '${offline ? 'Local order: ${cart.clientOrderId}\nPending sync — not sent to kitchen.\n' : 'Sales Order: ${result.salesOrder}\n'}'
             '${result.session.isNotEmpty ? 'Session: ${result.session}\n' : ''}'
             'Total: ${formatAmount(result.grandTotal)}',
           ),
