@@ -58,7 +58,9 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final desktop = Theme.of(context).platform == TargetPlatform.windows && MediaQuery.sizeOf(context).width >= 900;
+    return Scaffold(
     appBar: AppBar(
       title: const Text('Sales Summary by Item'),
       actions: [
@@ -70,7 +72,7 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
       ],
     ),
     body: Column(children: [
-      Card(
+      if (!desktop) Card(
         margin: const EdgeInsets.all(12),
         color: const Color(0xFF205F91),
         child: InkWell(
@@ -119,6 +121,89 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
               }).toList();
           final qty = rows.fold<double>(0, (s, r) => s + _num(r['qty']));
           final total = rows.fold<double>(0, (s, r) => s + _num(r['amount']));
+          if (desktop) {
+            return Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Card(
+                    color: Colors.white,
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Wrap(
+                        spacing: 10, runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          OutlinedButton.icon(onPressed: _pickDate,
+                            icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                            label: Text(_display(_selectedDate))),
+                          SizedBox(width: 170, child: DropdownButtonFormField<String>(
+                            key: ValueKey('desktop-counter-$_counter'),
+                            initialValue: counters.contains(_counter) ? _counter : '',
+                            isExpanded: true,
+                            decoration: const InputDecoration(labelText: 'Counter', isDense: true, contentPadding: EdgeInsets.all(10)),
+                            items: [const DropdownMenuItem(value: '', child: Text('All Counters')),
+                              for (final name in counters) DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis))],
+                            onChanged: (value) { if (value == null) return; setState(() { _counter = value; _itemGroup = ''; _load(); }); },
+                          )),
+                          SizedBox(width: 180, child: DropdownButtonFormField<String>(
+                            key: ValueKey('desktop-group-$_counter-$_itemGroup'),
+                            initialValue: groups.contains(_itemGroup) ? _itemGroup : '',
+                            isExpanded: true,
+                            decoration: const InputDecoration(labelText: 'Item Group', isDense: true, contentPadding: EdgeInsets.all(10)),
+                            items: [const DropdownMenuItem(value: '', child: Text('All Item Groups')),
+                              for (final group in groups) DropdownMenuItem(value: group, child: Text(group, overflow: TextOverflow.ellipsis))],
+                            onChanged: (value) { if (value == null) return; setState(() { _itemGroup = value; _load(); }); },
+                          )),
+                          SizedBox(width: 190, child: TextFormField(
+                            initialValue: _search,
+                            decoration: const InputDecoration(hintText: 'Search item', prefixIcon: Icon(Icons.search, size: 18), isDense: true),
+                            onChanged: (value) => setState(() => _search = value),
+                          )),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: _desktopMetric('Item rows', formatAmount(rows.length), const Color(0xFFE3EFFC))),
+                    const SizedBox(width: 8),
+                    Expanded(child: _desktopMetric('Total Qty', formatAmount(qty), const Color(0xFFE8F6EF))),
+                    const SizedBox(width: 8),
+                    Expanded(child: _desktopMetric('Total Amount (MMK)', formatAmount(total), const Color(0xFFE3EFFC))),
+                  ]),
+                  const SizedBox(height: 10),
+                  if (data['foc_detection_available'] != true)
+                    const Padding(padding: EdgeInsets.only(bottom: 8), child: Text('FOC mapping is not configured or not detected in ERPNext. Verify the Sales Order/Sales Invoice FOC flag before relying on FOC Qty.', style: TextStyle(color: Colors.deepOrange, fontSize: 12))),
+                  Expanded(child: Card(
+                    color: Colors.white, margin: EdgeInsets.zero, clipBehavior: Clip.antiAlias,
+                    child: Column(children: [
+                      _desktopRow('Item Name', 'Rate', 'Qty', 'FOC Qty', 'Amount', header: true),
+                      Expanded(child: rows.isEmpty ? const Center(child: Text('No sales items for these filters.')) : ListView.builder(
+                        itemCount: rows.length,
+                        itemBuilder: (context, index) {
+                          final row = rows[index];
+                          return _desktopRow(
+                            row['item_name']?.toString() ?? '',
+                            formatAmount(_num(row['rate'])),
+                            formatAmount(_num(row['qty'])),
+                            formatAmount(_num(row['foc_qty'])),
+                            formatAmount(_num(row['amount'])),
+                            alternate: index.isOdd,
+                          );
+                        },
+                      )),
+                      _desktopRow('Total', '', formatAmount(qty), formatAmount(rows.fold<double>(0, (sum, row) => sum + _num(row['foc_qty']))), formatAmount(total), header: true),
+                    ]),
+                  )),
+                  const SizedBox(height: 6),
+                  const Text('Amount (MMK) · Qty includes FOC; do not add FOC Qty again.', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                ],
+              ),
+            );
+          }
           return ListView(padding: const EdgeInsets.fromLTRB(12, 20, 12, 24), children: [
             const Padding(
               padding: EdgeInsets.only(bottom: 8),
@@ -326,4 +411,31 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
       )),
     ]),
   );
+  }
+
+  Widget _desktopMetric(String title, String value, Color background) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(10)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(fontSize: 12, color: Color(0xFF315F8E))),
+        const SizedBox(height: 4),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: Color(0xFF153D69))),
+      ]),
+    );
+  }
+
+  Widget _desktopRow(String name, String rate, String qty, String foc, String amount, {bool header = false, bool alternate = false}) {
+    final style = TextStyle(fontSize: 12, color: header ? Colors.white : const Color(0xFF173A5E), fontWeight: header ? FontWeight.w700 : FontWeight.w500);
+    Widget cell(String value, int flex, {bool numeric = true}) => Expanded(
+      flex: flex,
+      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 5),
+        child: Tooltip(message: value, child: Text(value, maxLines: numeric ? 1 : 2, overflow: TextOverflow.ellipsis, textAlign: numeric ? TextAlign.right : TextAlign.left, style: style))),
+    );
+    return Container(
+      color: header ? const Color(0xFF205F91) : alternate ? const Color(0xFFF4F7FB) : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+      child: Row(children: [cell(name, 5, numeric: false), cell(rate, 2), cell(qty, 1), cell(foc, 1), cell(amount, 2)]),
+    );
+  }
 }
