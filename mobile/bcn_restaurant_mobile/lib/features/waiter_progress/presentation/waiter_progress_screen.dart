@@ -107,7 +107,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
-                          flex: 5,
+                          flex: 4,
                           child: Card(
                             color: Colors.white,
                             margin: EdgeInsets.zero,
@@ -115,7 +115,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(12),
                                   child: Row(
                                     children: [
                                       const Icon(Icons.receipt_long_outlined, color: Color(0xFF1E5E96)),
@@ -141,7 +141,8 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                                           side: BorderSide(color: active ? const Color(0xFF1E5E96) : const Color(0xFFD5E1EE)),
                                         ),
                                         child: ListTile(
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          dense: true,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                                           leading: const Icon(Icons.table_restaurant_outlined, color: Color(0xFF1E5E96), size: 28),
                                           title: Text(order.customer, style: const TextStyle(fontWeight: FontWeight.w800)),
                                           subtitle: Text(order.name, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -165,23 +166,30 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          flex: 6,
+                          flex: 7,
                           child: Card(
                             color: Colors.white,
                             margin: EdgeInsets.zero,
-                            child: ListView(
-                              padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 const Padding(
-                                  padding: EdgeInsets.fromLTRB(8, 4, 8, 12),
-                                  child: Text('Order Details', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                                  padding: EdgeInsets.fromLTRB(12, 10, 12, 4),
+                                  child: Text('Order Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
                                 ),
-                                _ProgressCard(
-                                  key: ValueKey(selected.name),
-                                  order: selected,
-                                  busyRow: _busyRow,
-                                  onCancel: _cancelItem,
-                                  desktopDetails: true,
+                                Expanded(
+                                  child: ListView(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                    children: [
+                                      _ProgressCard(
+                                        key: ValueKey(selected.name),
+                                        order: selected,
+                                        busyRow: _busyRow,
+                                        onCancel: _cancelItem,
+                                        desktopDetails: true,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -414,7 +422,16 @@ class _ProgressCardState extends State<_ProgressCard> {
       const Color(0xFFD9C3F3),
     ];
     final cardIndex = widget.order.name.codeUnits.fold<int>(0, (sum, code) => sum + code) % cardColors.length;
-    final orderDetails = InkWell(
+    final orderDetails = widget.desktopDetails ? Row(
+      children: [
+        Expanded(child: Text(widget.order.customer, maxLines: 2, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+        const SizedBox(width: 8),
+        Flexible(child: Tooltip(message: widget.order.name, child: Text(widget.order.name,
+          maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF315F8E), fontWeight: FontWeight.w600)))),
+      ],
+    ) : InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: widget.desktopDetails ? null : () => setState(() => _expanded = !_expanded),
       child: Padding(
@@ -471,12 +488,12 @@ class _ProgressCardState extends State<_ProgressCard> {
     );
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: widget.desktopDetails ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
       color: widget.desktopDetails ? Colors.white : cardColors[cardIndex],
       elevation: widget.desktopDetails ? 0 : null,
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(widget.desktopDetails ? 4 : 14),
         child: LayoutBuilder(
           builder: (context, constraints) {
             return Column(
@@ -484,19 +501,19 @@ class _ProgressCardState extends State<_ProgressCard> {
               children: [
                 orderDetails,
                 if (_expanded) ...[
-                  const Divider(height: 24),
+                  Divider(height: widget.desktopDetails ? 12 : 24),
                   if (widget.order.roomPreview != null) ...[
                     _RoomChargePreviewCard(
                       preview: widget.order.roomPreview!,
                       currency: widget.order.currency,
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: widget.desktopDetails ? 6 : 12),
                   ],
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: widget.desktopDetails ? 4 : 10,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDDEBFA),
@@ -562,10 +579,10 @@ class _ProgressCardState extends State<_ProgressCard> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: widget.desktopDetails ? 3 : 8),
                   ...widget.order.items.map(
                     (item) => Padding(
-                      padding: const EdgeInsets.only(left: 4, right: 0, top: 5, bottom: 5),
+                      padding: EdgeInsets.only(left: 4, right: 0, top: widget.desktopDetails ? 3 : 5, bottom: widget.desktopDetails ? 3 : 5),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -613,7 +630,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                                       ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
+                                SizedBox(height: widget.desktopDetails ? 1 : 4),
                                 Text(
                                   '@ ${formatAmount(item.rate)}',
                                   style: const TextStyle(
@@ -670,7 +687,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                       ),
                     ),
                   ),
-                const Divider(height: 20),
+                Divider(height: widget.desktopDetails ? 10 : 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -690,14 +707,20 @@ class _ProgressCardState extends State<_ProgressCard> {
                         ],
                       ),
                     ),
-                const Divider(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text(formatMoney(widget.order.grandTotal, widget.order.currency),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-                  ],
+                Divider(height: widget.desktopDetails ? 10 : 16),
+                Container(
+                  padding: widget.desktopDetails ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8) : EdgeInsets.zero,
+                  decoration: widget.desktopDetails ? BoxDecoration(
+                    color: const Color(0xFFEAF1F8), borderRadius: BorderRadius.circular(8),
+                  ) : null,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(formatMoney(widget.order.grandTotal, widget.order.currency),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                    ],
+                  ),
                 ),
               ],
               ],
