@@ -57,6 +57,15 @@ class OrdersRepository {
         'payload': payload,
         'created_at': DateTime.now().toUtc().toIso8601String(),
         'estimated_total': cart.grandTotal,
+        'display_items': cart.lines.map((line) => {
+          'item_code': line.item.itemCode,
+          'item_name': line.item.itemName,
+          'qty': line.qty,
+          'uom': line.item.uom,
+          'foc': line.foc ? 1 : 0,
+          'parcel': line.parcel ? 1 : 0,
+          'kitchen_note': line.kitchenNote,
+        }).toList(),
         'status': 'pending',
       });
       return OrderResult(
