@@ -7,6 +7,8 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/cart/domain/cart_controller.dart';
 import '../../features/cashier/presentation/cashier_screen.dart';
+import '../../features/cashier/presentation/cashier_daily_report_screen.dart';
+import '../../features/cashier/presentation/cashier_sales_summary_screen.dart';
 import '../../features/credit/presentation/credit_customers_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
 import '../../features/room/presentation/room_timer_demo_screen.dart';
@@ -94,6 +96,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/cashier/credits',
         builder: (context, state) => const CreditCustomersScreen(),
+      ),
+      GoRoute(
+        path: '/cashier/reports/daily',
+        builder: (context, state) => CashierDailyReportScreen(
+          repository: ref.read(cashierRepositoryProvider),
+        ),
+      ),
+      GoRoute(
+        path: '/cashier/reports/items',
+        builder: (context, state) => CashierSalesSummaryScreen(
+          repository: ref.read(cashierRepositoryProvider),
+        ),
       ),
       GoRoute(
         path: '/printer-settings',
@@ -282,6 +296,12 @@ class _DesktopShell extends ConsumerWidget {
                         if (permissions?.cashier == true) ...[
                           nav(Icons.point_of_sale_outlined, 'Cashier', '/cashier', path == '/cashier'),
                           nav(Icons.people_outline, 'Credit Customers', '/cashier/credits', path == '/cashier/credits'),
+                          const Padding(
+                            padding: EdgeInsets.fromLTRB(16, 12, 8, 6),
+                            child: Text('REPORTS', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
+                          ),
+                          nav(Icons.calendar_today_outlined, 'Daily Sales Report', '/cashier/reports/daily', path == '/cashier/reports/daily'),
+                          nav(Icons.bar_chart_outlined, 'Sales by Item', '/cashier/reports/items', path == '/cashier/reports/items'),
                         ],
                         if (permissions?.canViewPrintStatus == true)
                           nav(Icons.print_outlined, 'Printer Settings', '/printer-settings', path == '/printer-settings'),
