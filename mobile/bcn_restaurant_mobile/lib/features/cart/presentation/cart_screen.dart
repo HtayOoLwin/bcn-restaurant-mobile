@@ -15,7 +15,8 @@ final ordersRepositoryProvider = Provider<OrdersRepository>(
 );
 
 class CartScreen extends ConsumerStatefulWidget {
-  const CartScreen({super.key});
+  const CartScreen({super.key, this.embedded = false});
+  final bool embedded;
 
   @override
   ConsumerState<CartScreen> createState() => _CartScreenState();
@@ -73,8 +74,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72,
-        leading: BackButton(
+        automaticallyImplyLeading: !widget.embedded,
+        toolbarHeight: widget.embedded ? 56 : 72,
+        leading: widget.embedded ? null : BackButton(
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -93,7 +95,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Cart - ${cart.customer ?? ''}',
+              widget.embedded ? 'Current Order' : 'Cart - ${cart.customer ?? ''}',
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19),
             ),
             const SizedBox(height: 2),
@@ -111,7 +113,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           if (cart.lines.isNotEmpty)
             IconButton(
               tooltip: 'Clear cart',
-              onPressed: () => ref.read(cartProvider.notifier).clear(),
+              onPressed: () {
+                final customer = cart.customer;
+                final session = cart.session;
+                ref.read(cartProvider.notifier).clear();
+                if (widget.embedded && customer != null) {
+                  ref.read(cartProvider.notifier).setOrderContext(customer: customer, session: session);
+                }
+              },
               icon: const Icon(Icons.delete_outline_rounded),
             ),
           const SizedBox(width: 6),
@@ -199,8 +208,8 @@ class _CartLineCard extends ConsumerWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  width: 68,
-                  height: 68,
+                  width: 44,
+                  height: 44,
                   color: const Color(0xFFEAF1F8),
                   child: imageUri.hasScheme
                       ? Image.network(
