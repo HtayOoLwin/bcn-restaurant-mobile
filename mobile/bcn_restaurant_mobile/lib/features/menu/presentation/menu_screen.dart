@@ -560,7 +560,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                           return GridView.builder(
                             padding: const EdgeInsets.all(10),
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: columns, mainAxisExtent: 238, crossAxisSpacing: 8, mainAxisSpacing: 8),
+                              crossAxisCount: columns, mainAxisExtent: 228, crossAxisSpacing: 8, mainAxisSpacing: 8),
                             itemCount: visibleItems.length,
                             itemBuilder: (context, index) => _MenuItemCard(
                               key: ValueKey(visibleItems[index].itemCode), item: visibleItems[index], compact: true),
@@ -782,41 +782,59 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFDCE7F1)),
+        borderRadius: BorderRadius.circular(widget.compact ? 12 : 18),
+        border: Border.all(color: widget.compact && quantity > 0 ? const Color(0xFF1E5E96) : const Color(0xFFDCE7F1)),
       ),
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(widget.compact ? 8 : 10),
       child: Column(
         children: [
           if (widget.compact)
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: ColoredBox(
-                    color: const Color(0xFFF7F9FC),
-                    child: imageUri.hasScheme ? Image.network(imageUri.toString(), fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Icon(Icons.restaurant_menu, color: Color(0xFF5E7D9C))) : const Icon(Icons.restaurant_menu, color: Color(0xFF5E7D9C)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 72,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: ColoredBox(
+                        color: const Color(0xFFF7F9FC),
+                        child: imageUri.hasScheme
+                            ? Image.network(imageUri.toString(), fit: BoxFit.contain,
+                                errorBuilder: (_, _, _) => const Icon(Icons.restaurant_menu, size: 24, color: Color(0xFF5E7D9C)))
+                            : const Icon(Icons.restaurant_menu, size: 24, color: Color(0xFF5E7D9C)),
+                      ),
+                    ),
                   ),
-                )),
-                const SizedBox(height: 4),
-                Tooltip(message: item.itemName, child: Text(item.itemName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12))),
-                Text('${formatMoney(_foc ? 0 : selected.rate, item.currency)} / ${selected.uom}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF173A5E))),
-                if (hasMultipleUoms) DropdownButton<String>(
-                  isExpanded: true, isDense: true, value: selected.uom,
-                  items: [for (final option in options) DropdownMenuItem(value: option.uom, child: Text(option.uom, overflow: TextOverflow.ellipsis))],
-                  onChanged: (value) { if (value != null) setState(() => _selectedUom = value); },
-                ),
-                if (item.itemGroup.trim().toLowerCase() != 'room charges')
-                  Row(children: [
-                    Expanded(child: _compactVariant('FOC', _foc, const Color(0xFFC62828), () => _setVariant(item, foc: !_foc))),
-                    const SizedBox(width: 4),
-                    Expanded(child: _compactVariant('Parcel', _parcel, const Color(0xFF18834B), () => _setVariant(item, parcel: !_parcel))),
-                  ]),
-                Align(alignment: Alignment.centerRight, child: _QuantityControl(item: selectedItem, quantity: quantity, foc: _foc, parcel: _parcel)),
-              ],
-            ))
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    height: 34,
+                    child: Tooltip(message: item.itemName, child: Text(item.itemName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, height: 1.3))),
+                  ),
+                  SizedBox(
+                    height: 16,
+                    child: Text('${formatMoney(_foc ? 0 : selected.rate, item.currency)} / ${selected.uom}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF173A5E))),
+                  ),
+                  SizedBox(
+                    height: 24,
+                    child: hasMultipleUoms ? DropdownButton<String>(
+                      isExpanded: true, isDense: true, value: selected.uom,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF173A5E)),
+                      items: [for (final option in options) DropdownMenuItem(value: option.uom, child: Text(option.uom, overflow: TextOverflow.ellipsis))],
+                      onChanged: (value) { if (value != null) setState(() => _selectedUom = value); },
+                    ) : const SizedBox.shrink(),
+                  ),
+                  if (item.itemGroup.trim().toLowerCase() != 'room charges')
+                    Row(children: [
+                      Expanded(child: _compactVariant('FOC', _foc, const Color(0xFFC62828), () => _setVariant(item, foc: !_foc))),
+                      const SizedBox(width: 4),
+                      Expanded(child: _compactVariant('Parcel', _parcel, const Color(0xFF18834B), () => _setVariant(item, parcel: !_parcel))),
+                    ]),
+                  const Spacer(),
+                  _QuantityControl(item: selectedItem, quantity: quantity, foc: _foc, parcel: _parcel, compact: true),
+                ],
+              ),
+            )
           else Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -986,7 +1004,9 @@ Widget _compactVariant(String label, bool selected, Color color, VoidCallback on
 }
 
 class _QuantityControl extends ConsumerWidget {
-  const _QuantityControl({required this.item, required this.quantity, required this.foc, required this.parcel});
+  const _QuantityControl({required this.item, required this.quantity, required this.foc, required this.parcel, this.compact = false});
+
+  final bool compact;
 
   final MenuItemModel item;
   final double quantity;
@@ -996,6 +1016,48 @@ class _QuantityControl extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final primary = Theme.of(context).colorScheme.primary;
+
+    if (compact) {
+      final controller = ref.read(cartProvider.notifier);
+      return SizedBox(
+        height: 30,
+        child: Material(
+          color: quantity > 0 ? const Color(0xFFE3EFFC) : const Color(0xFFF0F4F9),
+          borderRadius: BorderRadius.circular(7),
+          clipBehavior: Clip.antiAlias,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: IconButton(
+                  tooltip: 'Decrease',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: quantity <= 0 ? null : () => controller.decrement(item.itemCode, uom: item.uom, foc: foc, parcel: parcel),
+                  icon: const Icon(Icons.remove, size: 17),
+                ),
+              ),
+              Expanded(child: Center(child: Text(formatQuantity(quantity), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF173A5E))))),
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: Material(
+                  color: primary,
+                  child: IconButton(
+                    tooltip: 'Add',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => controller.add(item, foc: foc, parcel: parcel),
+                    icon: const Icon(Icons.add, color: Colors.white, size: 17),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (quantity <= 0) {
       return IconButton.filled(
