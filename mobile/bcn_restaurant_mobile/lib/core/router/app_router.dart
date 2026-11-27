@@ -441,8 +441,15 @@ class _ConnectionStatusFooter extends ConsumerWidget {
           ]),
           const SizedBox(height: 4),
           Text(detail, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 4),
+          ref.watch(pendingOrderCountProvider).when(
+            data: (count) => Text('Pending orders: $count', style: TextStyle(
+              color: count > 0 ? const Color(0xFFFF7777) : Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+            loading: () => const Text('Pending orders: …', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            error: (_, _) => const Text('Pending orders unavailable', style: TextStyle(color: Colors.white70, fontSize: 12)),
+          ),
           if (status == _ServerStatus.offline)
-            const Text('Offline orders not enabled yet', style: TextStyle(color: Colors.white70, fontSize: 10)),
+            const Text('Local orders only · no printing', style: TextStyle(color: Colors.white70, fontSize: 10)),
         ],
       ),
     );
