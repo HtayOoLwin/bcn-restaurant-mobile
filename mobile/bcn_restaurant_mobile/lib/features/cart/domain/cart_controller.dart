@@ -180,6 +180,18 @@ class CartController extends Notifier<CartState> {
     state = state.copyWith(lines: lines);
   }
 
+  void removeLine(CartLine line) {
+    final lines = [...state.lines];
+    final index = lines.indexOf(line);
+    if (index < 0) return;
+    lines.removeAt(index);
+    state = state.copyWith(
+      lines: lines,
+      clearRoomCharge: line.item.itemCode == state.roomChargeItemCode &&
+          !lines.any((remaining) => remaining.item.itemCode == line.item.itemCode),
+    );
+  }
+
   void remove(String itemCode, {String? uom}) {
     state = state.copyWith(
       clearRoomCharge: itemCode == state.roomChargeItemCode,
