@@ -8,6 +8,7 @@ class RestaurantTableModel {
     this.sessionStatus,
     this.waiter,
     this.openedAt,
+    this.hasPendingOrders = false,
   });
 
   factory RestaurantTableModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +32,7 @@ class RestaurantTableModel {
   final String? sessionStatus;
   final String? waiter;
   final String? openedAt;
+  final bool hasPendingOrders;
 }
 
 class TablesResponse {
