@@ -99,6 +99,13 @@ class OrdersRepository {
         'Check ERPNext Sales Orders for this table before retrying.',
       );
     }
+    if (allowOffline) {
+      try {
+        await _apiClient.getMethod('bcn_waiter_order_progress');
+      } catch (_) {
+        // The order is already confirmed; cache refresh must not fail it.
+      }
+    }
     return OrderResult.fromJson(body);
   }
 }
