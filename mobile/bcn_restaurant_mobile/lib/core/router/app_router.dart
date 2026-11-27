@@ -218,7 +218,9 @@ class _DesktopShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (Theme.of(context).platform != TargetPlatform.windows ||
-        MediaQuery.sizeOf(context).width < 900) return child;
+        MediaQuery.sizeOf(context).width < 900) {
+      return child;
+    }
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
     final permissions = bootstrap?.permissions;
     Future<void> navigate(String destination) async {
