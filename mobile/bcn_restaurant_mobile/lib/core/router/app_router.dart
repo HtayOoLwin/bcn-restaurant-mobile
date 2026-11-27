@@ -307,11 +307,23 @@ class _DesktopShell extends ConsumerWidget {
                         ],
                         if (permissions?.canViewPrintStatus == true)
                           nav(Icons.print_outlined, 'Printer Settings', '/printer-settings', path == '/printer-settings'),
-                        nav(Icons.settings_outlined, 'Settings', '/settings', path == '/settings'),
                       ],
                     )),
                     const Divider(color: Colors.white24),
-                    const Padding(padding: EdgeInsets.all(16), child: Text('Restaurant POS', style: TextStyle(color: Colors.white70))),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 4, 10, 8),
+                      child: Row(children: [
+                        const Expanded(child: Text('Restaurant POS', style: TextStyle(color: Colors.white70))),
+                        IconButton(
+                          tooltip: 'Settings',
+                          isSelected: path == '/settings',
+                          color: Colors.white,
+                          selectedIcon: const Icon(Icons.settings, color: Colors.white),
+                          icon: const Icon(Icons.settings_outlined),
+                          onPressed: () => navigate('/settings'),
+                        ),
+                      ]),
+                    ),
                   ],
                 ),
               ),
