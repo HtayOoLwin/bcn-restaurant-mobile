@@ -112,7 +112,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     var transferring = false;
 
     final desktopTransfer = Theme.of(context).platform == TargetPlatform.windows;
-    final WidgetBuilder transferBuilder = (sheetContext) => StatefulBuilder(
+    Widget transferBuilder(BuildContext sheetContext) => StatefulBuilder(
         builder: (sheetContext, updateSheet) {
           return PopScope(
             canPop: !transferring,
