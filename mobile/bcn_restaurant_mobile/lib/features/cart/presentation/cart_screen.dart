@@ -189,25 +189,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            margin: const EdgeInsets.all(10),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: const Color(0xFFEAF1F8), borderRadius: BorderRadius.circular(10)),
-            child: Row(children: [
-              const Icon(Icons.shopping_cart_outlined, color: Color(0xFF1E5E96)),
-              const SizedBox(width: 8),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Current Order', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                Text('${formatQuantity(cart.totalQty)} items selected', style: const TextStyle(fontSize: 12)),
-              ])),
-              IconButton(tooltip: 'Clear cart', onPressed: submitting || cart.lines.isEmpty ? null : () {
-                final customer = cart.customer;
-                final session = cart.session;
-                controller.clear();
-                if (customer != null) controller.setOrderContext(customer: customer, session: session);
-              }, icon: const Icon(Icons.delete_outline, color: Color(0xFFC62828))),
-            ]),
-          ),
+          const SizedBox(height: 8),
           Expanded(
             child: cart.lines.isEmpty ? const _EmptyCart() : ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -228,9 +210,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       Text(formatAmount(line.amount), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1E5E96))),
                     ]),
                     Row(children: [
-                      IconButton(visualDensity: VisualDensity.compact, tooltip: 'Decrease', onPressed: submitting ? null : () => controller.decrement(line.item.itemCode, uom: line.item.uom, foc: line.foc, parcel: line.parcel), icon: const Icon(Icons.remove_circle_outline, size: 20)),
+                      IconButton(visualDensity: VisualDensity.compact, tooltip: 'Decrease', onPressed: submitting ? null : () => controller.decrement(line.item.itemCode, uom: line.item.uom, foc: line.foc, parcel: line.parcel), icon: const Icon(Icons.remove_circle_outline, size: 20, color: Color(0xFFC62828))),
                       Text(formatQuantity(line.qty), style: const TextStyle(fontWeight: FontWeight.w700)),
-                      IconButton(visualDensity: VisualDensity.compact, tooltip: 'Increase', onPressed: submitting ? null : () => controller.add(line.item, foc: line.foc, parcel: line.parcel), icon: const Icon(Icons.add_circle, size: 20, color: Color(0xFF1E5E96))),
+                      IconButton(visualDensity: VisualDensity.compact, tooltip: 'Increase', onPressed: submitting ? null : () => controller.add(line.item, foc: line.foc, parcel: line.parcel), icon: const Icon(Icons.add_circle, size: 20, color: Color(0xFF15803D))),
                       Expanded(child: Text([line.item.uom, if (line.foc) 'FOC', if (line.parcel) 'Parcel'].join(' · '), style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)),
                     ]),
                     TextFormField(
