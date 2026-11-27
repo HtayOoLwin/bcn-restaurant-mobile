@@ -282,7 +282,8 @@ class _CartLineCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final imageUri = AppConfig.resolveAssetUrl(line.item.image);
-    final primary = Theme.of(context).colorScheme.primary;
+    final windows = Theme.of(context).platform == TargetPlatform.windows;
+    final primary = windows ? const Color(0xFF15803D) : Theme.of(context).colorScheme.primary;
 
     return Container(
       decoration: BoxDecoration(
@@ -363,6 +364,7 @@ class _CartLineCard extends ConsumerWidget {
                   IconButton.filledTonal(
                     visualDensity: VisualDensity.compact,
                     tooltip: 'Decrease',
+                    style: windows ? IconButton.styleFrom(backgroundColor: const Color(0xFFC62828), foregroundColor: Colors.white) : null,
                     onPressed: () => ref
                         .read(cartProvider.notifier)
                         .decrement(line.item.itemCode, uom: line.item.uom, foc: line.foc, parcel: line.parcel),
