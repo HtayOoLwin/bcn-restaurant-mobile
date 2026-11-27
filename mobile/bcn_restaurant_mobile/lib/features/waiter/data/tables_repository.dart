@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../../core/network/api_client.dart';
 import '../domain/table_models.dart';
 
@@ -61,6 +63,23 @@ class TablesRepository {
         '_refresh': DateTime.now().millisecondsSinceEpoch,
       },
     );
-    return TablesResponse.fromJson(Map<String, dynamic>.from(data as Map));
+    final response = TablesResponse.fromJson(Map<String, dynamic>.from(data as Map));
+    final pending = await _apiClient.pendingOrders();
+    final customers = <String>{};
+    for (final raw in pending.values) {
+      try {
+        final record = jsonDecode(raw) as Map;
+        final payload = record['payload'] as Map;
+        customers.add(payload['customer']?.toString() ?? '');
+      } catch (_) {}
+    }
+    return TablesResponse(serviceType: response.serviceType, companyName: response.companyName,
+      customerGroup: response.customerGroup, customerGroups: response.customerGroups,
+      tables: response.tables.map((t) => customers.contains(t.customer)
+        ? RestaurantTableModel(customer: t.customer, customerName: t.customerName,
+            customerGroup: t.customerGroup, isOpen: true, session: t.session,
+            sessionStatus: t.isOpen ? t.sessionStatus : 'Occupied',
+            waiter: t.waiter, openedAt: t.openedAt, hasPendingOrders: true)
+        : t).toList());
   }
 }
