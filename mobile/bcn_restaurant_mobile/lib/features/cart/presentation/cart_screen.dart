@@ -208,8 +208,8 @@ class _CartLineCard extends ConsumerWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  width: 44,
-                  height: 44,
+                  width: MediaQuery.sizeOf(context).width >= 1200 && Theme.of(context).platform == TargetPlatform.windows ? 44 : 68,
+                  height: MediaQuery.sizeOf(context).width >= 1200 && Theme.of(context).platform == TargetPlatform.windows ? 44 : 68,
                   color: const Color(0xFFEAF1F8),
                   child: imageUri.hasScheme
                       ? Image.network(
