@@ -31,6 +31,7 @@ class MenuScreen extends ConsumerStatefulWidget {
 
 class _MenuScreenState extends ConsumerState<MenuScreen> {
   String _selectedCategory = 'All';
+  bool _desktopList = false;
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
@@ -504,7 +505,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    width: 150,
+                    width: 146,
                     child: Material(
                       color: Colors.white,
                       child: ListView(
@@ -515,9 +516,13 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                             ListTile(
                               dense: true,
                               selected: _selectedCategory == category,
-                              selectedTileColor: const Color(0xFFE3EFFC),
+                              selectedTileColor: const Color(0xFF1E5E96),
+                              tileColor: const Color(0xFFF0F4F9),
+                              selectedColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              title: Text(category, style: const TextStyle(fontSize: 13)),
+                              title: Text(category, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              trailing: Text('${response.items.where((item) => category == 'All' || item.itemGroup == category).length}', style: const TextStyle(fontSize: 11)),
                               onTap: () => setState(() => _selectedCategory = category),
                             ),
                         ],
@@ -527,20 +532,35 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                   Expanded(child: Column(children: [
                     Padding(
                       padding: const EdgeInsets.all(10),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(hintText: 'Search menu items', prefixIcon: Icon(Icons.search), isDense: true),
-                        onChanged: (value) => setState(() => _searchQuery = value),
+                      child: Row(
+                        children: [
+                          Expanded(child: TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(hintText: 'Search menu items', prefixIcon: Icon(Icons.search), isDense: true),
+                            onChanged: (value) => setState(() => _searchQuery = value),
+                          )),
+                          const SizedBox(width: 6),
+                          IconButton(isSelected: !_desktopList, tooltip: 'Grid view', onPressed: () => setState(() => _desktopList = false), icon: const Icon(Icons.grid_view), selectedIcon: const Icon(Icons.grid_view, color: Color(0xFF1E5E96))),
+                          IconButton(isSelected: _desktopList, tooltip: 'List view', onPressed: () => setState(() => _desktopList = true), icon: const Icon(Icons.view_list_outlined), selectedIcon: const Icon(Icons.view_list, color: Color(0xFF1E5E96))),
+                        ],
                       ),
                     ),
                     Expanded(child: visibleItems.isEmpty
                       ? const Center(child: Text('No matching items.'))
                       : LayoutBuilder(builder: (context, grid) {
-                          final columns = (grid.maxWidth / 240).floor().clamp(1, 5).toInt();
+                          final columns = ((grid.maxWidth - 12) / 172).floor().clamp(1, 6).toInt();
+                          if (_desktopList) {
+                            return ListView.separated(
+                              padding: const EdgeInsets.all(8),
+                              itemCount: visibleItems.length,
+                              separatorBuilder: (context, index) => const SizedBox(height: 6),
+                              itemBuilder: (context, index) => _MenuItemCard(key: ValueKey(visibleItems[index].itemCode), item: visibleItems[index]),
+                            );
+                          }
                           return GridView.builder(
                             padding: const EdgeInsets.all(10),
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: columns, mainAxisExtent: 285, crossAxisSpacing: 10, mainAxisSpacing: 10),
+                              crossAxisCount: columns, mainAxisExtent: 238, crossAxisSpacing: 8, mainAxisSpacing: 8),
                             itemCount: visibleItems.length,
                             itemBuilder: (context, index) => _MenuItemCard(
                               key: ValueKey(visibleItems[index].itemCode), item: visibleItems[index], compact: true),
@@ -549,7 +569,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                   ])),
                   if (showCart) ...[
                     const VerticalDivider(width: 1),
-                    const SizedBox(width: 340, child: CartScreen(embedded: true)),
+                    const SizedBox(width: 310, child: CartScreen(embedded: true)),
                   ],
                 ],
               );
@@ -773,17 +793,27 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: imageUri.hasScheme ? Image.network(imageUri.toString(), fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const Icon(Icons.restaurant_menu, color: Color(0xFF5E7D9C))) : const Icon(Icons.restaurant_menu, color: Color(0xFF5E7D9C)),
+                  borderRadius: BorderRadius.circular(8),
+                  child: ColoredBox(
+                    color: const Color(0xFFF7F9FC),
+                    child: imageUri.hasScheme ? Image.network(imageUri.toString(), fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Icon(Icons.restaurant_menu, color: Color(0xFF5E7D9C))) : const Icon(Icons.restaurant_menu, color: Color(0xFF5E7D9C)),
+                  ),
                 )),
-                Text(item.itemName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                Text('${formatMoney(selected.rate, item.currency)} / ${selected.uom}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF173A5E))),
+                const SizedBox(height: 4),
+                Tooltip(message: item.itemName, child: Text(item.itemName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12))),
+                Text('${formatMoney(_foc ? 0 : selected.rate, item.currency)} / ${selected.uom}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF173A5E))),
                 if (hasMultipleUoms) DropdownButton<String>(
                   isExpanded: true, isDense: true, value: selected.uom,
-                  items: [for (final option in options) DropdownMenuItem(value: option.uom, child: Text(option.uom))],
+                  items: [for (final option in options) DropdownMenuItem(value: option.uom, child: Text(option.uom, overflow: TextOverflow.ellipsis))],
                   onChanged: (value) { if (value != null) setState(() => _selectedUom = value); },
                 ),
+                if (item.itemGroup.trim().toLowerCase() != 'room charges')
+                  Row(children: [
+                    Expanded(child: _compactVariant('FOC', _foc, const Color(0xFFC62828), () => _setVariant(item, foc: !_foc))),
+                    const SizedBox(width: 4),
+                    Expanded(child: _compactVariant('Parcel', _parcel, const Color(0xFF18834B), () => _setVariant(item, parcel: !_parcel))),
+                  ]),
                 Align(alignment: Alignment.centerRight, child: _QuantityControl(item: selectedItem, quantity: quantity, foc: _foc, parcel: _parcel)),
               ],
             ))
@@ -892,7 +922,7 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
                 ),
             ],
           ),
-          if (item.itemGroup.trim().toLowerCase() != 'room charges') ...[
+          if (!widget.compact && item.itemGroup.trim().toLowerCase() != 'room charges') ...[
             const SizedBox(height: 8),
             Wrap(spacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
               FilterChip(
@@ -938,6 +968,21 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
       ),
     );
   }
+}
+
+Widget _compactVariant(String label, bool selected, Color color, VoidCallback onTap) {
+  return Material(
+    color: selected ? color : const Color(0xFFF0F4F9),
+    borderRadius: BorderRadius.circular(6),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: selected ? Colors.white : const Color(0xFF315F8E))),
+      ),
+    ),
+  );
 }
 
 class _QuantityControl extends ConsumerWidget {
