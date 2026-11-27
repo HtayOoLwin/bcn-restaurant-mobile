@@ -404,8 +404,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     final cart = ref.watch(cartProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
-    final desktop = Theme.of(context).platform == TargetPlatform.windows &&
-        MediaQuery.sizeOf(context).width >= 680;
+    final windowWidth = MediaQuery.sizeOf(context).width;
+    final desktop = Theme.of(context).platform == TargetPlatform.windows && windowWidth >= 900;
+    final inlineCart = desktop && windowWidth >= 1200;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: desktop ? 64 : 105,
@@ -498,7 +499,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
           if (desktop) {
             return LayoutBuilder(builder: (context, constraints) {
-              final showCart = constraints.maxWidth >= 980;
+              final showCart = inlineCart;
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -641,7 +642,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           );
         },
       ),
-      bottomNavigationBar: desktop && MediaQuery.sizeOf(context).width >= 980 ? null : SafeArea(
+      bottomNavigationBar: inlineCart ? null : SafeArea(
         top: false,
         child: Container(
           color: Colors.white,
