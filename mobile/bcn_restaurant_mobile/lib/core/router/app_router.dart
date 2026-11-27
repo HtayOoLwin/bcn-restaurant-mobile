@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../network/api_exception.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
@@ -18,6 +21,33 @@ import '../../features/printing/presentation/printer_settings_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/waiter/presentation/waiter_tables_screen.dart';
 import '../../features/waiter_progress/presentation/waiter_progress_screen.dart';
+
+enum _ServerStatus { online, offline, sessionExpired, unavailable }
+
+final _serverStatusProvider = StreamProvider.autoDispose<_ServerStatus>((ref) async* {
+  final api = ref.watch(apiClientProvider);
+  while (true) {
+    try {
+      final user = await api.getMethod('frappe.auth.get_logged_user')
+          .timeout(const Duration(seconds: 4));
+      yield user is String && user.isNotEmpty && user != 'Guest'
+          ? _ServerStatus.online
+          : _ServerStatus.sessionExpired;
+    } on TimeoutException {
+      yield _ServerStatus.offline;
+    } on ApiException catch (error) {
+      final code = error.statusCode;
+      yield code == 401 || code == 403
+          ? _ServerStatus.sessionExpired
+          : code == null
+              ? _ServerStatus.offline
+              : _ServerStatus.unavailable;
+    } catch (_) {
+      yield _ServerStatus.unavailable;
+    }
+    await Future<void>.delayed(const Duration(seconds: 5));
+  }
+});
 
 final _desktopPackageInfoProvider = FutureProvider<PackageInfo>((ref) => PackageInfo.fromPlatform());
 
@@ -337,6 +367,8 @@ class _DesktopShell extends ConsumerWidget {
                       ],
                     )),
                     const Divider(color: Colors.white24),
+                    const _ConnectionStatusFooter(),
+                    const Divider(color: Colors.white24, height: 1),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 4, 10, 8),
                       child: Row(children: [
@@ -377,6 +409,40 @@ class _DesktopShell extends ConsumerWidget {
             ),
           ),
           Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConnectionStatusFooter extends ConsumerWidget {
+  const _ConnectionStatusFooter();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(_serverStatusProvider).asData?.value;
+    final (label, detail, icon, color) = switch (status) {
+      _ServerStatus.online => ('Online Mode', 'ERPNext connected', Icons.wifi, const Color(0xFF86EFAC)),
+      _ServerStatus.offline => ('Offline Mode', 'ERPNext unreachable', Icons.wifi_off, const Color(0xFFFF7777)),
+      _ServerStatus.sessionExpired => ('Session expired', 'Please sign in again', Icons.lock_outline, const Color(0xFFFFC66D)),
+      _ServerStatus.unavailable => ('Server unavailable', 'Check ERPNext server', Icons.error_outline, const Color(0xFFFF7777)),
+      null => ('Checking connection', 'Checking ERPNext...', Icons.sync, Colors.white70),
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 8),
+            Expanded(child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 13))),
+          ]),
+          const SizedBox(height: 4),
+          Text(detail, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          if (status == _ServerStatus.offline)
+            const Text('Offline orders not enabled yet', style: TextStyle(color: Colors.white70, fontSize: 10)),
         ],
       ),
     );
