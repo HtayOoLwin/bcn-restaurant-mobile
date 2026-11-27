@@ -89,11 +89,18 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
         : (response?.customerGroup ?? '');
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
+    final desktop = Theme.of(context).platform == TargetPlatform.windows &&
+        MediaQuery.sizeOf(context).width >= 900;
+    final company = response?.companyName.isNotEmpty == true
+        ? response!.companyName
+        : (bootstrap?.company ?? 'Restaurant');
+
+    final screen = Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72,
+        automaticallyImplyLeading: !desktop,
+        toolbarHeight: desktop ? 56 : 72,
         titleSpacing: 16,
-        title: Column(
+        title: desktop ? const Text('Tables', style: TextStyle(fontWeight: FontWeight.w800)) : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -252,9 +259,9 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
                             ref.refresh(tablesProvider(customerGroup).future),
                         child: LayoutBuilder(
                           builder: (context, constraints) {
-                            final columns = waiterTableColumnCount(
-                              constraints.maxWidth,
-                            );
+                            final columns = desktop
+                                ? (constraints.maxWidth / 120).floor().clamp(4, 10).toInt()
+                                : waiterTableColumnCount(constraints.maxWidth);
 
                             return GridView.builder(
                               physics: const AlwaysScrollableScrollPhysics(),
@@ -262,6 +269,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
                               gridDelegate:
                                   SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: columns,
+                                    mainAxisExtent: desktop ? 104 : null,
                                     childAspectRatio: columns == 3
                                         ? 0.88
                                         : columns <= 2
@@ -275,6 +283,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
                                 final table = filteredTables[index];
                                 return _TableCard(
                                   table: table,
+                                  compact: desktop,
                                   onTap: () async {
                                     ref
                                         .read(cartProvider.notifier)
@@ -305,7 +314,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: desktop ? null : NavigationBar(
         height: 66,
         selectedIndex: 0,
         backgroundColor: Colors.white,
@@ -337,11 +346,100 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
         ],
       ),
     );
+    if (!desktop) return screen;
+
+    return Scaffold(
+      body: Row(
+        children: [
+          SizedBox(
+            width: 220,
+            child: ColoredBox(
+              color: const Color(0xFF155484),
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.restaurant, color: Colors.white, size: 28),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(company, style: const TextStyle(
+                            color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800))),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Colors.white24, height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.account_circle_outlined, color: Colors.white),
+                      title: Text(bootstrap?.fullName ?? 'Waiter', maxLines: 1,
+                        overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      subtitle: const Text('Waiter', style: TextStyle(color: Colors.white70)),
+                    ),
+                    const Divider(color: Colors.white24, height: 1),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        children: [
+                          _desktopNav(Icons.table_restaurant_outlined, 'Tables', () {}, selected: true),
+                          _desktopNav(Icons.receipt_long_outlined, 'Orders', () => context.push('/waiter-progress')),
+                          if (bootstrap?.permissions.cashier == true) ...[
+                            _desktopNav(Icons.point_of_sale_outlined, 'Cashier', () => context.push('/cashier')),
+                            _desktopNav(Icons.people_outline, 'Credit Customers', () => context.push('/cashier/credits')),
+                          ],
+                          if (bootstrap?.permissions.canViewPrintStatus == true)
+                            _desktopNav(Icons.print_outlined, 'Printer Settings', () => context.push('/printer-settings')),
+                          _desktopNav(Icons.settings_outlined, 'Settings', () => context.push('/settings')),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Colors.white24),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(tables.hasError ? Icons.error_outline : tables.isLoading ? Icons.sync : Icons.check_circle_outline,
+                            color: tables.hasError ? Colors.orangeAccent : Colors.white70, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(tables.hasError ? 'Table refresh failed' : tables.isLoading ? 'Refreshing tables' : 'Tables loaded',
+                            style: const TextStyle(color: Colors.white70, fontSize: 12))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(child: screen),
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopNav(IconData icon, String label, VoidCallback onTap, {bool selected = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: ListTile(
+        selected: selected,
+        selectedTileColor: const Color(0xFF397FBB),
+        selectedColor: Colors.white,
+        iconColor: Colors.white,
+        textColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+        leading: Icon(icon, size: 23),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        onTap: onTap,
+      ),
+    );
   }
 }
 
 class _TableCard extends StatelessWidget {
-  const _TableCard({required this.table, required this.onTap});
+  const _TableCard({required this.table, required this.onTap, this.compact = false});
+
+  final bool compact;
 
   final RestaurantTableModel table;
   final VoidCallback onTap;
@@ -394,16 +492,16 @@ class _TableCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderColor),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: compact ? 4 : 10),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.table_restaurant_outlined,
-                size: 30,
+                size: compact ? 24 : 30,
                 color: const Color(0xFF315F8E),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: compact ? 3 : 6),
               Text(
                 table.customerName,
                 maxLines: 1,
@@ -414,7 +512,7 @@ class _TableCard extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: compact ? 3 : 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
