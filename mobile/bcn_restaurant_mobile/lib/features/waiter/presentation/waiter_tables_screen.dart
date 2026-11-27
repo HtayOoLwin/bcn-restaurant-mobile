@@ -257,7 +257,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
                         child: LayoutBuilder(
                           builder: (context, constraints) {
                             final columns = desktop
-                                ? (constraints.maxWidth / 120).floor().clamp(4, 10).toInt()
+                                ? ((constraints.maxWidth - 16) / 108).floor().clamp(4, 14).toInt()
                                 : waiterTableColumnCount(constraints.maxWidth);
 
                             return GridView.builder(
@@ -266,14 +266,14 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
                               gridDelegate:
                                   SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: columns,
-                                    mainAxisExtent: desktop ? 104 : null,
+                                    mainAxisExtent: desktop ? 82 : null,
                                     childAspectRatio: columns == 3
                                         ? 0.88
                                         : columns <= 2
                                         ? 1.15
                                         : 1.02,
-                                    crossAxisSpacing: 10,
-                                    mainAxisSpacing: 10,
+                                    crossAxisSpacing: desktop ? 7 : 10,
+                                    mainAxisSpacing: desktop ? 7 : 10,
                                   ),
                               itemCount: filteredTables.length,
                               itemBuilder: (context, index) {
@@ -392,6 +392,44 @@ class _TableCard extends StatelessWidget {
         break;
     }
 
+    if (compact) {
+      return Material(
+        color: cardBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: borderColor),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Row(
+            children: [
+              Container(width: 3, color: statusColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.table_restaurant_outlined, size: 20, color: statusColor),
+                      const SizedBox(height: 2),
+                      Tooltip(
+                        message: table.customerName,
+                        child: Text(table.customerName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Color(0xFF102F4F), fontSize: 12, fontWeight: FontWeight.w800)),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(status, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Material(
       color: cardBackground,
       borderRadius: BorderRadius.circular(16),
