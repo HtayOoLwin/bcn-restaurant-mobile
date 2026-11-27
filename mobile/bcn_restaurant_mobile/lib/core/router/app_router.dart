@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../network/api_exception.dart';
+import '../../features/orders/presentation/offline_orders_screen.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
@@ -443,8 +444,22 @@ class _ConnectionStatusFooter extends ConsumerWidget {
           Text(detail, style: const TextStyle(color: Colors.white70, fontSize: 11)),
           const SizedBox(height: 4),
           ref.watch(pendingOrderCountProvider).when(
-            data: (count) => Text('Pending orders: $count', style: TextStyle(
-              color: count > 0 ? const Color(0xFFFF7777) : Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+            data: (count) => InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const OfflineOrdersScreen(),
+              )),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Row(children: [
+                  Icon(Icons.receipt_long_outlined, size: 17, color: count > 0 ? const Color(0xFFFF7777) : Colors.white70),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text('Pending orders: $count', style: TextStyle(
+                    color: count > 0 ? const Color(0xFFFF7777) : Colors.white70, fontSize: 12, fontWeight: FontWeight.w700))),
+                  const Icon(Icons.chevron_right, size: 18, color: Colors.white70),
+                ]),
+              ),
+            ),
             loading: () => const Text('Pending orders: …', style: TextStyle(color: Colors.white70, fontSize: 12)),
             error: (_, _) => const Text('Pending orders unavailable', style: TextStyle(color: Colors.white70, fontSize: 12)),
           ),
