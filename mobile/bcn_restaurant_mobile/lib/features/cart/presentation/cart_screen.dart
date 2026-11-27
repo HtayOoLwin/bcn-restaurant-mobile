@@ -71,6 +71,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
+    if (widget.embedded) return _buildDesktopCart(cart);
 
     return Scaffold(
       appBar: AppBar(
@@ -181,6 +182,96 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ),
     );
   }
+  Widget _buildDesktopCart(CartState cart) {
+    final controller = ref.read(cartProvider.notifier);
+    return Material(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            margin: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: const Color(0xFFEAF1F8), borderRadius: BorderRadius.circular(10)),
+            child: Row(children: [
+              const Icon(Icons.shopping_cart_outlined, color: Color(0xFF1E5E96)),
+              const SizedBox(width: 8),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Current Order', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                Text('${formatQuantity(cart.totalQty)} items selected', style: const TextStyle(fontSize: 12)),
+              ])),
+              IconButton(tooltip: 'Clear cart', onPressed: submitting || cart.lines.isEmpty ? null : () {
+                final customer = cart.customer;
+                final session = cart.session;
+                controller.clear();
+                if (customer != null) controller.setOrderContext(customer: customer, session: session);
+              }, icon: const Icon(Icons.delete_outline, color: Color(0xFFC62828))),
+            ]),
+          ),
+          Expanded(
+            child: cart.lines.isEmpty ? const _EmptyCart() : ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              itemCount: cart.lines.length,
+              separatorBuilder: (context, index) => const Divider(height: 12),
+              itemBuilder: (context, index) {
+                final line = cart.lines[index];
+                final image = AppConfig.resolveAssetUrl(line.item.image);
+                return Column(
+                  key: ValueKey('${line.item.itemCode}-${line.item.uom}-${line.foc}-${line.parcel}'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      SizedBox(width: 36, height: 42, child: image.hasScheme ? Image.network(image.toString(), fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.restaurant_menu)) : const Icon(Icons.restaurant_menu)),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(line.item.itemName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                      const SizedBox(width: 4),
+                      Text(formatAmount(line.amount), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1E5E96))),
+                    ]),
+                    Row(children: [
+                      IconButton(visualDensity: VisualDensity.compact, tooltip: 'Decrease', onPressed: submitting ? null : () => controller.decrement(line.item.itemCode, uom: line.item.uom, foc: line.foc, parcel: line.parcel), icon: const Icon(Icons.remove_circle_outline, size: 20)),
+                      Text(formatQuantity(line.qty), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      IconButton(visualDensity: VisualDensity.compact, tooltip: 'Increase', onPressed: submitting ? null : () => controller.add(line.item, foc: line.foc, parcel: line.parcel), icon: const Icon(Icons.add_circle, size: 20, color: Color(0xFF1E5E96))),
+                      Expanded(child: Text([line.item.uom, if (line.foc) 'FOC', if (line.parcel) 'Parcel'].join(' · '), style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)),
+                    ]),
+                    TextFormField(
+                      initialValue: line.kitchenNote,
+                      enabled: !submitting,
+                      style: const TextStyle(fontSize: 12),
+                      decoration: const InputDecoration(hintText: 'Kitchen note', isDense: true, contentPadding: EdgeInsets.all(8)),
+                      onChanged: (value) => controller.setKitchenNote(line.item.itemCode, value, uom: line.item.uom, foc: line.foc, parcel: line.parcel),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              TextFormField(
+                key: ValueKey(cart.clientOrderId),
+                initialValue: cart.remarks,
+                enabled: !submitting,
+                decoration: const InputDecoration(hintText: 'Order Note (Optional)', isDense: true, prefixIcon: Icon(Icons.edit_note)),
+                onChanged: controller.setRemarks,
+              ),
+              const SizedBox(height: 8),
+              _TotalPanel(cart: cart),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF15803D)),
+                onPressed: submitting || cart.lines.isEmpty ? null : _placeOrder,
+                icon: const Icon(Icons.check),
+                label: Text(submitting ? 'Placing Order...' : 'Place Order'),
+              ),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
 
 class _CartLineCard extends ConsumerWidget {
