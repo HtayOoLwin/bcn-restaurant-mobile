@@ -472,7 +472,7 @@ class _TableCard extends StatelessWidget {
                           style: const TextStyle(color: Color(0xFF102F4F), fontSize: 12, fontWeight: FontWeight.w800)),
                       ),
                       const SizedBox(height: 3),
-                      Text(status, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      Text(table.hasPendingOrders ? '$status · Pending' : status, maxLines: 1, overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w700)),
                     ],
                   ),
