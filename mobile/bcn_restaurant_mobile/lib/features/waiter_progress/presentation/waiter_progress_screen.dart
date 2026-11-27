@@ -145,7 +145,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                                           leading: const Icon(Icons.table_restaurant_outlined, color: Color(0xFF1E5E96), size: 28),
                                           title: Text(order.customer, style: const TextStyle(fontWeight: FontWeight.w800)),
-                                          subtitle: Text(order.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          subtitle: Text(order.localPreview ? '${order.name} · ${order.cached ? 'Cached' : 'Pending sync'}' : order.name, maxLines: 2, overflow: TextOverflow.ellipsis),
                                           trailing: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
@@ -500,6 +500,8 @@ class _ProgressCardState extends State<_ProgressCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 orderDetails,
+                if (widget.order.localPreview)
+                  Text(widget.order.cached ? 'Cached order · local estimate · read only' : 'Pending sync · local estimate · read only', style: const TextStyle(color: Color(0xFFB4232D), fontWeight: FontWeight.w700, fontSize: 12)),
                 if (_expanded) ...[
                   Divider(height: widget.desktopDetails ? 12 : 24),
                   if (widget.order.roomPreview != null) ...[
@@ -531,7 +533,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                           ),
                         ),
                         OutlinedButton.icon(
-                            onPressed: widget.busyRow != null
+                            onPressed: widget.order.localPreview || widget.busyRow != null
                                 ? null
                                 : () {
                                     if (!_cancelMode &&
@@ -616,6 +618,8 @@ class _ProgressCardState extends State<_ProgressCard> {
                                   runSpacing: 4,
                                   children: [
                                     Text(item.itemName),
+                                    if (item.offlineQty > 0)
+                                      Text('Online: ${(item.onlineQty ?? 0).g} + Offline: ${item.offlineQty.g}', style: const TextStyle(color: Color(0xFFB4232D), fontSize: 11)),
                                     if (item.foc)
                                       const _ProgressItemBadge(
                                         label: 'FOC',
@@ -691,10 +695,15 @@ class _ProgressCardState extends State<_ProgressCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Subtotal'),
+                    Text(widget.order.localPreview ? 'Server Subtotal' : 'Subtotal'),
                     Text(formatMoney(widget.order.netTotal, widget.order.currency)),
                   ],
                 ),
+                if (widget.order.pendingAmount > 0)
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    const Text('Offline additions (before tax)'),
+                    Text(formatMoney(widget.order.pendingAmount, widget.order.currency)),
+                  ]),
                 for (final rawTax in widget.order.taxes)
                   if (rawTax is Map && ((rawTax['amount'] as num?) ?? 0).abs() > 0.00001)
                     Padding(
@@ -716,7 +725,7 @@ class _ProgressCardState extends State<_ProgressCard> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Grand Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(widget.order.localPreview ? 'Estimated Grand Total' : 'Grand Total', style: const TextStyle(fontWeight: FontWeight.bold)),
                       Text(formatMoney(widget.order.grandTotal, widget.order.currency),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
                     ],
