@@ -111,17 +111,16 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     RestaurantTableModel? selectedTable;
     var transferring = false;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (sheetContext) => StatefulBuilder(
+    final desktopTransfer = Theme.of(context).platform == TargetPlatform.windows;
+    final WidgetBuilder transferBuilder = (sheetContext) => StatefulBuilder(
         builder: (sheetContext, updateSheet) {
-          return SizedBox(
-            height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+          return PopScope(
+            canPop: !transferring,
+            child: SizedBox(
+            width: desktopTransfer ? 720 : null,
+            height: MediaQuery.sizeOf(sheetContext).height * (desktopTransfer ? 0.68 : 0.72),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              padding: EdgeInsets.fromLTRB(16, desktopTransfer ? 16 : 4, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -157,8 +156,14 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                     }),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Available tables only',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                  Row(children: [
+                    const Expanded(child: Text('Available tables only',
+                      style: TextStyle(fontWeight: FontWeight.w700))),
+                    if (desktopTransfer && selectedTable != null)
+                      Flexible(child: Text('To: ${selectedTable!.customerName}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFF147B60), fontWeight: FontWeight.w700))),
+                  ]),
                   const SizedBox(height: 8),
                   Expanded(
                     child: FutureBuilder<List<RestaurantTableModel>>(
@@ -180,8 +185,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                         }
                         return GridView.builder(
                           itemCount: tables.length,
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: desktopTransfer ? 5 : 3,
+                            mainAxisExtent: desktopTransfer ? 80 : null,
                             crossAxisSpacing: 9,
                             mainAxisSpacing: 9,
                             childAspectRatio: 0.95,
@@ -195,7 +201,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                               borderRadius: BorderRadius.circular(14),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE7F8EE),
+                                  color: isSelected && desktopTransfer
+                                      ? const Color(0xFFCCEBDD)
+                                      : const Color(0xFFE7F8EE),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: isSelected
@@ -260,7 +268,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                                     ],
                                   ),
                                 );
-                                if (confirmed != true || !mounted) return;
+                                if (confirmed != true || !mounted || !sheetContext.mounted) return;
                                 updateSheet(() => transferring = true);
                                 try {
                                   await ref.read(tablesRepositoryProvider).transferTable(
@@ -378,10 +386,29 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                 ],
               ),
             ),
-          );
+          ));
         },
-      ),
-    );
+      );
+    if (desktopTransfer) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          clipBehavior: Clip.antiAlias,
+          child: transferBuilder(dialogContext),
+        ),
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        useSafeArea: true,
+        builder: transferBuilder,
+      );
+    }
   }
 
   @override
@@ -471,8 +498,19 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           ),
         ),
         actions: desktop ? [
-          TextButton.icon(onPressed: _showTransferTable, icon: const Icon(Icons.swap_horiz, color: Colors.white), label: const Text('Table Transfer', style: TextStyle(color: Colors.white))),
-          TextButton.icon(onPressed: menu.asData == null ? null : () => _selectRoomCharge(menu.asData!.value.items), icon: const Icon(Icons.meeting_room_outlined, color: Colors.white), label: const Text('Room Charges', style: TextStyle(color: Colors.white))),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF008C80), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            onPressed: _showTransferTable,
+            icon: const Icon(Icons.swap_horiz, size: 20),
+            label: const Text('Table Transfer', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFFC04D), foregroundColor: const Color(0xFF503000), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            onPressed: menu.asData == null ? null : () => _selectRoomCharge(menu.asData!.value.items),
+            icon: const Icon(Icons.meeting_room_outlined, size: 20),
+            label: const Text('Room Charges', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
           const SizedBox(width: 12),
         ] : null,
       ),
