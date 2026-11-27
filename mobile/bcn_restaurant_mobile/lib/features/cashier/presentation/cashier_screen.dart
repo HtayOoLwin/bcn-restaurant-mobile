@@ -46,6 +46,7 @@ class CashierScreen extends ConsumerStatefulWidget {
 
 class _CashierScreenState extends ConsumerState<CashierScreen> {
   String _searchQuery = '';
+  String? _selectedBill;
   final Set<String> _pendingPrintSalesOrders = {};
   final Map<String, String> _retryPrintRequestIds = {};
   final Set<String> _receiptsPendingPrint = {};
@@ -143,21 +144,22 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   Widget build(BuildContext context) {
     final bootstrap = ref.watch(authControllerProvider).asData?.value.bootstrap;
     final billing = ref.watch(cashierBillingProvider);
+    final desktop = Theme.of(context).platform == TargetPlatform.windows && MediaQuery.sizeOf(context).width >= 900;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          bootstrap?.fullName.isNotEmpty == true
+          desktop ? 'Cashier' : bootstrap?.fullName.isNotEmpty == true
               ? bootstrap!.fullName
               : 'Cashier',
         ),
         actions: [
-          IconButton(
+          if (!desktop) IconButton(
             tooltip: 'Credit Customers',
             onPressed: () => context.push('/cashier/credits'),
             icon: const Icon(Icons.account_balance_wallet_outlined),
           ),
-          IconButton(
+          if (!desktop) IconButton(
             tooltip: 'Reports',
             onPressed: _showReports,
             icon: const Icon(Icons.bar_chart_outlined),
@@ -167,7 +169,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             onPressed: () => ref.invalidate(cashierBillingProvider),
             icon: const Icon(Icons.refresh),
           ),
-          PopupMenuButton<String>(
+          if (!desktop) PopupMenuButton<String>(
             tooltip: 'More options',
             icon: const Icon(Icons.more_vert),
             onSelected: (selection) async {
@@ -247,6 +249,98 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       ),
                     )
                     .toList();
+                if (desktop && filteredBills.isNotEmpty) {
+                  final selected = filteredBills.firstWhere(
+                    (bill) => bill.salesOrder == _selectedBill,
+                    orElse: () => filteredBills.first,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 6,
+                          child: Card(
+                            color: Colors.white,
+                            margin: EdgeInsets.zero,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Text('Bills (${filteredBills.length})',
+                                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                                ),
+                                const Divider(height: 1),
+                                Expanded(
+                                  child: ListView.separated(
+                                    padding: const EdgeInsets.all(10),
+                                    itemCount: filteredBills.length,
+                                    separatorBuilder: (context, index) => const SizedBox(height: 6),
+                                    itemBuilder: (context, index) {
+                                      final bill = filteredBills[index];
+                                      final active = bill.salesOrder == selected.salesOrder;
+                                      return Material(
+                                        color: active ? const Color(0xFFE3EFFC) : const Color(0xFFF4F7FB),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(9),
+                                          side: BorderSide(color: active ? const Color(0xFF1E5E96) : const Color(0xFFDCE7F1)),
+                                        ),
+                                        child: ListTile(
+                                          dense: true,
+                                          leading: const Icon(Icons.receipt_long_outlined, color: Color(0xFF1E5E96)),
+                                          title: Text(bill.customerName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontWeight: FontWeight.w800)),
+                                          subtitle: Text(bill.salesOrder, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          trailing: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text(formatMoney(bill.grandTotal, bill.currency), style: const TextStyle(fontWeight: FontWeight.w800)),
+                                              Text(bill.restaurantStatus, style: const TextStyle(fontSize: 11, color: Color(0xFF315F8E))),
+                                            ],
+                                          ),
+                                          onTap: () => setState(() => _selectedBill = bill.salesOrder),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 5,
+                          child: Card(
+                            color: Colors.white,
+                            margin: EdgeInsets.zero,
+                            child: ListView(
+                              padding: const EdgeInsets.all(12),
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: Text('Bill Details', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                                ),
+                                _BillCard(
+                                  key: ValueKey(selected.salesOrder),
+                                  desktopDetails: true,
+                                  bill: selected,
+                                  onPayment: () => _prepareAndOpenPayment(
+                                    context: this.context, billing: data, bill: selected, creditFlow: false),
+                                  onCredit: () => _prepareAndOpenPayment(
+                                    context: this.context, billing: data, bill: selected, creditFlow: true),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 return RefreshIndicator(
                   onRefresh: () => ref.refresh(cashierBillingProvider.future),
                   child: data.bills.isEmpty
@@ -1321,11 +1415,14 @@ const _disabledForeground = Color(0xFF94A3B8);
 
 class _BillCard extends StatefulWidget {
   const _BillCard({
+    super.key,
+    this.desktopDetails = false,
     required this.bill,
     required this.onPayment,
     required this.onCredit,
   });
 
+  final bool desktopDetails;
   final CashierBill bill;
   final VoidCallback onPayment;
   final VoidCallback onCredit;
@@ -1338,6 +1435,12 @@ class _BillCardState extends State<_BillCard> {
   bool _expanded = false;
 
   @override
+  void initState() {
+    super.initState();
+    _expanded = widget.desktopDetails;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bill = widget.bill;
     final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'open' ||
@@ -1348,7 +1451,7 @@ class _BillCardState extends State<_BillCard> {
 
     final orderDetails = InkWell(
       borderRadius: BorderRadius.circular(10),
-      onTap: () => setState(() => _expanded = !_expanded),
+      onTap: widget.desktopDetails ? null : () => setState(() => _expanded = !_expanded),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -1368,7 +1471,7 @@ class _BillCardState extends State<_BillCard> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Icon(
+                if (!widget.desktopDetails) Icon(
                   _expanded ? Icons.expand_less : Icons.expand_more,
                   color: statusForeground,
                 ),
@@ -1403,7 +1506,8 @@ class _BillCardState extends State<_BillCard> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      color: cardColor,
+      color: widget.desktopDetails ? Colors.white : cardColor,
+      elevation: widget.desktopDetails ? 0 : null,
       surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       child: Padding(
