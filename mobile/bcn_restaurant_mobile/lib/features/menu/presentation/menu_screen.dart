@@ -6,7 +6,6 @@ import '../../../core/config/app_config.dart';
 import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cart/domain/cart_controller.dart';
-import '../../cart/presentation/cart_screen.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../../waiter/domain/table_models.dart';
 import '../data/menu_repository.dart';
@@ -407,7 +406,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
     final windowWidth = MediaQuery.sizeOf(context).width;
     final desktop = Theme.of(context).platform == TargetPlatform.windows && windowWidth >= 900;
-    final inlineCart = desktop && windowWidth >= 1200;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: desktop ? 64 : 105,
@@ -500,7 +498,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
 
           if (desktop) {
             return LayoutBuilder(builder: (context, constraints) {
-              final showCart = inlineCart;
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -560,17 +557,13 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                           return GridView.builder(
                             padding: const EdgeInsets.all(10),
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: columns, mainAxisExtent: 228, crossAxisSpacing: 8, mainAxisSpacing: 8),
+                              crossAxisCount: columns, mainAxisExtent: 244, crossAxisSpacing: 8, mainAxisSpacing: 8),
                             itemCount: visibleItems.length,
                             itemBuilder: (context, index) => _MenuItemCard(
                               key: ValueKey(visibleItems[index].itemCode), item: visibleItems[index], compact: true),
                           );
                         })),
                   ])),
-                  if (showCart) ...[
-                    const VerticalDivider(width: 1),
-                    const SizedBox(width: 310, child: CartScreen(embedded: true)),
-                  ],
                 ],
               );
             });
@@ -662,7 +655,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           );
         },
       ),
-      bottomNavigationBar: inlineCart ? null : SafeArea(
+      bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
           color: Colors.white,
@@ -815,14 +808,37 @@ class _MenuItemCardState extends ConsumerState<_MenuItemCard> {
                     height: 16,
                     child: Text('${formatMoney(_foc ? 0 : selected.rate, item.currency)} / ${selected.uom}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF173A5E))),
                   ),
-                  SizedBox(
-                    height: 24,
-                    child: hasMultipleUoms ? DropdownButton<String>(
-                      isExpanded: true, isDense: true, value: selected.uom,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF173A5E)),
-                      items: [for (final option in options) DropdownMenuItem(value: option.uom, child: Text(option.uom, overflow: TextOverflow.ellipsis))],
-                      onChanged: (value) { if (value != null) setState(() => _selectedUom = value); },
-                    ) : const SizedBox.shrink(),
+                  Container(
+                    height: 32,
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F4F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(children: [
+                      const Text('UOM', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF315F8E))),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            isDense: true,
+                            value: selected.uom,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF173A5E), fontWeight: FontWeight.w600),
+                            items: [
+                              for (final option in options)
+                                DropdownMenuItem(value: option.uom, child: Text(option.uom, overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: hasMultipleUoms ? (value) {
+                              if (value != null) {
+                                setState(() => _selectedUom = value);
+                              }
+                            } : null,
+                          ),
+                        ),
+                      ),
+                    ]),
                   ),
                   if (item.itemGroup.trim().toLowerCase() != 'room charges')
                     Row(children: [
@@ -1015,7 +1031,8 @@ class _QuantityControl extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final windows = Theme.of(context).platform == TargetPlatform.windows;
+    final primary = windows ? const Color(0xFF15803D) : Theme.of(context).colorScheme.primary;
 
     if (compact) {
       final controller = ref.read(cartProvider.notifier);
@@ -1030,12 +1047,15 @@ class _QuantityControl extends ConsumerWidget {
               SizedBox(
                 width: 30,
                 height: 30,
-                child: IconButton(
+                child: Material(
+                  color: quantity > 0 ? const Color(0xFFC62828) : const Color(0xFFF4DADA),
+                  child: IconButton(
                   tooltip: 'Decrease',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: quantity <= 0 ? null : () => controller.decrement(item.itemCode, uom: item.uom, foc: foc, parcel: parcel),
-                  icon: const Icon(Icons.remove, size: 17),
+                  icon: Icon(Icons.remove, size: 17, color: quantity > 0 ? Colors.white : const Color(0xFFB77A7A)),
+                ),
                 ),
               ),
               Expanded(child: Center(child: Text(formatQuantity(quantity), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF173A5E))))),
@@ -1043,7 +1063,7 @@ class _QuantityControl extends ConsumerWidget {
                 width: 30,
                 height: 30,
                 child: Material(
-                  color: primary,
+                  color: const Color(0xFF15803D),
                   child: IconButton(
                     tooltip: 'Add',
                     padding: EdgeInsets.zero,
@@ -1077,6 +1097,7 @@ class _QuantityControl extends ConsumerWidget {
         IconButton.filledTonal(
           visualDensity: VisualDensity.compact,
           tooltip: 'Decrease',
+          style: windows ? IconButton.styleFrom(backgroundColor: const Color(0xFFC62828), foregroundColor: Colors.white) : null,
           onPressed: () =>
               ref.read(cartProvider.notifier).decrement(item.itemCode, uom: item.uom, foc: foc, parcel: parcel),
           icon: const Icon(Icons.remove_rounded),
