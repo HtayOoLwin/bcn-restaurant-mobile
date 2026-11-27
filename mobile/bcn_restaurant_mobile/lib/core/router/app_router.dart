@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -17,6 +18,8 @@ import '../../features/printing/presentation/printer_settings_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/waiter/presentation/waiter_tables_screen.dart';
 import '../../features/waiter_progress/presentation/waiter_progress_screen.dart';
+
+final _desktopPackageInfoProvider = FutureProvider<PackageInfo>((ref) => PackageInfo.fromPlatform());
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authControllerProvider);
@@ -337,7 +340,24 @@ class _DesktopShell extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 4, 10, 8),
                       child: Row(children: [
-                        const Expanded(child: Text('Restaurant POS', style: TextStyle(color: Colors.white70))),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('Restaurant POS', style: TextStyle(color: Colors.white70)),
+                              const SizedBox(height: 4),
+                              ref.watch(_desktopPackageInfoProvider).when(
+                                data: (info) => Text(
+                                  'Version ${info.version}${info.buildNumber.isEmpty ? '' : ' (${info.buildNumber})'}',
+                                  style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                ),
+                                loading: () => const Text('Version …', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                                error: (_, _) => const Text('Version unavailable', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                              ),
+                            ],
+                          ),
+                        ),
                         IconButton(
                           tooltip: 'Settings',
                           isSelected: path == '/settings',
