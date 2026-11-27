@@ -22,6 +22,7 @@ class WaiterProgressScreen extends ConsumerStatefulWidget {
 class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
   String _searchQuery = '';
   String? _busyRow;
+  String? _selectedOrder;
   Timer? _autoRefreshTimer;
 
   @override
@@ -56,6 +57,8 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
   @override
   Widget build(BuildContext context) {
     final progress = ref.watch(waiterProgressProvider);
+    final desktop = Theme.of(context).platform == TargetPlatform.windows &&
+        MediaQuery.sizeOf(context).width >= 900;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Order Progress'),
@@ -93,6 +96,101 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
                       ),
                     )
                     .toList();
+                if (desktop && filteredOrders.isNotEmpty) {
+                  final selected = filteredOrders.firstWhere(
+                    (order) => order.name == _selectedOrder,
+                    orElse: () => filteredOrders.first,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: Card(
+                            color: Colors.white,
+                            margin: EdgeInsets.zero,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.receipt_long_outlined, color: Color(0xFF1E5E96)),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text('Active Orders (${filteredOrders.length})',
+                                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+                                      const Text('Auto refresh: 5s', style: TextStyle(fontSize: 12, color: Color(0xFF617B94))),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                                    itemCount: filteredOrders.length,
+                                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                                    itemBuilder: (context, index) {
+                                      final order = filteredOrders[index];
+                                      final active = order.name == selected.name;
+                                      return Material(
+                                        color: active ? const Color(0xFFE3EFFC) : const Color(0xFFF4F7FB),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          side: BorderSide(color: active ? const Color(0xFF1E5E96) : const Color(0xFFD5E1EE)),
+                                        ),
+                                        child: ListTile(
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          leading: const Icon(Icons.table_restaurant_outlined, color: Color(0xFF1E5E96), size: 28),
+                                          title: Text(order.customer, style: const TextStyle(fontWeight: FontWeight.w800)),
+                                          subtitle: Text(order.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text('${order.items.length} items', style: const TextStyle(color: Color(0xFF617B94))),
+                                              const SizedBox(width: 8),
+                                              const Icon(Icons.chevron_right),
+                                            ],
+                                          ),
+                                          onTap: _busyRow != null ? null : () => setState(() => _selectedOrder = order.name),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 6,
+                          child: Card(
+                            color: Colors.white,
+                            margin: EdgeInsets.zero,
+                            child: ListView(
+                              padding: const EdgeInsets.all(12),
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.fromLTRB(8, 4, 8, 12),
+                                  child: Text('Order Details', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                                ),
+                                _ProgressCard(
+                                  key: ValueKey(selected.name),
+                                  order: selected,
+                                  busyRow: _busyRow,
+                                  onCancel: _cancelItem,
+                                  desktopDetails: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 return RefreshIndicator(
                   onRefresh: () => ref.refresh(waiterProgressProvider.future),
                   child: data.orders.isEmpty
@@ -280,11 +378,14 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
 
 class _ProgressCard extends StatefulWidget {
   const _ProgressCard({
+    super.key,
+    this.desktopDetails = false,
     required this.order,
     required this.busyRow,
     required this.onCancel,
   });
 
+  final bool desktopDetails;
   final WaiterProgressOrder order;
   final String? busyRow;
   final Future<void> Function(WaiterProgressItem item) onCancel;
@@ -295,6 +396,12 @@ class _ProgressCard extends StatefulWidget {
 
 class _ProgressCardState extends State<_ProgressCard> {
   bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.desktopDetails;
+  }
   bool _cancelMode = false;
 
   @override
@@ -309,7 +416,7 @@ class _ProgressCardState extends State<_ProgressCard> {
     final cardIndex = widget.order.name.codeUnits.fold<int>(0, (sum, code) => sum + code) % cardColors.length;
     final orderDetails = InkWell(
       borderRadius: BorderRadius.circular(10),
-      onTap: () => setState(() => _expanded = !_expanded),
+      onTap: widget.desktopDetails ? null : () => setState(() => _expanded = !_expanded),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -329,7 +436,8 @@ class _ProgressCardState extends State<_ProgressCard> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                if (!widget.desktopDetails)
+                  Icon(_expanded ? Icons.expand_less : Icons.expand_more),
               ],
             ),
             const SizedBox(height: 6),
@@ -365,7 +473,8 @@ class _ProgressCardState extends State<_ProgressCard> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
-      color: cardColors[cardIndex],
+      color: widget.desktopDetails ? Colors.white : cardColors[cardIndex],
+      elevation: widget.desktopDetails ? 0 : null,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: LayoutBuilder(
