@@ -73,6 +73,95 @@ class _CreditCustomersScreenState extends ConsumerState<CreditCustomersScreen> {
                       c.customer.toLowerCase().contains(_search) ||
                       c.customerName.toLowerCase().contains(_search)).toList();
                   final total = all.fold<double>(0, (sum, c) => sum + c.outstanding);
+                  final desktop = Theme.of(context).platform == TargetPlatform.windows &&
+                      MediaQuery.sizeOf(context).width >= 900;
+                  if (desktop) {
+                    final unpaid = all.fold<num>(0, (sum, c) => sum + c.invoiceCount);
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(children: [
+                            Expanded(child: _CreditMetric(label: 'Total Outstanding', value: formatMoney(total, 'MMK'), icon: Icons.account_balance_wallet_outlined, color: const Color(0xFFB4232D), background: const Color(0xFFFCE7E8))),
+                            const SizedBox(width: 10),
+                            Expanded(child: _CreditMetric(label: 'Credit Customers', value: all.length.toString(), icon: Icons.people_outline, color: const Color(0xFF155484), background: const Color(0xFFE3EFFC))),
+                            const SizedBox(width: 10),
+                            Expanded(child: _CreditMetric(label: 'Unpaid Invoices', value: unpaid.toString(), icon: Icons.receipt_long_outlined, color: const Color(0xFF805A16), background: const Color(0xFFFFF2DB))),
+                          ]),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: Card(
+                              color: Colors.white,
+                              margin: EdgeInsets.zero,
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Text('Credit Customers (${visible.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                                  ),
+                                  Container(
+                                    color: const Color(0xFF205F91),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    child: const Row(children: [
+                                      SizedBox(width: 36),
+                                      Expanded(flex: 4, child: Text('Customer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+                                      Expanded(flex: 2, child: Text('Unpaid Invoices', textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+                                      Expanded(flex: 3, child: Text('Outstanding', textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+                                      SizedBox(width: 32),
+                                    ]),
+                                  ),
+                                  Expanded(
+                                    child: visible.isEmpty
+                                        ? const Center(child: Text('No credit customers found'))
+                                        : ListView.builder(
+                                            itemCount: visible.length,
+                                            itemBuilder: (context, index) {
+                                              final customer = visible[index];
+                                              final name = customer.customerName.isEmpty ? customer.customer : customer.customerName;
+                                              return Material(
+                                                color: index.isEven ? Colors.white : const Color(0xFFF4F7FB),
+                                                child: InkWell(
+                                                  onTap: () async {
+                                                    await Navigator.of(context).push(MaterialPageRoute<void>(
+                                                      builder: (_) => _CreditDetailsScreen(customer: customer),
+                                                    ));
+                                                    if (mounted) _refresh();
+                                                  },
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                    decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+                                                    child: Row(children: [
+                                                      const SizedBox(width: 36, child: Icon(Icons.account_circle_outlined, color: Color(0xFF315F8E), size: 22)),
+                                                      Expanded(flex: 4, child: Tooltip(message: name, child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)))),
+                                                      Expanded(flex: 2, child: Text(customer.invoiceCount.toString(), textAlign: TextAlign.right)),
+                                                      Expanded(flex: 3, child: Text(formatMoney(customer.outstanding, customer.currency), textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFB4232D), fontWeight: FontWeight.w700))),
+                                                      const SizedBox(width: 32, child: Icon(Icons.chevron_right, color: Color(0xFF315F8E))),
+                                                    ]),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                  ),
+                                  Container(
+                                    color: const Color(0xFFEAF1F8),
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(children: [
+                                      Expanded(child: Text('Showing ${visible.length} of ${all.length} customers')),
+                                      Text(formatMoney(visible.fold<double>(0, (sum, c) => sum + c.outstanding), 'MMK'), style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF155484))),
+                                    ]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                   return RefreshIndicator(
                     onRefresh: () async {
                       _refresh();
@@ -127,6 +216,32 @@ class _CreditCustomersScreenState extends ConsumerState<CreditCustomersScreen> {
           ],
         ),
       );
+}
+
+class _CreditMetric extends StatelessWidget {
+  const _CreditMetric({required this.label, required this.value, required this.icon, required this.color, required this.background});
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(10)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 6),
+          Expanded(child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700))),
+        ]),
+        const SizedBox(height: 6),
+        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w800))),
+      ]),
+    );
+  }
 }
 
 class _CreditDetailsScreen extends ConsumerStatefulWidget {
