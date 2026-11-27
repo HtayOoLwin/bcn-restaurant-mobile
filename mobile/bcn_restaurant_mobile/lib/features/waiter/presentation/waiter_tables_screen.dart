@@ -224,8 +224,31 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
                   );
                 }).toList();
 
+                final available = response.tables.where((table) => !table.isOpen).length;
+                final occupied = response.tables.where((table) => table.isOpen &&
+                    (table.sessionStatus ?? 'Occupied').trim().toLowerCase() == 'occupied').length;
+                final billing = response.tables.where((table) => table.isOpen &&
+                    (table.sessionStatus ?? '').trim().toLowerCase() == 'billing').length;
+                final other = response.tables.length - available - occupied - billing;
+
                 return Column(
                   children: [
+                    if (desktop)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            _TableStatusCount(label: 'Available', count: available, color: const Color(0xFF2E7D5B), background: const Color(0xFFE8F6EF)),
+                            _TableStatusCount(label: 'Occupied', count: occupied, color: const Color(0xFFB94A55), background: const Color(0xFFFFEFF1)),
+                            _TableStatusCount(label: 'Billing', count: billing, color: const Color(0xFF2E67A0), background: const Color(0xFFEAF2FA)),
+                            if (other > 0)
+                              _TableStatusCount(label: 'Other', count: other, color: const Color(0xFF64748B), background: const Color(0xFFEAF1F8)),
+                            _TableStatusCount(label: 'Total Tables', count: response.tables.length, color: const Color(0xFF173A5E), background: const Color(0xFFEAF1F8)),
+                          ],
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
                       child: Row(
@@ -344,6 +367,36 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
       ),
     );
     return screen;
+  }
+}
+
+class _TableStatusCount extends StatelessWidget {
+  const _TableStatusCount({required this.label, required this.count, required this.color, required this.background});
+  final String label;
+  final int count;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, size: 8, color: color),
+          const SizedBox(width: 7),
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 12),
+          Text('$count', style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
   }
 }
 
