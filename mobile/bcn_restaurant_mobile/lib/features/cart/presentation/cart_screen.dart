@@ -10,6 +10,9 @@ import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../../waiter_progress/presentation/waiter_ready_screen.dart';
 import '../domain/cart_controller.dart';
 
+final pendingOrderCountProvider = FutureProvider<int>((ref) async =>
+    (await ref.watch(apiClientProvider).pendingOrders()).length);
+
 final ordersRepositoryProvider = Provider<OrdersRepository>(
   (ref) => OrdersRepository(ref.watch(apiClientProvider)),
 );
@@ -31,7 +34,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
     setState(() => submitting = true);
     try {
-      final result = await ref.read(ordersRepositoryProvider).createOrder(cart);
+      final result = await ref.read(ordersRepositoryProvider).createOrder(
+        cart, allowOffline: Theme.of(context).platform == TargetPlatform.windows,
+      );
+      final offline = result.salesOrder.isEmpty;
+      ref.invalidate(pendingOrderCountProvider);
       ref.invalidate(tablesProvider('dine_in'));
       ref.invalidate(tablesProvider('takeaway'));
       ref.invalidate(waiterProgressProvider);
@@ -42,10 +49,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           title: Text(
-            result.duplicate ? 'Order already received' : 'Order placed',
+            offline ? 'Order saved offline' : result.duplicate ? 'Order already received' : 'Order placed',
           ),
           content: Text(
-            'Sales Order: ${result.salesOrder}\n'
+            (offline ? 'Local order: ${cart.clientOrderId}\nPending sync — not sent to kitchen.\n' : 'Sales Order: ${result.salesOrder}\n') +
             '${result.session.isNotEmpty ? 'Session: ${result.session}\n' : ''}'
             'Total: ${formatAmount(result.grandTotal)}',
           ),
