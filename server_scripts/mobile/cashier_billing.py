@@ -408,7 +408,17 @@ def build_bill_row(order, has_print_job_doctype, get_linked_draft_sales_invoice_
             last_print_job = print_rows[0].name
             last_print_status = print_rows[0].status
 
+    offline_cash_eligible = order.docstatus == 0 and order.custom_restaurant_status in ("Open", "Billing") and float(sales_order.grand_total or 0) > 0
+    has_room_flag = frappe.get_meta("Item").has_field("custom_is_room_charge")
+    for item in sales_order.items:
+        group = frappe.db.get_value("Item", item.item_code, "item_group") or ""
+        flag = frappe.db.get_value("Item", item.item_code, "custom_is_room_charge") if has_room_flag else False
+        if flag or group.strip().lower() == "room charges":
+            offline_cash_eligible = False
+
     return {
+        "offline_cash_eligible": bool(offline_cash_eligible),
+        "offline_modified": str(sales_order.modified),
         "sales_order": order.name,
         "sales_invoice": draft_invoice,
         "customer": order.customer,
@@ -1099,6 +1109,7 @@ else:
                 {
                     "name": mode_name,
                     "default": bool(payment.default),
+                    "is_cash": frappe.db.get_value("Mode of Payment", mode_name, "type") == "Cash",
                 }
             )
 
