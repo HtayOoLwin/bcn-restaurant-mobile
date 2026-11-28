@@ -512,6 +512,18 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
   bool _autoSync = true;
   bool _autoScheduled = false;
   bool _dispatching = false;
+  bool _warmingWaiterCache = false;
+
+  Future<void> _warmWaiterCache() async {
+    if (!mounted || _warmingWaiterCache ||
+        ref.read(authControllerProvider).asData?.value.bootstrap?.permissions.waiter != true) return;
+    _warmingWaiterCache = true;
+    try {
+      await ref.read(apiClientProvider).warmWaiterCache();
+    } finally {
+      _warmingWaiterCache = false;
+    }
+  }
 
   Future<void> _runSync({bool manual = false}) async {
     if (_dispatching || !mounted) return;
@@ -547,6 +559,11 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
   void initState() {
     super.initState();
     _maybeAutoSync();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && ref.read(_serverStatusProvider).asData?.value == _ServerStatus.online) {
+        unawaited(_warmWaiterCache());
+      }
+    });
   }
 
   void _maybeAutoSync() {
@@ -599,6 +616,7 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
       if (previous?.asData?.value != _ServerStatus.online &&
           next.asData?.value == _ServerStatus.online) {
         _maybeAutoSync();
+        unawaited(_warmWaiterCache());
       }
     });
     ref.listen(pendingOrderCountProvider, (_, next) {
