@@ -6,6 +6,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../orders/data/orders_repository.dart';
+import '../../cashier/presentation/cashier_screen.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
 import '../../waiter_progress/presentation/waiter_ready_screen.dart';
 import '../domain/cart_controller.dart';
@@ -39,8 +40,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       );
       final offline = result.salesOrder.isEmpty;
       ref.invalidate(pendingOrderCountProvider);
-      ref.invalidate(tablesProvider('dine_in'));
-      ref.invalidate(tablesProvider('takeaway'));
+      ref.invalidate(tablesProvider);
+      ref.invalidate(cashierBillingProvider);
       ref.invalidate(waiterProgressProvider);
       ref.read(cartProvider.notifier).clear();
       if (!mounted) return;
