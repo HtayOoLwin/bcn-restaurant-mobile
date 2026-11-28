@@ -174,7 +174,7 @@ class CashierBill {
 }
 
 class CashierBillingResponse {
-  const CashierBillingResponse({required this.bills, required this.modes});
+  const CashierBillingResponse({required this.bills, required this.modes, this.creditCustomers = const []});
 
   factory CashierBillingResponse.fromJson(Map<String, dynamic> json) {
     return CashierBillingResponse(
@@ -185,6 +185,7 @@ class CashierBillingResponse {
             ),
           )
           .toList(),
+      creditCustomers: (json['credit_customers'] as List? ?? const []).map((row) => Map<String, dynamic>.from(row as Map)).toList(),
       modes: (json['modes'] as List? ?? const [])
           .map(
             (value) => CashierPaymentMode.fromJson(
@@ -198,6 +199,7 @@ class CashierBillingResponse {
 
   final List<CashierBill> bills;
   final List<CashierPaymentMode> modes;
+  final List<Map<String, dynamic>> creditCustomers;
 }
 
 class CashierPaymentResult {
