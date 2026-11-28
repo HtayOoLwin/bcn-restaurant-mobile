@@ -464,7 +464,7 @@ action = (frappe.form_dict.get("action") or "").strip()
 if not frappe.db.exists("DocType", SYNC_DOCTYPE):
     frappe.throw("Missing DocType: " + SYNC_DOCTYPE)
 if action == "ping":
-    frappe.response["message"] = {"ready": True, "backend_version": 1}
+    frappe.response["message"] = {"ready": True, "backend_version": 2}
 elif action == "submit":
     request_id = (frappe.form_dict.get("request_id") or "").strip()
     order_name = (frappe.form_dict.get("sales_order") or "").strip()
@@ -473,6 +473,9 @@ elif action == "submit":
     amount = float(frappe.form_dict.get("amount") or 0)
     mode = (frappe.form_dict.get("mode_of_payment") or "").strip()
     received_at = (frappe.form_dict.get("received_at") or "").strip()
+    credit_customer = (frappe.form_dict.get("credit_customer") or "").strip()
+    if credit_customer and mode:
+        frappe.throw("Full credit must not include cash")
     if not request_id.startswith("offline-pay:") or len(request_id) > 140:
         frappe.throw("Invalid offline payment request ID")
     if not order_name or not customer or not expected_modified or not received_at or not (0 < amount < 1000000000000):
@@ -480,6 +483,11 @@ elif action == "submit":
     payload = json.dumps({"sales_order": order_name, "customer": customer,
         "expected_modified": expected_modified, "amount": amount,
         "mode_of_payment": mode, "received_at": received_at}, sort_keys=True)
+    if credit_customer:
+        payload = json.dumps({"sales_order": order_name, "customer": customer,
+            "expected_modified": expected_modified, "amount": amount,
+            "mode_of_payment": mode, "received_at": received_at,
+            "credit_customer": credit_customer}, sort_keys=True)
     frappe.db.sql("SELECT name FROM `tabCustomer` WHERE name=%(name)s FOR UPDATE",
         {"name": customer})
     locked = frappe.db.sql("SELECT name FROM `tabSales Order` WHERE name=%(name)s FOR UPDATE",
@@ -511,9 +519,18 @@ elif action == "submit":
         if get_linked_draft_sales_invoice_names(so.name) or get_linked_submitted_sales_invoice_names(so.name):
             frappe.throw("PAYMENT CONFLICT: Linked invoice already exists")
         profile = frappe.get_doc("POS Profile", POS_PROFILE)
-        allocation = get_mode_details(profile, mode)
-        if not allocation["is_cash"]:
-            frappe.throw("Offline settlement only supports Cash")
+        allocation = None
+        credit_name = ""
+        if credit_customer:
+            credit = frappe.db.get_value("Customer", credit_customer,
+                ["name", "customer_name", "customer_group", "disabled"], as_dict=True)
+            if not credit or credit.disabled or credit.customer_group != "Credit":
+                frappe.throw("PAYMENT CONFLICT: Credit customer is unavailable")
+            credit_name = credit.customer_name or credit.name
+        else:
+            allocation = get_mode_details(profile, mode)
+            if not allocation["is_cash"]:
+                frappe.throw("Offline settlement only supports Cash or full Credit")
         has_room_flag = frappe.get_meta("Item").has_field("custom_is_room_charge")
         for row in so.items:
             group = frappe.db.get_value("Item", row.item_code, "item_group") or ""
@@ -537,6 +554,9 @@ elif action == "submit":
             frappe.throw("Billing order has no locked checkout")
         frozen_net = float(so.net_total or 0)
         frozen_tax = float(so.total_taxes_and_charges or 0)
+        if credit_customer:
+            so.customer = credit_customer
+            so.customer_name = credit_name
         so.custom_restaurant_status = "Payment Pending"
         so.calculate_taxes_and_totals()
         validate_invoice_totals(so, frozen_net, frozen_tax, amount)
@@ -552,12 +572,16 @@ elif action == "submit":
         si.paid_amount = 0
         si.calculate_taxes_and_totals()
         validate_invoice_totals(si, frozen_net, frozen_tax, amount)
+        if credit_customer:
+            si.remarks = credit_name
         si.insert(ignore_permissions=True)
         si.submit()
-        allocation["allocated_amount"] = amount
-        payment_entry = make_payment_entry(si, allocation, 1)
+        payment_entries = []
+        if not credit_customer:
+            allocation["allocated_amount"] = amount
+            payment_entries.append(make_payment_entry(si, allocation, 1))
         outstanding = float(frappe.db.get_value("Sales Invoice", si.name, "outstanding_amount") or 0)
-        if abs(outstanding) > AMOUNT_TOLERANCE:
+        if abs(outstanding - (amount if credit_customer else 0)) > AMOUNT_TOLERANCE:
             frappe.throw("Offline payment did not settle invoice")
         frappe.db.set_value("Sales Order", so.name, "custom_restaurant_status", "Closed", update_modified=True)
         receipt = frappe.new_doc(SYNC_DOCTYPE)
@@ -571,6 +595,6 @@ elif action == "submit":
         receipt.grand_total = amount
         receipt.insert(ignore_permissions=True)
         frappe.response["message"] = {"success": True, "duplicate": False,
-            "sales_order": so.name, "sales_invoice": si.name, "payment_entries": [payment_entry]}
+            "sales_order": so.name, "sales_invoice": si.name, "payment_entries": payment_entries, "outstanding_amount": outstanding}
 else:
     frappe.throw("Unsupported offline payment action")
