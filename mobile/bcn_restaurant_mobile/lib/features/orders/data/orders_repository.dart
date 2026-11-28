@@ -14,6 +14,13 @@ class OrdersRepository {
     if (customer == null || customer.isEmpty) {
       throw StateError('Customer/table is missing from the cart.');
     }
+    final payments = await _apiClient.pendingPayments();
+    for (final raw in payments.values) {
+      final payment = jsonDecode(raw) as Map;
+      if (payment['customer'] == customer) {
+        throw StateError('Cash already received for this table. Wait for payment sync.');
+      }
+    }
     if (cart.lines.isEmpty) {
       throw StateError('Cart is empty.');
     }
