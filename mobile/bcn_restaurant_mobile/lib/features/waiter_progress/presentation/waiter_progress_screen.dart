@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -63,6 +64,7 @@ class _WaiterProgressScreenState extends ConsumerState<WaiterProgressScreen> {
       appBar: AppBar(
         title: const Text('Order Progress'),
         actions: [
+          const DesktopConnectionStatus(),
           IconButton(
             tooltip: 'Refresh',
             onPressed: () => ref.invalidate(waiterProgressProvider),
