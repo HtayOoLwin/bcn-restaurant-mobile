@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -56,7 +57,7 @@ class SettingsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(actions: const [DesktopConnectionStatus()], title: const Text('Settings')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
