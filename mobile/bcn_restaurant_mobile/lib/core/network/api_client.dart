@@ -89,6 +89,8 @@ class ApiClient {
 
   Future<Map<String, String>> pendingOrders() => _sessionStorage.pendingOrders();
 
+  Future<dynamic> cachedOrderProgress() => _readCache('cache:bcn_waiter_order_progress');
+
   Future<bool> canReachServer() async {
     try {
       final user = await getMethod('frappe.auth.get_logged_user').timeout(const Duration(seconds: 4));
