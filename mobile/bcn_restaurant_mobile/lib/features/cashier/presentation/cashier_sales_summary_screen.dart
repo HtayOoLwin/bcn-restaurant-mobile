@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'package:flutter/material.dart';
 
 import '../../../core/formatters/amount_format.dart';
@@ -64,6 +65,7 @@ class _CashierSalesSummaryScreenState extends State<CashierSalesSummaryScreen> {
     appBar: AppBar(
       title: const Text('Sales Summary by Item'),
       actions: [
+          const DesktopConnectionStatus(),
         IconButton(
           tooltip: 'Refresh',
           onPressed: () => setState(_load),
