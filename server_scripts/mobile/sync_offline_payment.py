@@ -566,7 +566,9 @@ elif action == "submit":
                     frappe.throw("Full credit must not include payments")
             else:
                 tenders = parse_tenders(tender_rows, profile)
-                allocations, change_amount = allocate_tenders(tenders, paid_due)
+                allocation_result = allocate_tenders(tenders, paid_due)
+                allocations = allocation_result[0]
+                change_amount = allocation_result[1]
         elif not credit_customer:
             allocation = get_mode_details(profile, mode)
             if not allocation["is_cash"]:
