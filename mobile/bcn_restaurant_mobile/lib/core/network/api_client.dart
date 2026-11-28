@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 
@@ -117,6 +118,23 @@ class ApiClient {
     return value;
   }
 
+  bool _isTransportFailure(DioException error) => error.response == null &&
+      (error.type == DioExceptionType.connectionError ||
+       error.type == DioExceptionType.connectionTimeout ||
+       error.type == DioExceptionType.receiveTimeout ||
+       error.type == DioExceptionType.sendTimeout ||
+       error.error is SocketException);
+
+  Future<void> warmWaiterCache() async {
+    for (final method in ['bcn_mobile_menu', 'bcn_waiter_order_progress']) {
+      try {
+        await getMethod(method);
+      } catch (_) {
+        // Keep the last successful snapshot; each page can retry independently.
+      }
+    }
+  }
+
   Future<bool> canReachServer() async {
     try {
       final user = await getMethod('frappe.auth.get_logged_user').timeout(const Duration(seconds: 4));
@@ -177,11 +195,7 @@ class ApiClient {
       }
       throw const ApiException('Server unreachable. No usable offline cache.');
     } on DioException catch (error) {
-      if (key != null && error.response == null &&
-          (error.type == DioExceptionType.connectionError ||
-           error.type == DioExceptionType.connectionTimeout ||
-           error.type == DioExceptionType.receiveTimeout ||
-           error.type == DioExceptionType.sendTimeout)) {
+      if (key != null && _isTransportFailure(error)) {
         final cached = await _readCache(key);
         if (cached != null) return cached;
       }
