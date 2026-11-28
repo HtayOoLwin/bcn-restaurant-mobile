@@ -25,37 +25,6 @@ class OfflineOrdersScreen extends ConsumerStatefulWidget {
 class _OfflineOrdersScreenState extends ConsumerState<OfflineOrdersScreen> {
   String? selected;
 
-  Future<void> _linkOrder(_LocalOrder order) async {
-    try {
-      final api = ref.read(apiClientProvider);
-      final data = await api.getMethod('bcn_waiter_order_progress');
-      if (data is! Map || data['_offline_cached'] == true) {
-        throw StateError('Connect to ERPNext to review this order.');
-      }
-      final candidates = (data['orders'] as List? ?? []).where((row) =>
-        row is Map && row['customer'] == order.customer).toList();
-      if (candidates.length != 1) throw StateError('Exactly one active Sales Order is required.');
-      final candidate = candidates.single as Map;
-      final name = candidate['name']?.toString() ?? '';
-      if (name.isEmpty) throw StateError('Sales Order reference missing.');
-      if (!mounted) return;
-      final approved = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
-        title: const Text('Link existing Sales Order?'),
-        content: Text('Table: ${order.customer}\nSales Order: $name\nCreated: ${candidate['creation'] ?? ''}\nOffline order: ${order.dateLabel}\n\nConfirm only if both belong to the same customer visit.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Link & Sync')),
-        ],
-      ));
-      if (approved != true || !mounted) return;
-      await ref.read(offlineSyncProvider.notifier).linkExistingOrder(order.id, name);
-      if (!mounted) return;
-      await ref.read(offlineSyncProvider.notifier).sync();
-    } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final records = ref.watch(_offlineOrdersProvider);
@@ -177,8 +146,6 @@ class _OfflineOrdersScreenState extends ConsumerState<OfflineOrdersScreen> {
                               Text(formatAmount(order.total), style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF155484), fontSize: 18)),
                             ]),
                             const SizedBox(height: 8),
-                            if (order.session.isEmpty)
-                              OutlinedButton.icon(onPressed: sync.running ? null : () => _linkOrder(order), icon: const Icon(Icons.link), label: const Text('Link existing Sales Order')),
                             const Text('Pending Sync · Printing not available yet', style: TextStyle(color: Color(0xFFB4232D), fontWeight: FontWeight.w700)),
                           ],
                         ],
