@@ -54,9 +54,19 @@ class CashierRepository {
         bill['grand_total'] = ((bill['grand_total'] as num?) ?? 0) + amount;
         bill['net_total'] = ((bill['net_total'] as num?) ?? 0) + amount;
         bill['_local_preview'] = true;
+        bill['offline_cash_eligible'] = false;
         bill['restaurant_status'] = 'Pending Sync';
       } catch (_) {
         // Keep malformed local records available for review.
+      }
+    }
+    final payments = await _apiClient.pendingPayments();
+    for (final raw in payments.values) {
+      final payment = jsonDecode(raw) as Map;
+      for (final bill in bills.where((b) => b['customer'] == payment['customer'])) {
+        bill['_cash_recorded'] = true;
+        bill['offline_cash_eligible'] = false;
+        bill['restaurant_status'] = 'Cash received · pending sync';
       }
     }
     return CashierBillingResponse.fromJson({...data, 'bills': bills});
