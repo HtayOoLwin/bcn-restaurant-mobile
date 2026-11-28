@@ -25,7 +25,11 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
   @override
   OfflinePaymentState build() => const OfflinePaymentState();
 
-  Future<void> recordCash(CashierBill bill, CashierPaymentMode mode) async {
+  Future<void> recordCash(CashierBill bill, CashierPaymentMode mode) => _record(bill, mode: mode);
+
+  Future<void> recordCredit(CashierBill bill, String customer) => _record(bill, creditCustomer: customer);
+
+  Future<void> _record(CashierBill bill, {CashierPaymentMode? mode, String? creditCustomer}) async {
     if (state.running) throw StateError('Payment sync in progress.');
     final auth = ref.read(authControllerProvider).asData?.value.bootstrap;
     final storage = ref.read(sessionStorageProvider);
@@ -33,7 +37,7 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
     final sid = await storage.readSid();
     if (sid == null || auth?.permissions.cashier != true ||
         !bill.localPreview || !bill.offlineCashEligible || bill.cashRecorded ||
-        bill.offlineModified.isEmpty || !mode.isCash || bill.grandTotal <= 0 ||
+        bill.offlineModified.isEmpty || (creditCustomer == null ? mode?.isCash != true : creditCustomer.trim().isEmpty) || bill.grandTotal <= 0 ||
         !bill.grandTotal.isFinite || bill.currency != 'MMK') {
       throw StateError('This bill is not eligible for offline cash payment.');
     }
@@ -47,7 +51,8 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
       'customer': bill.customer,
       'expected_modified': bill.offlineModified,
       'amount': bill.grandTotal,
-      'mode_of_payment': mode.name,
+      'mode_of_payment': mode?.name ?? '',
+      'credit_customer': ?creditCustomer,
       'received_at': DateTime.now().toUtc().toIso8601String(),
     }, expectedSid: sid);
     ref.invalidate(pendingPaymentCountProvider);
@@ -70,7 +75,7 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
       final records = await storage.pendingPayments();
       if (records.isEmpty) return;
       final ping = await api.postMethod('bcn_sync_offline_payment', data: {'action': 'ping'});
-      if (ping is! Map || ping['ready'] != true || ping['backend_version'] != 1) {
+      if (ping is! Map || ping['ready'] != true || ping['backend_version'] != 2) {
         throw StateError('Offline payment API is not ready.');
       }
       for (final entry in records.entries) {
@@ -82,7 +87,7 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
         if (result is! Map || result['success'] != true ||
             result['sales_order'] != data['sales_order'] ||
             (result['sales_invoice']?.toString() ?? '').isEmpty) {
-          throw StateError('Server did not confirm offline cash settlement.');
+          throw StateError('Server did not confirm offline settlement.');
         }
         await storage.deletePendingPayment(entry.key, entry.value, expectedSid: sid);
         completed++;
