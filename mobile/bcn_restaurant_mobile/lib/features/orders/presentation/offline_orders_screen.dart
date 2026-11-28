@@ -5,6 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formatters/amount_format.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../data/offline_sync_service.dart';
+import '../../cart/presentation/cart_screen.dart';
+import '../../waiter/presentation/waiter_tables_screen.dart';
+import '../../waiter_progress/presentation/waiter_ready_screen.dart';
+import '../../cashier/presentation/cashier_screen.dart';
 
 final _offlineOrdersProvider = FutureProvider.autoDispose<Map<String, String>>(
   (ref) => ref.watch(apiClientProvider).pendingOrders(),
@@ -23,10 +28,27 @@ class _OfflineOrdersScreenState extends ConsumerState<OfflineOrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final records = ref.watch(_offlineOrdersProvider);
+    final sync = ref.watch(offlineSyncProvider);
+    ref.listen(offlineSyncProvider, (previous, next) {
+      if (previous?.running == true && !next.running) {
+        ref.invalidate(_offlineOrdersProvider);
+        ref.invalidate(pendingOrderCountProvider);
+        ref.invalidate(tablesProvider);
+        ref.invalidate(waiterProgressProvider);
+        ref.invalidate(waiterReadyProvider);
+        ref.invalidate(cashierBillingProvider);
+      }
+    });
     return Scaffold(
       appBar: AppBar(
         title: const Text('Offline Orders'),
         actions: [
+          TextButton.icon(
+            onPressed: sync.running || (records.asData?.value.isEmpty ?? true)
+                ? null : () async { await ref.read(offlineSyncProvider.notifier).sync(); },
+            icon: const Icon(Icons.sync),
+            label: Text(sync.running ? 'Syncing…' : 'Sync Now'),
+          ),
           IconButton(tooltip: 'Refresh', onPressed: () => ref.invalidate(_offlineOrdersProvider), icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -36,7 +58,9 @@ class _OfflineOrdersScreenState extends ConsumerState<OfflineOrdersScreen> {
         data: (records) {
           final orders = records.entries.map(_LocalOrder.fromEntry).toList()
             ..sort((a, b) => b.created.compareTo(a.created));
-          if (orders.isEmpty) return const Center(child: Text('No pending offline orders'));
+          if (orders.isEmpty) return Center(child: Text(sync.completed > 0
+              ? '${sync.completed} order(s) synced. No pending orders.'
+              : 'No pending offline orders'));
           final order = orders.firstWhere((o) => o.id == selected, orElse: () => orders.first);
           return Padding(
             padding: const EdgeInsets.all(12),
@@ -82,6 +106,8 @@ class _OfflineOrdersScreenState extends ConsumerState<OfflineOrdersScreen> {
                           const SizedBox(height: 5),
                           SelectableText('Local ID: ${order.id}', style: const TextStyle(fontSize: 11)),
                           Text(order.dateLabel),
+                          if (sync.errors[order.id] != null || sync.errors['_sync'] != null)
+                            Text(sync.errors[order.id] ?? sync.errors['_sync']!, style: const TextStyle(color: Color(0xFFB4232D), fontWeight: FontWeight.w700)),
                           const Divider(),
                           if (!order.valid) const Expanded(child: Center(child: Text('Record could not be decoded. It has not been deleted.')))
                           else ...[
