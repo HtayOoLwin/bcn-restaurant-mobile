@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -39,6 +40,7 @@ class _CreditCustomersScreenState extends ConsumerState<CreditCustomersScreen> {
         appBar: AppBar(
           title: const Text('Credit Customers'),
           actions: [
+          const DesktopConnectionStatus(),
             IconButton(
               tooltip: 'Refresh',
               onPressed: _refresh,
@@ -269,7 +271,7 @@ class _CreditDetailsScreenState extends ConsumerState<_CreditDetailsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(widget.customer.customerName)),
+        appBar: AppBar(actions: const [DesktopConnectionStatus()], title: Text(widget.customer.customerName)),
         body: FutureBuilder<List<CreditInvoice>>(
           future: _invoices,
           builder: (context, snapshot) {
