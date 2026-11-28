@@ -67,7 +67,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
       ),
     );
     if (selected == null || !mounted) return;
-    ref.read(cartProvider.notifier).setOrderContext(customer: widget.customer);
+    final current = ref.read(cartProvider);
+    ref.read(cartProvider.notifier).setOrderContext(customer: widget.customer,
+      session: current.customer == widget.customer ? current.session : null);
     ref.read(cartProvider.notifier).selectRoomCharge(selected);
 
   }
