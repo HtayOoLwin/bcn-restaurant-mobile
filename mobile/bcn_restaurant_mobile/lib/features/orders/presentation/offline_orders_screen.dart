@@ -58,9 +58,11 @@ class _OfflineOrdersScreenState extends ConsumerState<OfflineOrdersScreen> {
         data: (records) {
           final orders = records.entries.map(_LocalOrder.fromEntry).toList()
             ..sort((a, b) => b.created.compareTo(a.created));
-          if (orders.isEmpty) return Center(child: Text(sync.completed > 0
-              ? '${sync.completed} order(s) synced. No pending orders.'
-              : 'No pending offline orders'));
+          if (orders.isEmpty) {
+            return Center(child: Text(sync.completed > 0
+                ? '${sync.completed} order(s) synced. No pending orders.'
+                : 'No pending offline orders'));
+          }
           final order = orders.firstWhere((o) => o.id == selected, orElse: () => orders.first);
           return Padding(
             padding: const EdgeInsets.all(12),
