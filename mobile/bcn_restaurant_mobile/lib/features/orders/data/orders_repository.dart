@@ -88,7 +88,7 @@ class OrdersRepository {
       }
       await _apiClient.saveOfflineOrder(clientOrderId, {
         'payload': payload,
-        if (predecessor != null) 'predecessor': predecessor,
+        'predecessor': ?predecessor,
         'created_at': DateTime.now().toUtc().toIso8601String(),
         'estimated_total': cart.grandTotal,
         'display_items': cart.lines.map((line) => {
