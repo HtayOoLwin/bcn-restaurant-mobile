@@ -14,6 +14,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/cart/domain/cart_controller.dart';
 import '../../features/cashier/presentation/cashier_screen.dart';
+import '../../features/cashier/data/offline_payment_service.dart';
 import '../../features/cashier/presentation/cashier_daily_report_screen.dart';
 import '../../features/cashier/presentation/cashier_sales_summary_screen.dart';
 import '../../features/credit/presentation/credit_customers_screen.dart';
@@ -467,6 +468,37 @@ class _ConnectionStatusFooter extends ConsumerStatefulWidget {
 class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter> {
   bool _autoSync = true;
   bool _autoScheduled = false;
+  bool _dispatching = false;
+
+  Future<void> _runSync({bool manual = false}) async {
+    if (_dispatching || !mounted) return;
+    _dispatching = true;
+    try {
+      final permissions = ref.read(authControllerProvider).asData?.value.bootstrap?.permissions;
+      final api = ref.read(apiClientProvider);
+      final orders = ref.read(offlineSyncProvider);
+      final payments = ref.read(offlinePaymentProvider);
+      if (orders.running || payments.running) return;
+      if (permissions?.waiter == true && (manual || orders.errors.isEmpty) &&
+          (await api.pendingOrders()).isNotEmpty) {
+        if (!mounted) return;
+        await ref.read(offlineSyncProvider.notifier).sync();
+      }
+      if (!mounted) return;
+      // Never settle an offline bill before its queued orders have synced.
+      if (permissions?.cashier == true && (manual || payments.error == null) &&
+          (await api.pendingOrders()).isEmpty && (await api.pendingPayments()).isNotEmpty) {
+        if (!mounted) return;
+        await ref.read(offlinePaymentProvider.notifier).sync();
+      }
+    } catch (error) {
+      if (mounted && manual) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      _dispatching = false;
+    }
+  }
 
   @override
   void initState() {
@@ -481,11 +513,10 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
       _autoScheduled = false;
       if (!mounted || !_autoSync) return;
       final online = ref.read(_serverStatusProvider).asData?.value == _ServerStatus.online;
-      final count = ref.read(pendingOrderCountProvider).asData?.value ?? 0;
-      final sync = ref.read(offlineSyncProvider);
-      final allowed = ref.read(authControllerProvider).asData?.value.bootstrap?.permissions.waiter == true;
-      if (allowed && online && count > 0 && !sync.running && sync.errors.isEmpty) {
-        unawaited(ref.read(offlineSyncProvider.notifier).sync());
+      final orderCount = ref.read(pendingOrderCountProvider).asData?.value ?? 0;
+      final paymentCount = ref.read(pendingPaymentCountProvider).asData?.value ?? 0;
+      if (online && (orderCount > 0 || paymentCount > 0)) {
+        unawaited(_runSync());
       }
     });
   }
@@ -496,7 +527,22 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
     final sync = ref.watch(offlineSyncProvider);
     final pending = ref.watch(pendingOrderCountProvider);
     final count = pending.asData?.value ?? 0;
-    final canSync = ref.watch(authControllerProvider).asData?.value.bootstrap?.permissions.waiter == true;
+    final permissions = ref.watch(authControllerProvider).asData?.value.bootstrap?.permissions;
+    final canSync = permissions?.waiter == true || permissions?.cashier == true;
+    final paymentSync = ref.watch(offlinePaymentProvider);
+    final paymentCount = ref.watch(pendingPaymentCountProvider).asData?.value ?? 0;
+    final syncing = sync.running || paymentSync.running;
+    ref.listen(pendingPaymentCountProvider, (_, next) {
+      if ((next.asData?.value ?? 0) > 0) _maybeAutoSync();
+    });
+    ref.listen(offlinePaymentProvider, (previous, next) {
+      if (previous?.running == true && !next.running) {
+        ref.invalidate(cashierBillingProvider);
+        ref.invalidate(tablesProvider);
+        ref.invalidate(waiterProgressProvider);
+        ref.invalidate(waiterReadyProvider);
+      }
+    });
     ref.listen(offlineSyncProvider, (previous, next) {
       if (previous?.running == true && !next.running) {
         ref.invalidate(pendingOrderCountProvider);
@@ -556,19 +602,23 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
             loading: () => const Text('Pending orders: …', style: TextStyle(color: Colors.white70, fontSize: 12)),
             error: (_, _) => const Text('Pending orders unavailable', style: TextStyle(color: Colors.white70, fontSize: 12)),
           ),
-          if (canSync && (count > 0 || sync.running)) ...[
+          if (permissions?.cashier == true)
+            Text('Pending payments: $paymentCount', style: TextStyle(
+              color: paymentCount > 0 ? const Color(0xFFFFC66D) : Colors.white70,
+              fontSize: 12, fontWeight: FontWeight.w700)),
+          if (canSync && (count > 0 || paymentCount > 0 || syncing)) ...[
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: const Color(0xFF15803D),
                   foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8)),
-                onPressed: status == _ServerStatus.online && !sync.running && count > 0
-                    ? () => unawaited(ref.read(offlineSyncProvider.notifier).sync())
+                onPressed: status == _ServerStatus.online && !syncing && (count > 0 || paymentCount > 0)
+                    ? () => unawaited(_runSync(manual: true))
                     : null,
-                icon: sync.running
+                icon: syncing
                     ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.sync, size: 17),
-                label: Text(sync.running ? 'Syncing…' : 'Sync Now'),
+                label: Text(syncing ? 'Syncing…' : 'Sync Now'),
               ),
             ),
           ],
@@ -584,12 +634,18 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
                 inactiveThumbColor: Colors.white70,
                 inactiveTrackColor: const Color(0xFF64748B),
                 value: _autoSync,
-                onChanged: sync.running ? null : (value) {
+                onChanged: syncing ? null : (value) {
                   setState(() => _autoSync = value);
                   if (value) _maybeAutoSync();
                 },
               )),
             ]),
+          if (paymentSync.error != null)
+            Tooltip(message: paymentSync.error!, child: Text('Payment needs review: ${paymentSync.error}',
+              maxLines: 3, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFFFF7777), fontSize: 11)))
+          else if (paymentSync.completed > 0 && !paymentSync.running)
+            Text('${paymentSync.completed} payment(s) synced', style: const TextStyle(color: Color(0xFF86EFAC), fontSize: 11)),
           if (sync.errors.isNotEmpty)
             Tooltip(
               message: sync.errors.values.first,
@@ -600,7 +656,7 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
           else if (sync.completed > 0 && !sync.running)
             Text('${sync.completed} order(s) synced', style: const TextStyle(color: Color(0xFF86EFAC), fontSize: 11)),
           if (status == _ServerStatus.offline)
-            const Text('Local orders only · no printing', style: TextStyle(color: Colors.white70, fontSize: 10)),
+            const Text('Local orders / eligible cash · no printing', style: TextStyle(color: Colors.white70, fontSize: 10)),
         ],
       ),
     );
