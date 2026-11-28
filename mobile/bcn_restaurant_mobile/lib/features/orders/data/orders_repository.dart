@@ -53,8 +53,42 @@ class OrdersRepository {
     }
 
     if (allowOffline && !await _apiClient.canReachServer()) {
+      String? predecessor;
+      if ((payload['session']?.toString() ?? '').isEmpty) {
+        final snapshot = await _apiClient.cachedOrderProgress();
+        if (snapshot is Map) {
+          final matches = (snapshot['orders'] as List? ?? []).where((row) =>
+            row is Map && row['customer'] == customer).toList();
+          if (matches.length == 1) {
+            final name = (matches.single as Map)['name']?.toString() ?? '';
+            if (name.isNotEmpty) payload['session'] = name;
+          }
+        }
+        if ((payload['session']?.toString() ?? '').isEmpty) {
+          final pending = await _apiClient.pendingOrders();
+          final earlier = <MapEntry<String, String>>[];
+          for (final entry in pending.entries) {
+            final record = jsonDecode(entry.value) as Map;
+            final previous = record['payload'] as Map;
+            if (previous['customer'] == customer) earlier.add(entry);
+          }
+          earlier.sort((a, b) => (jsonDecode(b.value)['created_at'] as String)
+              .compareTo(jsonDecode(a.value)['created_at'] as String));
+          if (earlier.isNotEmpty) {
+            final previous = jsonDecode(earlier.first.value) as Map;
+            final previousPayload = previous['payload'] as Map;
+            final session = previousPayload['session']?.toString() ?? '';
+            if (session.isNotEmpty) {
+              payload['session'] = session;
+            } else {
+              predecessor = earlier.first.key;
+            }
+          }
+        }
+      }
       await _apiClient.saveOfflineOrder(clientOrderId, {
         'payload': payload,
+        if (predecessor != null) 'predecessor': predecessor,
         'created_at': DateTime.now().toUtc().toIso8601String(),
         'estimated_total': cart.grandTotal,
         'display_items': cart.lines.map((line) => {
