@@ -91,6 +91,30 @@ class ApiClient {
 
   Future<dynamic> cachedOrderProgress() => _readCache('cache:bcn_waiter_order_progress');
 
+  Future<void> rememberTableSession(String customer, String? session,
+      {required DateTime observedAt}) async {
+    final key = 'table-session:$customer';
+    final previous = await _sessionStorage.readOffline(key);
+    if (previous != null) {
+      final value = jsonDecode(previous) as Map;
+      final at = DateTime.tryParse(value['observed_at']?.toString() ?? '');
+      if (at != null && at.isAfter(observedAt)) return;
+    }
+    await _sessionStorage.writeOffline(key, jsonEncode({
+      'session': session ?? '',
+      'observed_at': observedAt.toUtc().toIso8601String(),
+    }));
+  }
+
+  Future<Map<String, dynamic>?> knownTableSession(String customer) async {
+    final raw = await _sessionStorage.readOffline('table-session:$customer');
+    if (raw == null) return null;
+    final value = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    final at = DateTime.tryParse(value['observed_at']?.toString() ?? '');
+    if (at == null || DateTime.now().toUtc().difference(at) > const Duration(hours: 24)) return null;
+    return value;
+  }
+
   Future<bool> canReachServer() async {
     try {
       final user = await getMethod('frappe.auth.get_logged_user').timeout(const Duration(seconds: 4));
@@ -111,6 +135,7 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
   }) async {
     final key = _cacheKey(method, queryParameters);
+    final observedAt = DateTime.now().toUtc();
     try {
       final response = await _dio.get<dynamic>(
         '/api/method/$method',
@@ -119,6 +144,19 @@ class ApiClient {
         cancelToken: null,
       ).timeout(key == null ? const Duration(seconds: 35) : const Duration(seconds: 6));
       final result = _unwrapMessage(response.data);
+      if (method == 'bcn_mobile_tables' && result is Map && result['tables'] is List) {
+        try {
+          for (final row in result['tables'] as List) {
+            if (row is! Map) continue;
+            final customer = row['customer']?.toString() ?? '';
+            if (customer.isNotEmpty) {
+              await rememberTableSession(customer, row['session']?.toString(), observedAt: observedAt);
+            }
+          }
+        } catch (_) {
+          // A local cache failure must not break the live table response.
+        }
+      }
       if (key != null && result is Map) {
         try {
           await _sessionStorage.writeOffline(key, jsonEncode({
@@ -156,7 +194,7 @@ class ApiClient {
     final saved = DateTime.tryParse(value['saved_at']?.toString() ?? '');
     if (saved == null || DateTime.now().toUtc().difference(saved) > const Duration(hours: 24)) return null;
     final data = value['data'];
-    if (data is Map) return {...data, '_offline_cached': true};
+    if (data is Map) return {...data, '_offline_cached': true, '_offline_saved_at': saved.toIso8601String()};
     return data;
   }
 
