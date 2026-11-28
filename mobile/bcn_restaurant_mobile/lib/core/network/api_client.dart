@@ -79,6 +79,7 @@ class ApiClient {
 
   String? _cacheKey(String method, Map<String, dynamic>? query) {
     if (method == 'bcn_mobile_bootstrap' || method == 'bcn_mobile_menu' || method == 'bcn_waiter_order_progress') return 'cache:$method';
+    if (method == 'bcn_cashier_billing' && (query?['action']?.toString().isEmpty ?? true)) return 'cache:$method';
     if (method == 'bcn_mobile_tables') return 'cache:$method:${query?['customer_group'] ?? ''}';
     return null;
   }
