@@ -55,14 +55,10 @@ class OrdersRepository {
     if (allowOffline && !await _apiClient.canReachServer()) {
       String? predecessor;
       if ((payload['session']?.toString() ?? '').isEmpty) {
-        final snapshot = await _apiClient.cachedOrderProgress();
-        if (snapshot is Map) {
-          final matches = (snapshot['orders'] as List? ?? []).where((row) =>
-            row is Map && row['customer'] == customer).toList();
-          if (matches.length == 1) {
-            final name = (matches.single as Map)['name']?.toString() ?? '';
-            if (name.isNotEmpty) payload['session'] = name;
-          }
+        final known = await _apiClient.knownTableSession(customer);
+        final session = known?['session']?.toString() ?? '';
+        if (session.isNotEmpty) {
+          payload['session'] = session;
         }
         if ((payload['session']?.toString() ?? '').isEmpty) {
           final pending = await _apiClient.pendingOrders();
@@ -95,6 +91,8 @@ class OrdersRepository {
           'item_code': line.item.itemCode,
           'item_name': line.item.itemName,
           'qty': line.qty,
+          'rate': line.foc ? 0 : line.item.rate,
+          'amount': line.amount,
           'uom': line.item.uom,
           'foc': line.foc ? 1 : 0,
           'parcel': line.parcel ? 1 : 0,
@@ -135,6 +133,7 @@ class OrdersRepository {
     }
     if (allowOffline) {
       try {
+        await _apiClient.rememberTableSession(customer, name, observedAt: DateTime.now().toUtc());
         await _apiClient.getMethod('bcn_waiter_order_progress');
       } catch (_) {
         // The order is already confirmed; cache refresh must not fail it.
