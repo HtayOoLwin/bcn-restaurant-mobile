@@ -1116,4 +1116,5 @@ else:
     frappe.response["message"] = {
         "bills": bills,
         "modes": modes,
+        "credit_customers": frappe.get_all("Customer", filters={"disabled": 0, "customer_group": "Credit"}, fields=["name", "customer_name"], order_by="name asc", limit_page_length=5000),
     }
