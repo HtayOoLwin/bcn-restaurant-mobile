@@ -121,6 +121,44 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
     }
   }
 
+  Future<void> linkExistingOrder(String id, String salesOrder) async {
+    if (state.running) throw StateError('Sync is running.');
+    state = const OfflineSyncState(running: true);
+    final api = ref.read(apiClientProvider);
+    final storage = ref.read(sessionStorageProvider);
+    try {
+      final sid = await storage.readSid();
+      final bootstrap = ref.read(authControllerProvider).asData?.value.bootstrap;
+      if (sid == null || bootstrap == null || !bootstrap.permissions.waiter ||
+          await api.getMethod('frappe.auth.get_logged_user') != bootstrap.user) {
+        throw StateError('An authenticated waiter session is required.');
+      }
+      final raw = (await storage.pendingOrders())[id];
+      if (raw == null) throw StateError('Local order no longer exists.');
+      final record = _PendingRecord.parse(MapEntry(id, raw));
+      if ((record.payload['session']?.toString() ?? '').isNotEmpty) {
+        throw StateError('This order already has a Sales Order reference.');
+      }
+      final status = _message(await api.postMethod('bcn_sync_offline_order',
+        data: {'action': 'status', 'client_order_id': id}));
+      if (status['found'] != false) {
+        throw StateError('Request may already be synced. Use Sync Now without changing it.');
+      }
+      final live = _message(await api.getMethod('bcn_waiter_order_progress'));
+      if (live['_offline_cached'] == true) throw StateError('A live server response is required.');
+      final matches = (live['orders'] as List? ?? []).where((row) =>
+        row is Map && row['customer'] == record.customer && row['name'] == salesOrder);
+      if (matches.length != 1) throw StateError('Sales Order is no longer active for this table.');
+      await _checkSession(storage, sid);
+      if ((await storage.pendingOrders())[id] != raw) throw StateError('Local record changed.');
+      final saved = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      saved['payload'] = {...record.payload, 'session': salesOrder};
+      await storage.writeOffline('order:$id', jsonEncode(saved));
+    } finally {
+      state = const OfflineSyncState();
+    }
+  }
+
   Future<void> _checkSession(SessionStorage storage, String sid) async {
     if (await storage.readSid() != sid) {
       throw StateError('Login session changed. Sync stopped.');
