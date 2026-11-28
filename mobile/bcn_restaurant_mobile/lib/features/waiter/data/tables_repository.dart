@@ -73,9 +73,18 @@ class TablesRepository {
         customers.add(payload['customer']?.toString() ?? '');
       } catch (_) {}
     }
+    final paidCustomers = <String>{};
+    for (final raw in (await _apiClient.pendingPayments()).values) {
+      final record = jsonDecode(raw) as Map;
+      paidCustomers.add(record['customer']?.toString() ?? '');
+    }
     return TablesResponse(serviceType: response.serviceType, companyName: response.companyName,
       customerGroup: response.customerGroup, customerGroups: response.customerGroups,
-      tables: response.tables.map((t) => customers.contains(t.customer)
+      tables: response.tables.map((t) => paidCustomers.contains(t.customer)
+        ? RestaurantTableModel(customer: t.customer, customerName: t.customerName,
+            customerGroup: t.customerGroup, isOpen: true, session: t.session,
+            sessionStatus: 'Billing', waiter: t.waiter, openedAt: t.openedAt, hasPendingOrders: true)
+        : customers.contains(t.customer)
         ? RestaurantTableModel(customer: t.customer, customerName: t.customerName,
             customerGroup: t.customerGroup, isOpen: true, session: t.session,
             sessionStatus: t.isOpen ? t.sessionStatus : 'Occupied',
