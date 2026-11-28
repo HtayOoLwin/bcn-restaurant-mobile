@@ -465,8 +465,14 @@ class _ConnectionStatusFooter extends ConsumerStatefulWidget {
 }
 
 class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter> {
-  bool _autoSync = false;
+  bool _autoSync = true;
   bool _autoScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _maybeAutoSync();
+  }
 
   void _maybeAutoSync() {
     if (!_autoSync || _autoScheduled) return;
@@ -477,7 +483,8 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
       final online = ref.read(_serverStatusProvider).asData?.value == _ServerStatus.online;
       final count = ref.read(pendingOrderCountProvider).asData?.value ?? 0;
       final sync = ref.read(offlineSyncProvider);
-      if (online && count > 0 && !sync.running && sync.errors.isEmpty) {
+      final allowed = ref.read(authControllerProvider).asData?.value.bootstrap?.permissions.waiter == true;
+      if (allowed && online && count > 0 && !sync.running && sync.errors.isEmpty) {
         unawaited(ref.read(offlineSyncProvider.notifier).sync());
       }
     });
