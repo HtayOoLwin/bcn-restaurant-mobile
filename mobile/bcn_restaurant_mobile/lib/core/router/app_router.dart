@@ -460,6 +460,17 @@ class _DesktopShell extends ConsumerWidget {
 
 /// Shared status indicator for Windows page AppBars. The sidebar retains
 /// ownership of auto-sync and the existing provider listeners.
+final _manualSyncRequestProvider = NotifierProvider<_ManualSyncRequest, int>(
+  _ManualSyncRequest.new,
+);
+
+class _ManualSyncRequest extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+}
+
 class DesktopConnectionStatus extends ConsumerWidget {
   const DesktopConnectionStatus({super.key});
 
@@ -477,7 +488,15 @@ class DesktopConnectionStatus extends ConsumerWidget {
       _ServerStatus.unavailable => ('Checking session', 'Retrying ERPNext connection', Icons.error_outline, const Color(0xFFFF7777)),
       null => ('Checking…', 'Checking ERPNext...', Icons.sync, Colors.white70),
     };
-    return Center(
+    final orders = ref.watch(pendingOrderCountProvider).asData?.value ?? 0;
+    final payments = ref.watch(pendingPaymentCountProvider).asData?.value ?? 0;
+    final syncing = ref.watch(offlineSyncProvider).running || ref.watch(offlinePaymentProvider).running;
+    final permissions = ref.watch(authControllerProvider).asData?.value.bootstrap?.permissions;
+    final canSync = permissions?.waiter == true || permissions?.cashier == true;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Center(
       child: Tooltip(
         message: detail,
         child: Container(
@@ -497,6 +516,28 @@ class DesktopConnectionStatus extends ConsumerWidget {
           ),
         ),
       ),
+    ),
+        if (canSync && (orders > 0 || payments > 0 || syncing))
+          Center(
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF15803D),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(0, 34),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: status == _ServerStatus.online && !syncing
+                  ? () => ref.read(_manualSyncRequestProvider.notifier).request()
+                  : null,
+              icon: syncing
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.sync, size: 16),
+              label: Text(syncing ? 'Syncing…' : 'Sync Now'),
+            ),
+          ),
+        const SizedBox(width: 8),
+      ],
     );
   }
 }
@@ -585,10 +626,14 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
 
   @override
   Widget build(BuildContext context) {
-    final status = ref.watch(_serverStatusProvider).asData?.value;
+    ref.watch(_serverStatusProvider);
+    ref.listen(_manualSyncRequestProvider, (_, _) {
+      if (ref.read(_serverStatusProvider).asData?.value == _ServerStatus.online) {
+        unawaited(_runSync(manual: true));
+      }
+    });
     final sync = ref.watch(offlineSyncProvider);
     final pending = ref.watch(pendingOrderCountProvider);
-    final count = pending.asData?.value ?? 0;
     final permissions = ref.watch(authControllerProvider).asData?.value.bootstrap?.permissions;
     final canSync = permissions?.waiter == true || permissions?.cashier == true;
     final paymentSync = ref.watch(offlinePaymentProvider);
@@ -654,22 +699,6 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
             Text('Pending payments: $paymentCount', style: TextStyle(
               color: paymentCount > 0 ? const Color(0xFFFFC66D) : Colors.white70,
               fontSize: 12, fontWeight: FontWeight.w700)),
-          if (canSync && (count > 0 || paymentCount > 0 || syncing)) ...[
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF15803D),
-                  foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8)),
-                onPressed: status == _ServerStatus.online && !syncing && (count > 0 || paymentCount > 0)
-                    ? () => unawaited(_runSync(manual: true))
-                    : null,
-                icon: syncing
-                    ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.sync, size: 17),
-                label: Text(syncing ? 'Syncing…' : 'Sync Now'),
-              ),
-            ),
-          ],
           if (canSync)
             Row(children: [
               Expanded(child: Text(_autoSync ? 'Auto Sync: On' : 'Auto Sync: Off',
