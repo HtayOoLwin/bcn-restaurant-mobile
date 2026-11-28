@@ -516,7 +516,9 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
 
   Future<void> _warmWaiterCache() async {
     if (!mounted || _warmingWaiterCache ||
-        ref.read(authControllerProvider).asData?.value.bootstrap?.permissions.waiter != true) return;
+        ref.read(authControllerProvider).asData?.value.bootstrap?.permissions.waiter != true) {
+      return;
+    }
     _warmingWaiterCache = true;
     try {
       await ref.read(apiClientProvider).warmWaiterCache();
