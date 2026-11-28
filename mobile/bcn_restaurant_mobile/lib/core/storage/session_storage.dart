@@ -52,9 +52,11 @@ class SessionStorage {
     };
   }
 
-  Future<void> deletePendingOrder(String id) async {
+  Future<void> deletePendingOrder(String id, {String? expectedSid}) async {
     final sid = await readSid();
-    if (sid == null) throw StateError('Session missing');
+    if (sid == null || (expectedSid != null && sid != expectedSid)) {
+      throw StateError('Session missing or changed');
+    }
     await _storage.delete(key: '${_prefix(sid)}order:$id');
   }
 }
