@@ -85,23 +85,48 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
           // Persist the bound payload before submission so retries are identical.
           var rawToDelete = record.raw;
           final predecessor = (jsonDecode(record.raw) as Map)['predecessor']?.toString() ?? '';
-          if (status['found'] == false && predecessor.isNotEmpty &&
+          if (status['found'] == false &&
               (record.payload['session']?.toString() ?? '').isEmpty) {
-            final prior = _message(await api.postMethod('bcn_sync_offline_order',
-              data: {'action': 'status', 'client_order_id': predecessor}));
-            final target = prior['sales_order']?.toString() ?? '';
-            if (prior['found'] != true || target.isEmpty) {
-              throw StateError('Earlier offline order has not been confirmed.');
+            String target = '';
+            if (predecessor.isNotEmpty) {
+              final prior = _message(await api.postMethod('bcn_sync_offline_order',
+                data: {'action': 'status', 'client_order_id': predecessor}));
+              target = prior['sales_order']?.toString() ?? '';
+              if (prior['found'] != true || target.isEmpty) {
+                throw StateError('Earlier offline order has not been confirmed.');
+              }
+            } else {
+              // Legacy orders may only be repaired from a snapshot that
+              // actually existed before the offline order was recorded.
+              final known = await api.knownTableSession(record.customer);
+              final observed = DateTime.tryParse(known?['observed_at']?.toString() ?? '');
+              if (observed != null && !observed.isAfter(record.created)) {
+                target = known?['session']?.toString() ?? '';
+              } else {
+                final snapshot = await api.cachedOrderProgress();
+                if (snapshot is Map) {
+                  final savedAt = DateTime.tryParse(snapshot['_offline_saved_at']?.toString() ?? '');
+                  if (savedAt != null && !savedAt.isAfter(record.created)) {
+                    final matches = (snapshot['orders'] as List? ?? []).where((row) =>
+                      row is Map && row['customer'] == record.customer).toList();
+                    if (matches.length == 1) {
+                      target = (matches.single as Map)['name']?.toString() ?? '';
+                    }
+                  }
+                }
+              }
             }
-            await _checkSession(storage, sid);
-            if ((await storage.pendingOrders())[record.id] != record.raw) {
-              throw StateError('Local order changed during sync.');
+            if (target.isNotEmpty) {
+              await _checkSession(storage, sid);
+              if ((await storage.pendingOrders())[record.id] != record.raw) {
+                throw StateError('Local order changed during sync.');
+              }
+              record.payload['session'] = target;
+              final saved = Map<String, dynamic>.from(jsonDecode(record.raw) as Map);
+              saved['payload'] = record.payload;
+              rawToDelete = jsonEncode(saved);
+              await storage.writeOffline('order:${record.id}', rawToDelete);
             }
-            record.payload['session'] = target;
-            final saved = Map<String, dynamic>.from(jsonDecode(record.raw) as Map);
-            saved['payload'] = record.payload;
-            rawToDelete = jsonEncode(saved);
-            await storage.writeOffline('order:${record.id}', rawToDelete);
           }
           // Always submit the ORIGINAL payload. The server compares the payload
           // even for duplicates; status alone does not prove payload equality.
