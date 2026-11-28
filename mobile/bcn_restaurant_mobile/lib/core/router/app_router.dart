@@ -29,25 +29,64 @@ enum _ServerStatus { online, offline, sessionExpired, unavailable }
 
 final _serverStatusProvider = StreamProvider.autoDispose<_ServerStatus>((ref) async* {
   final api = ref.watch(apiClientProvider);
+  final expectedUser = ref.watch(authControllerProvider).asData?.value.bootstrap?.user;
+  var authFailures = 0;
   while (true) {
+    var status = _ServerStatus.unavailable;
     try {
       final user = await api.getMethod('frappe.auth.get_logged_user')
-          .timeout(const Duration(seconds: 4));
-      yield user is String && user.isNotEmpty && user != 'Guest'
-          ? _ServerStatus.online
-          : _ServerStatus.sessionExpired;
+          .timeout(const Duration(seconds: 8));
+      if (user is String && user.isNotEmpty && user != 'Guest' &&
+          user == expectedUser) {
+        authFailures = 0;
+        status = _ServerStatus.online;
+      } else if (user == 'Guest' || (user is String && user.isNotEmpty && user != expectedUser)) {
+        authFailures++;
+        status = authFailures >= 2 ? _ServerStatus.sessionExpired : _ServerStatus.unavailable;
+      } else {
+        authFailures = 0;
+      }
     } on TimeoutException {
-      yield _ServerStatus.offline;
+      authFailures = 0;
+      status = _ServerStatus.offline;
     } on ApiException catch (error) {
-      final code = error.statusCode;
-      yield code == 401 || code == 403
-          ? _ServerStatus.sessionExpired
-          : code == null
-              ? _ServerStatus.offline
-              : _ServerStatus.unavailable;
+      if (error.statusCode == null) {
+        authFailures = 0;
+        status = _ServerStatus.offline;
+      } else if (error.statusCode == 401 || error.statusCode == 403) {
+        // A single forbidden response during reconnect is not proof of expiry.
+        // Verify using a fresh bootstrap response, never the offline snapshot.
+        try {
+          final data = await api.getMethod('bcn_mobile_bootstrap')
+              .timeout(const Duration(seconds: 8));
+          if (data is Map && data['_offline_cached'] != true &&
+              expectedUser != null && data['user'] == expectedUser) {
+            authFailures = 0;
+            status = _ServerStatus.online;
+          } else {
+            authFailures = 0;
+          }
+        } on ApiException catch (second) {
+          if (error.statusCode == 401 && second.statusCode == 401) {
+            authFailures++;
+            status = authFailures >= 2 ? _ServerStatus.sessionExpired : _ServerStatus.unavailable;
+          } else {
+            authFailures = 0;
+            status = second.statusCode == null ? _ServerStatus.offline : _ServerStatus.unavailable;
+          }
+        } on TimeoutException {
+          authFailures = 0;
+          status = _ServerStatus.offline;
+        } catch (_) {
+          authFailures = 0;
+        }
+      } else {
+        authFailures = 0;
+      }
     } catch (_) {
-      yield _ServerStatus.unavailable;
+      authFailures = 0;
     }
+    yield status;
     await Future<void>.delayed(const Duration(seconds: 5));
   }
 });
@@ -473,7 +512,7 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
       _ServerStatus.online => ('Online Mode', 'ERPNext connected', Icons.wifi, const Color(0xFF86EFAC)),
       _ServerStatus.offline => ('Offline Mode', 'ERPNext unreachable', Icons.wifi_off, const Color(0xFFFF7777)),
       _ServerStatus.sessionExpired => ('Session expired', 'Please sign in again', Icons.lock_outline, const Color(0xFFFFC66D)),
-      _ServerStatus.unavailable => ('Server unavailable', 'Check ERPNext server', Icons.error_outline, const Color(0xFFFF7777)),
+      _ServerStatus.unavailable => ('Checking session', 'Retrying ERPNext connection', Icons.error_outline, const Color(0xFFFF7777)),
       null => ('Checking connection', 'Checking ERPNext...', Icons.sync, Colors.white70),
     };
     return Padding(
