@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -500,6 +501,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           ),
         ),
         actions: desktop ? [
+          const DesktopConnectionStatus(),
           FilledButton.icon(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFF008C80), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: _showTransferTable,
