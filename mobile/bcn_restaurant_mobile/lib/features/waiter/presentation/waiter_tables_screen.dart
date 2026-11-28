@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -123,6 +124,7 @@ class _WaiterTablesScreenState extends ConsumerState<WaiterTablesScreen>
           ],
         ),
         actions: [
+          const DesktopConnectionStatus(),
           if (!desktop && bootstrap?.permissions.cashier == true)
             IconButton(
               tooltip: 'Cashier',
