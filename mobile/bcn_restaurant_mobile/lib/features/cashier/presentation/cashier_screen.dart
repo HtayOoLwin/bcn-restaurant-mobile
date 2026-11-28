@@ -301,7 +301,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                             crossAxisAlignment: CrossAxisAlignment.end,
                                             children: [
                                               Text(formatMoney(bill.grandTotal, bill.currency), style: const TextStyle(fontWeight: FontWeight.w800)),
-                                              Text(bill.restaurantStatus, style: const TextStyle(fontSize: 11, color: Color(0xFF315F8E))),
+                                              Text(bill.localPreview ? 'Offline preview' : bill.restaurantStatus, style: const TextStyle(fontSize: 11, color: Color(0xFF315F8E))),
                                             ],
                                           ),
                                           onTap: () => setState(() => _selectedBill = bill.salesOrder),
@@ -640,6 +640,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required CashierBill bill,
     required bool creditFlow,
   }) async {
+    if (bill.localPreview) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connect to ERPNext and sync all orders before payment.')));
+      return;
+    }
     final status = bill.restaurantStatus.trim().toLowerCase();
     if (status != 'open' && status != 'billing' && status != 'payment pending') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1480,9 +1484,9 @@ class _BillCardState extends State<_BillCard> {
   @override
   Widget build(BuildContext context) {
     final bill = widget.bill;
-    final isBilling = bill.restaurantStatus.trim().toLowerCase() == 'open' ||
+    final isBilling = !bill.localPreview && (bill.restaurantStatus.trim().toLowerCase() == 'open' ||
         bill.restaurantStatus.trim().toLowerCase() == 'billing' ||
-        bill.restaurantStatus.trim().toLowerCase() == 'payment pending';
+        bill.restaurantStatus.trim().toLowerCase() == 'payment pending');
     final cardColor = isBilling ? _billingCardColor : _openCardColor;
     const statusForeground = Color(0xFF0B6B3A);
 
