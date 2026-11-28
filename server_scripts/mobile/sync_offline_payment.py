@@ -464,7 +464,7 @@ action = (frappe.form_dict.get("action") or "").strip()
 if not frappe.db.exists("DocType", SYNC_DOCTYPE):
     frappe.throw("Missing DocType: " + SYNC_DOCTYPE)
 if action == "ping":
-    frappe.response["message"] = {"ready": True, "backend_version": 2}
+    frappe.response["message"] = {"ready": True, "backend_version": 3}
 elif action == "submit":
     request_id = (frappe.form_dict.get("request_id") or "").strip()
     order_name = (frappe.form_dict.get("sales_order") or "").strip()
@@ -474,7 +474,32 @@ elif action == "submit":
     mode = (frappe.form_dict.get("mode_of_payment") or "").strip()
     received_at = (frappe.form_dict.get("received_at") or "").strip()
     credit_customer = (frappe.form_dict.get("credit_customer") or "").strip()
-    if credit_customer and mode:
+    raw_tenders = frappe.form_dict.get("payments")
+    modern = raw_tenders is not None
+    credit_amount = amount if credit_customer else 0
+    tender_rows = []
+    if modern:
+        if mode:
+            frappe.throw("Use either legacy mode or payments, not both")
+        credit_amount = float(frappe.form_dict.get("credit_amount") or 0)
+        if not (0 <= credit_amount <= amount) or bool(credit_customer) != (credit_amount > 0):
+            frappe.throw("Invalid credit allocation")
+        tender_rows = json.loads(raw_tenders) if isinstance(raw_tenders, str) else raw_tenders
+        if not isinstance(tender_rows, list) or len(tender_rows) > 20:
+            frappe.throw("Invalid payment rows")
+        seen = []
+        normalized = []
+        for row in tender_rows:
+            if not isinstance(row, dict):
+                frappe.throw("Invalid payment row")
+            tender_mode = (row.get("mode_of_payment") or "").strip()
+            tender_amount = float(row.get("amount") or 0)
+            if not tender_mode or tender_mode.lower() == "credit" or tender_mode in seen or not (0 < tender_amount < 1000000000000):
+                frappe.throw("Invalid or duplicate tender")
+            seen.append(tender_mode)
+            normalized.append({"mode_of_payment": tender_mode, "amount": tender_amount})
+        tender_rows = normalized
+    elif credit_customer and mode:
         frappe.throw("Full credit must not include cash")
     if not request_id.startswith("offline-pay:") or len(request_id) > 140:
         frappe.throw("Invalid offline payment request ID")
@@ -488,6 +513,11 @@ elif action == "submit":
             "expected_modified": expected_modified, "amount": amount,
             "mode_of_payment": mode, "received_at": received_at,
             "credit_customer": credit_customer}, sort_keys=True)
+    if modern:
+        payload = json.dumps({"sales_order": order_name, "customer": customer,
+            "expected_modified": expected_modified, "amount": amount,
+            "payments": tender_rows, "credit_customer": credit_customer,
+            "credit_amount": credit_amount, "received_at": received_at}, sort_keys=True)
     frappe.db.sql("SELECT name FROM `tabCustomer` WHERE name=%(name)s FOR UPDATE",
         {"name": customer})
     locked = frappe.db.sql("SELECT name FROM `tabSales Order` WHERE name=%(name)s FOR UPDATE",
@@ -527,10 +557,22 @@ elif action == "submit":
             if not credit or credit.disabled or credit.customer_group != "Credit":
                 frappe.throw("PAYMENT CONFLICT: Credit customer is unavailable")
             credit_name = credit.customer_name or credit.name
-        else:
+        allocations = []
+        change_amount = 0
+        paid_due = amount - credit_amount
+        if modern:
+            if paid_due <= AMOUNT_TOLERANCE:
+                if tender_rows:
+                    frappe.throw("Full credit must not include payments")
+            else:
+                tenders = parse_tenders(tender_rows, profile)
+                allocations, change_amount = allocate_tenders(tenders, paid_due)
+        elif not credit_customer:
             allocation = get_mode_details(profile, mode)
             if not allocation["is_cash"]:
-                frappe.throw("Offline settlement only supports Cash or full Credit")
+                frappe.throw("Legacy settlement only supports Cash")
+            allocation["allocated_amount"] = amount
+            allocations.append(allocation)
         has_room_flag = frappe.get_meta("Item").has_field("custom_is_room_charge")
         for row in so.items:
             group = frappe.db.get_value("Item", row.item_code, "item_group") or ""
@@ -577,11 +619,12 @@ elif action == "submit":
         si.insert(ignore_permissions=True)
         si.submit()
         payment_entries = []
-        if not credit_customer:
-            allocation["allocated_amount"] = amount
-            payment_entries.append(make_payment_entry(si, allocation, 1))
+        sequence = 0
+        for allocation in allocations:
+            sequence += 1
+            payment_entries.append(make_payment_entry(si, allocation, sequence))
         outstanding = float(frappe.db.get_value("Sales Invoice", si.name, "outstanding_amount") or 0)
-        if abs(outstanding - (amount if credit_customer else 0)) > AMOUNT_TOLERANCE:
+        if abs(outstanding - credit_amount) > AMOUNT_TOLERANCE:
             frappe.throw("Offline payment did not settle invoice")
         frappe.db.set_value("Sales Order", so.name, "custom_restaurant_status", "Closed", update_modified=True)
         receipt = frappe.new_doc(SYNC_DOCTYPE)
@@ -595,6 +638,6 @@ elif action == "submit":
         receipt.grand_total = amount
         receipt.insert(ignore_permissions=True)
         frappe.response["message"] = {"success": True, "duplicate": False,
-            "sales_order": so.name, "sales_invoice": si.name, "payment_entries": payment_entries, "outstanding_amount": outstanding}
+            "sales_order": so.name, "sales_invoice": si.name, "payment_entries": payment_entries, "outstanding_amount": outstanding, "change_amount": change_amount}
 else:
     frappe.throw("Unsupported offline payment action")
