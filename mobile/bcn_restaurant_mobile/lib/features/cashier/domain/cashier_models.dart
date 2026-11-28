@@ -9,17 +9,19 @@ class CashierPaymentTender {
 }
 
 class CashierPaymentMode {
-  const CashierPaymentMode({required this.name, required this.isDefault});
+  const CashierPaymentMode({required this.name, required this.isDefault, this.isCash = false});
 
   factory CashierPaymentMode.fromJson(Map<String, dynamic> json) {
     return CashierPaymentMode(
       name: json['name']?.toString() ?? '',
       isDefault: json['default'] == true || json['default'] == 1,
+      isCash: json['is_cash'] == true || json['is_cash'] == 1,
     );
   }
 
   final String name;
   final bool isDefault;
+  final bool isCash;
 }
 
 class CashierBillItem {
@@ -106,6 +108,9 @@ class CashierBill {
     required this.currency,
     required this.restaurantStatus,
     this.localPreview = false,
+    this.offlineCashEligible = false,
+    this.offlineModified = '',
+    this.cashRecorded = false,
     required this.lastPrintStatus,
     required this.lastPrintJob,
     required this.items,
@@ -127,6 +132,9 @@ class CashierBill {
       currency: json['currency']?.toString() ?? '',
       restaurantStatus: json['restaurant_status']?.toString() ?? '',
       localPreview: json['_local_preview'] == true,
+      offlineCashEligible: json['offline_cash_eligible'] == true,
+      offlineModified: json['offline_modified']?.toString() ?? '',
+      cashRecorded: json['_cash_recorded'] == true,
       lastPrintStatus: json['last_print_status']?.toString(),
       lastPrintJob: json['last_print_job']?.toString(),
       items: (json['items'] as List? ?? const [])
@@ -156,6 +164,9 @@ class CashierBill {
   final String currency;
   final String restaurantStatus;
   final bool localPreview;
+  final bool offlineCashEligible;
+  final String offlineModified;
+  final bool cashRecorded;
   final String? lastPrintStatus;
   final String? lastPrintJob;
   final List<CashierBillItem> items;
