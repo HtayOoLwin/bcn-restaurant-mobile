@@ -48,7 +48,7 @@ class SessionStorage {
     if (sid != null) {
       final prefix = _prefix(sid);
       final values = await _retry(() => _storage.readAll());
-      for (final key in values.keys.where((key) => key.startsWith(prefix) && !key.contains(':order:'))) {
+      for (final key in values.keys.where((key) => key.startsWith(prefix) && !key.contains(':order:') && !key.contains(':payment:'))) {
         await _retry(() => _storage.delete(key: key));
       }
     }
@@ -80,6 +80,54 @@ class SessionStorage {
       for (final entry in values.entries)
         if (entry.key.startsWith(prefix)) entry.key.substring(prefix.length): entry.value,
     };
+  });
+
+  Future<Map<String, String>> pendingPayments() => _serialized(() async {
+    final sid = await _readSid();
+    if (sid == null || sid.isEmpty || sid == 'Guest') return {};
+    final prefix = '${_prefix(sid)}payment:';
+    final values = await _retry(() => _storage.readAll());
+    return {for (final entry in values.entries)
+      if (entry.key.startsWith(prefix)) entry.key.substring(prefix.length): entry.value};
+  });
+
+  Future<void> savePayment(String id, Map<String, dynamic> payload, {required String expectedSid}) =>
+      _serialized(() async {
+    final sid = await _readSid();
+    if (sid == null || sid != expectedSid || sid == 'Guest') {
+      throw StateError('Login session changed.');
+    }
+    final prefix = _prefix(sid);
+    final values = await _retry(() => _storage.readAll());
+    for (final entry in values.entries) {
+      if (entry.key.startsWith('${prefix}order:')) {
+        final record = jsonDecode(entry.value) as Map;
+        final order = record['payload'] as Map;
+        if (order['customer'] == payload['customer']) {
+          throw StateError('This table has pending offline items. Sync first.');
+        }
+      }
+      if (entry.key.startsWith('${prefix}payment:')) {
+        final payment = jsonDecode(entry.value) as Map;
+        if (payment['customer'] == payload['customer'] || payment['sales_order'] == payload['sales_order']) {
+          throw StateError('Cash already recorded for this table. Do not collect again.');
+        }
+      }
+    }
+    await _retry(() => _storage.write(key: '${prefix}payment:$id', value: jsonEncode(payload)));
+  });
+
+  Future<void> deletePendingPayment(String id, String raw, {required String expectedSid}) =>
+      _serialized(() async {
+    final sid = await _readSid();
+    if (sid == null || sid != expectedSid) throw StateError('Login session changed.');
+    final key = '${_prefix(sid)}payment:$id';
+    await _retry(() async {
+      final current = await _storage.read(key: key);
+      if (current == null) return;
+      if (current != raw) throw StateError('Local payment record changed.');
+      await _storage.delete(key: key);
+    });
   });
 
   Future<void> deletePendingOrder(String id, {String? expectedSid}) => _serialized(() async {
