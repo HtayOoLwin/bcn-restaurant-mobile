@@ -66,7 +66,8 @@ class CashierRepository {
       for (final bill in bills.where((b) => b['customer'] == payment['customer'])) {
         bill['_cash_recorded'] = true;
         bill['offline_cash_eligible'] = false;
-        bill['restaurant_status'] = 'Cash received · pending sync';
+        bill['restaurant_status'] = (payment['credit_customer']?.toString() ?? '').isNotEmpty
+            ? 'Credit recorded · pending sync' : 'Cash received · pending sync';
       }
     }
     return CashierBillingResponse.fromJson({...data, 'bills': bills});
