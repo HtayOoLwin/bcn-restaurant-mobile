@@ -30,6 +30,28 @@ class ApiException implements Exception {
       }
       message ??= data['message']?.toString();
       message ??= data['exception']?.toString();
+      // Frappe may send only exc_type plus a JSON-encoded traceback.
+      // Prefer the final exception line instead of a generic NameError.
+      if (message == null || message == data['exc_type']?.toString()) {
+        final raw = data['exc'];
+        dynamic trace = raw;
+        if (raw is String) {
+          try {
+            trace = jsonDecode(raw);
+          } catch (_) {
+            trace = raw;
+          }
+        }
+        final traces = trace is List ? trace : [trace];
+        for (final entry in traces.reversed) {
+          if (entry is! String) continue;
+          final lines = entry.trim().split('\n');
+          if (lines.isNotEmpty && lines.last.trim().isNotEmpty) {
+            message = lines.last.trim();
+            break;
+          }
+        }
+      }
       message ??= data['exc_type']?.toString();
       if (message == null && data['exc'] is String) {
         final lines = data['exc'].toString().split('\\n');
