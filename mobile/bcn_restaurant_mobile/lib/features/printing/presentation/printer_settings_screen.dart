@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,7 +22,7 @@ class PrinterSettingsScreen extends ConsumerWidget {
 
     if (permissions?.canViewPrintStatus != true) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Android Printer Worker')),
+        appBar: AppBar(actions: const [DesktopConnectionStatus()], title: const Text('Android Printer Worker')),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -32,7 +33,7 @@ class PrinterSettingsScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Android Printer Worker')),
+      appBar: AppBar(actions: const [DesktopConnectionStatus()], title: const Text('Android Printer Worker')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
