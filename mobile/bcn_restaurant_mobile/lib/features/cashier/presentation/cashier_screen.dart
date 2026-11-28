@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,8 @@ import '../../../core/search/order_search.dart';
 import '../../../core/widgets/operational_refresh_indicator.dart';
 import '../../../core/widgets/order_search_field.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../orders/data/offline_sync_service.dart';
+import '../../waiter_progress/presentation/waiter_ready_screen.dart';
 import '../../printing/data/android_print_repository.dart';
 import '../../printing/domain/cashier_bill_print_result.dart';
 import '../../waiter/presentation/waiter_tables_screen.dart';
@@ -606,6 +609,31 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     );
   }
 
+  Future<void> _ensureSyncedForPayment(CashierBill bill) async {
+    if (ref.read(offlineSyncProvider).running) {
+      throw StateError('Offline orders are syncing. Please retry after sync finishes.');
+    }
+    final api = ref.read(apiClientProvider);
+    final pending = await api.pendingOrders();
+    for (final raw in pending.values) {
+      final record = jsonDecode(raw);
+      if (record is! Map || record['payload'] is! Map) {
+        throw StateError('An unreadable offline order requires review before checkout.');
+      }
+      final payload = record['payload'] as Map;
+      if (payload['customer'] == bill.customer ||
+          payload['session'] == bill.salesOrder) {
+        throw StateError('This table has pending offline orders. Sync them before payment.');
+      }
+    }
+    if (!await api.canReachServer()) {
+      throw StateError('Connect to ERPNext before taking payment.');
+    }
+    if (ref.read(offlineSyncProvider).running) {
+      throw StateError('Offline orders are syncing. Please retry after sync finishes.');
+    }
+  }
+
   Future<void> _prepareAndOpenPayment({
     required BuildContext context,
     required CashierBillingResponse billing,
@@ -620,6 +648,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       return;
     }
     try {
+      await _ensureSyncedForPayment(bill);
+      if (!mounted || !context.mounted) return;
       // The Pay/Credit tap itself starts checkout. Credit customer selection
       // happens only AFTER server-side checkout time and room rate are locked.
       // Closing a dialog must never roll back or reset this check-out time.
@@ -1254,6 +1284,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             : () async {
                                 setSheetState(() => busy = true);
                                 try {
+                                  await _ensureSyncedForPayment(bill);
                                   final result = await ref
                                       .read(cashierRepositoryProvider)
                                       .confirmPayment(
@@ -1276,8 +1307,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     });
                                   }
                                   ref.invalidate(cashierBillingProvider);
-                                  ref.invalidate(tablesProvider('dine_in'));
-                                  ref.invalidate(tablesProvider('takeaway'));
+                                  ref.invalidate(tablesProvider);
+                                  ref.invalidate(waiterProgressProvider);
+                                  ref.invalidate(waiterReadyProvider);
                                   if (sheetContext.mounted) {
                                     Navigator.of(sheetContext).pop();
                                   }
