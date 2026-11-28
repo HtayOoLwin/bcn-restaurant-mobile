@@ -89,6 +89,8 @@ class ApiClient {
 
   Future<Map<String, String>> pendingOrders() => _sessionStorage.pendingOrders();
 
+  Future<Map<String, String>> pendingPayments() => _sessionStorage.pendingPayments();
+
   Future<dynamic> cachedOrderProgress() => _readCache('cache:bcn_waiter_order_progress');
 
   Future<void> rememberTableSession(String customer, String? session,
