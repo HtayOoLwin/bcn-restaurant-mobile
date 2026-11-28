@@ -575,8 +575,14 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
           if (canSync)
             Row(children: [
               Expanded(child: Text(_autoSync ? 'Auto Sync: On' : 'Auto Sync: Off',
-                style: const TextStyle(color: Colors.white70, fontSize: 11))),
+                style: TextStyle(
+                  color: _autoSync ? const Color(0xFF86EFAC) : Colors.white70,
+                  fontSize: 11, fontWeight: FontWeight.w700))),
               SizedBox(height: 28, child: Switch(
+                activeThumbColor: Colors.white,
+                activeTrackColor: const Color(0xFF16A34A),
+                inactiveThumbColor: Colors.white70,
+                inactiveTrackColor: const Color(0xFF64748B),
                 value: _autoSync,
                 onChanged: sync.running ? null : (value) {
                   setState(() => _autoSync = value);
