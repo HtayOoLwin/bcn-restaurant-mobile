@@ -7,6 +7,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../network/api_exception.dart';
 import '../../features/orders/presentation/offline_orders_screen.dart';
+import '../../features/orders/data/offline_sync_service.dart';
+import '../../features/waiter_progress/presentation/waiter_ready_screen.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
@@ -416,12 +418,57 @@ class _DesktopShell extends ConsumerWidget {
   }
 }
 
-class _ConnectionStatusFooter extends ConsumerWidget {
+class _ConnectionStatusFooter extends ConsumerStatefulWidget {
   const _ConnectionStatusFooter();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ConnectionStatusFooter> createState() => _ConnectionStatusFooterState();
+}
+
+class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter> {
+  bool _autoSync = false;
+  bool _autoScheduled = false;
+
+  void _maybeAutoSync() {
+    if (!_autoSync || _autoScheduled) return;
+    _autoScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoScheduled = false;
+      if (!mounted || !_autoSync) return;
+      final online = ref.read(_serverStatusProvider).asData?.value == _ServerStatus.online;
+      final count = ref.read(pendingOrderCountProvider).asData?.value ?? 0;
+      final sync = ref.read(offlineSyncProvider);
+      if (online && count > 0 && !sync.running && sync.errors.isEmpty) {
+        unawaited(ref.read(offlineSyncProvider.notifier).sync());
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final status = ref.watch(_serverStatusProvider).asData?.value;
+    final sync = ref.watch(offlineSyncProvider);
+    final pending = ref.watch(pendingOrderCountProvider);
+    final count = pending.asData?.value ?? 0;
+    final canSync = ref.watch(authControllerProvider).asData?.value.bootstrap?.permissions.waiter == true;
+    ref.listen(offlineSyncProvider, (previous, next) {
+      if (previous?.running == true && !next.running) {
+        ref.invalidate(pendingOrderCountProvider);
+        ref.invalidate(tablesProvider);
+        ref.invalidate(waiterProgressProvider);
+        ref.invalidate(waiterReadyProvider);
+        ref.invalidate(cashierBillingProvider);
+      }
+    });
+    ref.listen(_serverStatusProvider, (previous, next) {
+      if (previous?.asData?.value != _ServerStatus.online &&
+          next.asData?.value == _ServerStatus.online) {
+        _maybeAutoSync();
+      }
+    });
+    ref.listen(pendingOrderCountProvider, (_, next) {
+      if ((next.asData?.value ?? 0) > 0) _maybeAutoSync();
+    });
     final (label, detail, icon, color) = switch (status) {
       _ServerStatus.online => ('Online Mode', 'ERPNext connected', Icons.wifi, const Color(0xFF86EFAC)),
       _ServerStatus.offline => ('Offline Mode', 'ERPNext unreachable', Icons.wifi_off, const Color(0xFFFF7777)),
@@ -443,7 +490,7 @@ class _ConnectionStatusFooter extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(detail, style: const TextStyle(color: Colors.white70, fontSize: 11)),
           const SizedBox(height: 4),
-          ref.watch(pendingOrderCountProvider).when(
+          pending.when(
             data: (count) => InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
@@ -463,6 +510,43 @@ class _ConnectionStatusFooter extends ConsumerWidget {
             loading: () => const Text('Pending orders: …', style: TextStyle(color: Colors.white70, fontSize: 12)),
             error: (_, _) => const Text('Pending orders unavailable', style: TextStyle(color: Colors.white70, fontSize: 12)),
           ),
+          if (canSync && (count > 0 || sync.running)) ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF15803D),
+                  foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                onPressed: status == _ServerStatus.online && !sync.running && count > 0
+                    ? () => unawaited(ref.read(offlineSyncProvider.notifier).sync())
+                    : null,
+                icon: sync.running
+                    ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.sync, size: 17),
+                label: Text(sync.running ? 'Syncing…' : 'Sync Now'),
+              ),
+            ),
+          ],
+          if (canSync)
+            Row(children: [
+              Expanded(child: Text(_autoSync ? 'Auto Sync: On' : 'Auto Sync: Off',
+                style: const TextStyle(color: Colors.white70, fontSize: 11))),
+              SizedBox(height: 28, child: Switch(
+                value: _autoSync,
+                onChanged: sync.running ? null : (value) {
+                  setState(() => _autoSync = value);
+                  if (value) _maybeAutoSync();
+                },
+              )),
+            ]),
+          if (sync.errors.isNotEmpty)
+            Tooltip(
+              message: sync.errors.values.first,
+              child: Text('Sync needs review: ${sync.errors.values.first}',
+                maxLines: 3, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFFFF7777), fontSize: 10)),
+            )
+          else if (sync.completed > 0 && !sync.running)
+            Text('${sync.completed} order(s) synced', style: const TextStyle(color: Color(0xFF86EFAC), fontSize: 11)),
           if (status == _ServerStatus.offline)
             const Text('Local orders only · no printing', style: TextStyle(color: Colors.white70, fontSize: 10)),
         ],
