@@ -458,6 +458,49 @@ class _DesktopShell extends ConsumerWidget {
   }
 }
 
+/// Shared status indicator for Windows page AppBars. The sidebar retains
+/// ownership of auto-sync and the existing provider listeners.
+class DesktopConnectionStatus extends ConsumerWidget {
+  const DesktopConnectionStatus({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (Theme.of(context).platform != TargetPlatform.windows ||
+        MediaQuery.sizeOf(context).width < 900) {
+      return const SizedBox.shrink();
+    }
+    final status = ref.watch(_serverStatusProvider).asData?.value;
+    final (label, detail, icon, color) = switch (status) {
+      _ServerStatus.online => ('Online', 'ERPNext connected', Icons.wifi, const Color(0xFF86EFAC)),
+      _ServerStatus.offline => ('Offline', 'ERPNext unreachable', Icons.wifi_off, const Color(0xFFFF7777)),
+      _ServerStatus.sessionExpired => ('Session expired', 'Please sign in again', Icons.lock_outline, const Color(0xFFFFC66D)),
+      _ServerStatus.unavailable => ('Checking session', 'Retrying ERPNext connection', Icons.error_outline, const Color(0xFFFF7777)),
+      null => ('Checking…', 'Checking ERPNext...', Icons.sync, Colors.white70),
+    };
+    return Center(
+      child: Tooltip(
+        message: detail,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF16466C),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ConnectionStatusFooter extends ConsumerStatefulWidget {
   const _ConnectionStatusFooter();
 
@@ -561,27 +604,12 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
     ref.listen(pendingOrderCountProvider, (_, next) {
       if ((next.asData?.value ?? 0) > 0) _maybeAutoSync();
     });
-    final (label, detail, icon, color) = switch (status) {
-      _ServerStatus.online => ('Online Mode', 'ERPNext connected', Icons.wifi, const Color(0xFF86EFAC)),
-      _ServerStatus.offline => ('Offline Mode', 'ERPNext unreachable', Icons.wifi_off, const Color(0xFFFF7777)),
-      _ServerStatus.sessionExpired => ('Session expired', 'Please sign in again', Icons.lock_outline, const Color(0xFFFFC66D)),
-      _ServerStatus.unavailable => ('Checking session', 'Retrying ERPNext connection', Icons.error_outline, const Color(0xFFFF7777)),
-      null => ('Checking connection', 'Checking ERPNext...', Icons.sync, Colors.white70),
-    };
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 2, 14, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(width: 8),
-            Expanded(child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 13))),
-          ]),
-          const SizedBox(height: 4),
-          Text(detail, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-          const SizedBox(height: 4),
           pending.when(
             data: (count) => InkWell(
               borderRadius: BorderRadius.circular(6),
@@ -589,7 +617,7 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
                 builder: (_) => const OfflineOrdersScreen(),
               )),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 7),
+                padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Row(children: [
                   Icon(Icons.receipt_long_outlined, size: 17, color: count > 0 ? const Color(0xFFFF7777) : Colors.white70),
                   const SizedBox(width: 6),
@@ -655,8 +683,7 @@ class _ConnectionStatusFooterState extends ConsumerState<_ConnectionStatusFooter
             )
           else if (sync.completed > 0 && !sync.running)
             Text('${sync.completed} order(s) synced', style: const TextStyle(color: Color(0xFF86EFAC), fontSize: 11)),
-          if (status == _ServerStatus.offline)
-            const Text('Local orders / eligible cash · no printing', style: TextStyle(color: Colors.white70, fontSize: 10)),
+
         ],
       ),
     );
