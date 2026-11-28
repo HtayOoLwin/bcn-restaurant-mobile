@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -160,6 +161,7 @@ class _CashierDailyReportScreenState extends ConsumerState<CashierDailyReportScr
       appBar: AppBar(
         title: const Text('Daily Sales Report'),
         actions: [
+          const DesktopConnectionStatus(),
           IconButton(
             tooltip: 'Refresh',
             onPressed: () => setState(_load),
