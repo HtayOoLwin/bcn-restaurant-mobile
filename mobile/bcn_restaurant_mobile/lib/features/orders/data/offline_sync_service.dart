@@ -81,6 +81,28 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
             throw StateError('Invalid status response.');
           }
 
+          // Bind a new-table follow-up to its recorded predecessor receipt.
+          // Persist the bound payload before submission so retries are identical.
+          var rawToDelete = record.raw;
+          final predecessor = (jsonDecode(record.raw) as Map)['predecessor']?.toString() ?? '';
+          if (status['found'] == false && predecessor.isNotEmpty &&
+              (record.payload['session']?.toString() ?? '').isEmpty) {
+            final prior = _message(await api.postMethod('bcn_sync_offline_order',
+              data: {'action': 'status', 'client_order_id': predecessor}));
+            final target = prior['sales_order']?.toString() ?? '';
+            if (prior['found'] != true || target.isEmpty) {
+              throw StateError('Earlier offline order has not been confirmed.');
+            }
+            await _checkSession(storage, sid);
+            if ((await storage.pendingOrders())[record.id] != record.raw) {
+              throw StateError('Local order changed during sync.');
+            }
+            record.payload['session'] = target;
+            final saved = Map<String, dynamic>.from(jsonDecode(record.raw) as Map);
+            saved['payload'] = record.payload;
+            rawToDelete = jsonEncode(saved);
+            await storage.writeOffline('order:${record.id}', rawToDelete);
+          }
           // Always submit the ORIGINAL payload. The server compares the payload
           // even for duplicates; status alone does not prove payload equality.
           await _checkSession(storage, sid);
@@ -96,7 +118,7 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
           await _checkSession(storage, sid);
           // Delete only the exact acknowledged local record.
           final current = await storage.pendingOrders();
-          if (current[record.id] != record.raw) {
+          if (current[record.id] != rawToDelete) {
             throw StateError('Local record changed during sync. Review it.');
           }
           await storage.deletePendingOrder(record.id, expectedSid: sid);
@@ -118,44 +140,6 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
       errors['_sync'] = error.toString();
     } finally {
       state = OfflineSyncState(completed: completed, errors: Map.unmodifiable(errors));
-    }
-  }
-
-  Future<void> linkExistingOrder(String id, String salesOrder) async {
-    if (state.running) throw StateError('Sync is running.');
-    state = const OfflineSyncState(running: true);
-    final api = ref.read(apiClientProvider);
-    final storage = ref.read(sessionStorageProvider);
-    try {
-      final sid = await storage.readSid();
-      final bootstrap = ref.read(authControllerProvider).asData?.value.bootstrap;
-      if (sid == null || bootstrap == null || !bootstrap.permissions.waiter ||
-          await api.getMethod('frappe.auth.get_logged_user') != bootstrap.user) {
-        throw StateError('An authenticated waiter session is required.');
-      }
-      final raw = (await storage.pendingOrders())[id];
-      if (raw == null) throw StateError('Local order no longer exists.');
-      final record = _PendingRecord.parse(MapEntry(id, raw));
-      if ((record.payload['session']?.toString() ?? '').isNotEmpty) {
-        throw StateError('This order already has a Sales Order reference.');
-      }
-      final status = _message(await api.postMethod('bcn_sync_offline_order',
-        data: {'action': 'status', 'client_order_id': id}));
-      if (status['found'] != false) {
-        throw StateError('Request may already be synced. Use Sync Now without changing it.');
-      }
-      final live = _message(await api.getMethod('bcn_waiter_order_progress'));
-      if (live['_offline_cached'] == true) throw StateError('A live server response is required.');
-      final matches = (live['orders'] as List? ?? []).where((row) =>
-        row is Map && row['customer'] == record.customer && row['name'] == salesOrder);
-      if (matches.length != 1) throw StateError('Sales Order is no longer active for this table.');
-      await _checkSession(storage, sid);
-      if ((await storage.pendingOrders())[id] != raw) throw StateError('Local record changed.');
-      final saved = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      saved['payload'] = {...record.payload, 'session': salesOrder};
-      await storage.writeOffline('order:$id', jsonEncode(saved));
-    } finally {
-      state = const OfflineSyncState();
     }
   }
 
