@@ -488,7 +488,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     }
   }
 
-  Future<String?> _chooseCreditCustomer(BuildContext context) async {
+  Future<String?> _chooseCreditCustomer(BuildContext context, {List<Map<String, dynamic>>? cachedCustomers}) async {
     final repository = ref.read(cashierRepositoryProvider);
     String query = '';
     return showDialog<String>(
@@ -540,7 +540,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 Expanded(
                   child: FutureBuilder<List<Map<String, dynamic>>>(
                     key: ValueKey(query),
-                    future: repository.searchCreditCustomers(query),
+                    future: cachedCustomers == null ? repository.searchCreditCustomers(query) : Future.value(cachedCustomers.where((row) => '${row['name']} ${row['customer_name']}'.toLowerCase().contains(query.toLowerCase())).toList()),
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return Center(
@@ -613,104 +613,19 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   }
 
   Future<void> _recordOfflineCredit(BuildContext context, CashierBillingResponse billing, CashierBill bill) async {
-    final customers = billing.creditCustomers.where((row) => (row['name']?.toString() ?? '').isNotEmpty).toList();
-    if (customers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No cached credit customers. Refresh Cashier online first.')));
-      return;
-    }
-    Map<String, dynamic>? selected;
-    String query = '';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, update) => AlertDialog(
-          title: const Text('Offline Credit'),
-          content: SizedBox(width: 440, child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(bill.customerName),
-            Text('Outstanding: ${formatMoney(bill.grandTotal, bill.currency)}'),
-            TextField(decoration: const InputDecoration(labelText: 'Search credit customer'),
-              onChanged: (value) => update(() => query = value.toLowerCase())),
-            SizedBox(height: 240, child: ListView(
-              children: customers.where((row) => '${row['name']} ${row['customer_name']}'.toLowerCase().contains(query)).map((row) =>
-                ListTile(title: Text(row['customer_name']?.toString() ?? row['name'].toString()),
-                  subtitle: Text(row['name'].toString()), selected: selected == row,
-                  onTap: () => update(() => selected = row))).toList(),
-            )),
-            Text(selected == null ? 'Select an existing credit customer.' : 'Selected: ${selected!['customer_name'] ?? selected!['name']}'),
-            const Text('Full credit only. No cash received. ERPNext invoice will be created after sync.'),
-          ])),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-            FilledButton(onPressed: selected == null ? null : () => Navigator.pop(dialogContext, true), child: const Text('Confirm Credit')),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true || selected == null || !mounted || !context.mounted) return;
-    try {
-      await ref.read(offlinePaymentProvider.notifier).recordCredit(bill, selected!['name'].toString());
-      if (!mounted || !context.mounted) return;
-      ref.invalidate(cashierBillingProvider);
-      ref.invalidate(tablesProvider);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Credit recorded locally. Pending sync.')));
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    }
+    final customer = await _chooseCreditCustomer(context, cachedCustomers: billing.creditCustomers);
+    if (customer == null || !mounted || !context.mounted) return;
+    await _openPaymentSheet(context: context, ref: ref, billing: billing, bill: bill,
+      creditFlow: true, offline: true, offlineCreditCustomer: customer);
   }
 
   Future<void> _recordOfflineCash(BuildContext context, CashierBillingResponse billing, CashierBill bill) async {
-    final cashModes = billing.modes.where((mode) => mode.isCash).toList();
-    if (cashModes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No verified cash mode. Refresh online before checkout.')));
+    if (!billing.modes.any((mode) => mode.isCash)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No verified cash mode. Refresh Cashier online first.')));
       return;
     }
-    var mode = cashModes.first;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Offline Cash Payment'),
-          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(bill.customerName),
-            Text(bill.salesOrder),
-            const SizedBox(height: 12),
-            Text(formatMoney(bill.grandTotal, bill.currency), style: Theme.of(dialogContext).textTheme.headlineSmall),
-            const SizedBox(height: 12),
-            DropdownButton<CashierPaymentMode>(
-              value: mode,
-              isExpanded: true,
-              items: cashModes.map((m) => DropdownMenuItem(value: m, child: Text(m.name))).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setDialogState(() => mode = value);
-                }
-              },
-            ),
-            const Text('Confirm only after receiving the exact cash amount. This bill remains locked locally until ERPNext confirms payment. No official invoice or receipt is issued offline.'),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Confirm Cash Received')),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true || !mounted || !context.mounted) return;
-    try {
-      await ref.read(offlinePaymentProvider.notifier).recordCash(bill, mode);
-      if (!mounted || !context.mounted) return;
-      ref.invalidate(cashierBillingProvider);
-      ref.invalidate(tablesProvider);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cash received locally. Pending payment sync. Do not collect again.')));
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    }
+    await _openPaymentSheet(context: context, ref: ref, billing: billing, bill: bill,
+      creditFlow: false, offline: true);
   }
 
   Future<void> _ensureSyncedForPayment(CashierBill bill) async {
@@ -843,8 +758,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required CashierBillingResponse billing,
     required CashierBill bill,
     required bool creditFlow,
+    bool offline = false,
+    String? offlineCreditCustomer,
   }) async {
-    if (bill.restaurantStatus.trim().toLowerCase() != 'open' &&
+    if (!offline && bill.restaurantStatus.trim().toLowerCase() != 'open' &&
         bill.restaurantStatus.trim().toLowerCase() != 'billing' &&
         bill.restaurantStatus.trim().toLowerCase() != 'payment pending') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -867,9 +784,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     // Credit is an unpaid invoice action, not a tender mode.
     // ERPNext may also return a Mode of Payment named Credit.
     final tenderModes = billing.modes
-        .where((mode) => mode.name.trim().toLowerCase() != 'credit')
+        .where((mode) => mode.name.trim().toLowerCase() != 'credit' && (!offline || mode.isCash))
         .toList();
-    final cashMode = _findModeByName(tenderModes, 'Cash');
+    final cashMode = offline && tenderModes.isNotEmpty ? tenderModes.first : _findModeByName(tenderModes, 'Cash');
     final primaryMode = cashMode;
     // Split uses every configured POS Profile tender mode, selected by the cashier.
     final splitModeNames = <String>[];
@@ -1008,7 +925,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 CashierPaymentTender(modeOfPayment: mode.name, amount: amount),
               );
               totalTendered += amount;
-              if (_isCashMode(mode.name)) {
+              if (offline ? mode.isCash : _isCashMode(mode.name)) {
                 cashTendered += amount;
               } else {
                 nonCashTotal += amount;
@@ -1022,7 +939,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             final creditSelected = selectedPaymentType == creditPaymentType ||
                 (selectedPaymentType == 'Split' &&
                     splitModeNames.contains(partialCreditName));
-            final creditRemarkValid = !creditSelected ||
+            final creditRemarkValid = offline || !creditSelected ||
                 creditRemarkController.text.trim().isNotEmpty;
             final creditValid = creditAmount >= 0 &&
                 creditAmount <= payable + 0.0001 &&
@@ -1071,7 +988,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Discount applies to the Draft Sales Invoice only.',
+                        offline ? 'Offline checkout · saved locally until sync. Discounts and split payments require internet.' : 'Discount applies to the Draft Sales Invoice only.',
                         style: Theme.of(sheetContext).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 8),
@@ -1080,7 +997,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         value: formatMoney(bill.grandTotal, bill.currency),
                       ),
                       const SizedBox(height: 10),
-                      TextField(
+                      if (!offline) TextField(
                         controller: discountController,
                         enabled: !busy,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1140,7 +1057,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                     () => setPaymentType(creditPaymentType),
                                   ),
                           ),
-                          if (cashMode != null && (creditFlow || tenderModes.length > 1))
+                          if (!offline && cashMode != null && (creditFlow || tenderModes.length > 1))
                             ChoiceChip(
                               label: Text(creditFlow ? 'Partial Credit' : 'Split'),
                               selected: selectedPaymentType == 'Split',
@@ -1346,7 +1263,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           ),
                         ),
                       ],
-                      if (creditSelected) ...[
+                      if (creditSelected && offline)
+                        _AmountSummaryRow(label: 'Credit Customer', value: offlineCreditCustomer ?? ''),
+                      if (creditSelected && !offline) ...[
                         const Padding(
                           padding: EdgeInsets.only(bottom: 6),
                           child: Text('Credit customer name / remark *',
@@ -1409,6 +1328,29 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                             : () async {
                                 setSheetState(() => busy = true);
                                 try {
+                                  if (offline) {
+                                    final service = ref.read(offlinePaymentProvider.notifier);
+                                    if (creditFlow) {
+                                      if (offlineCreditCustomer == null) throw StateError('Select a credit customer.');
+                                      await service.recordCredit(bill, offlineCreditCustomer);
+                                    } else {
+                                      final mode = _findModeByName(tenderModes, selectedPaymentType);
+                                      if (mode == null || !mode.isCash || totalTendered < bill.grandTotal) {
+                                        throw StateError('Enter sufficient cash received.');
+                                      }
+                                      await service.recordCash(bill, mode);
+                                    }
+                                    ref.invalidate(cashierBillingProvider);
+                                    ref.invalidate(tablesProvider);
+                                    ref.invalidate(waiterProgressProvider);
+                                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(creditFlow
+                                        ? 'Credit recorded locally. Pending sync.'
+                                        : 'Cash recorded locally. Pending sync · Change ${formatMoney(change, bill.currency)}')));
+                                    }
+                                    return;
+                                  }
                                   await _ensureSyncedForPayment(bill);
                                   final result = await ref
                                       .read(cashierRepositoryProvider)
