@@ -1,3 +1,4 @@
+import '../../../core/router/app_router.dart' show DesktopConnectionStatus;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -158,6 +159,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               : 'Cashier',
         ),
         actions: [
+          const DesktopConnectionStatus(),
           if (!desktop) IconButton(
             tooltip: 'Credit Customers',
             onPressed: () => context.push('/cashier/credits'),
