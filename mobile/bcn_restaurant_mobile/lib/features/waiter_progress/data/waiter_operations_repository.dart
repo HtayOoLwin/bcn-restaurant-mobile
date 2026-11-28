@@ -67,11 +67,13 @@ class WaiterOperationsRepository {
             target['_online_qty'] ??= target['qty'];
             target['_offline_qty'] = ((target['_offline_qty'] as num?) ?? 0) + qty;
             target['qty'] = ((target['qty'] as num?) ?? 0) + qty;
+            target['amount'] = ((target['amount'] as num?) ?? 0) + ((item['amount'] as num?) ?? 0);
             target['status'] = 'Pending sync';
           } else {
             items.add({'row_name': 'LOCAL:${entry.key}:${items.length}', 'item_code': code,
               'item_name': item['item_name'] ?? code, 'qty': qty, 'uom': item['uom'],
               'custom_foc': foc, 'custom_parcel': parcel, 'kitchen_note': item['kitchen_note'],
+              'rate': (item['rate'] as num?) ?? 0, 'amount': (item['amount'] as num?) ?? 0,
               '_online_qty': 0, '_offline_qty': qty, 'status': 'Pending sync'});
           }
         }
