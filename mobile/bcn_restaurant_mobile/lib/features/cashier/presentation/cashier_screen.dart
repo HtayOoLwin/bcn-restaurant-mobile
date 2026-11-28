@@ -302,7 +302,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                                             crossAxisAlignment: CrossAxisAlignment.end,
                                             children: [
                                               Text(formatMoney(bill.grandTotal, bill.currency), style: const TextStyle(fontWeight: FontWeight.w800)),
-                                              Text(bill.cashRecorded ? 'Cash received · pending sync' : bill.localPreview ? 'Offline preview' : bill.restaurantStatus, style: const TextStyle(fontSize: 11, color: Color(0xFF315F8E))),
+                                              Text(bill.cashRecorded ? bill.restaurantStatus : bill.localPreview ? 'Offline preview' : bill.restaurantStatus, style: const TextStyle(fontSize: 11, color: Color(0xFF315F8E))),
                                             ],
                                           ),
                                           onTap: () => setState(() => _selectedBill = bill.salesOrder),
@@ -610,6 +610,55 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     );
   }
 
+  Future<void> _recordOfflineCredit(BuildContext context, CashierBillingResponse billing, CashierBill bill) async {
+    final customers = billing.creditCustomers.where((row) => (row['name']?.toString() ?? '').isNotEmpty).toList();
+    if (customers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No cached credit customers. Refresh Cashier online first.')));
+      return;
+    }
+    Map<String, dynamic>? selected;
+    String query = '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, update) => AlertDialog(
+          title: const Text('Offline Credit'),
+          content: SizedBox(width: 440, child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(bill.customerName),
+            Text('Outstanding: ${formatMoney(bill.grandTotal, bill.currency)}'),
+            TextField(decoration: const InputDecoration(labelText: 'Search credit customer'),
+              onChanged: (value) => update(() => query = value.toLowerCase())),
+            SizedBox(height: 240, child: ListView(
+              children: customers.where((row) => '${row['name']} ${row['customer_name']}'.toLowerCase().contains(query)).map((row) =>
+                ListTile(title: Text(row['customer_name']?.toString() ?? row['name'].toString()),
+                  subtitle: Text(row['name'].toString()), selected: selected == row,
+                  onTap: () => update(() => selected = row))).toList(),
+            )),
+            Text(selected == null ? 'Select an existing credit customer.' : 'Selected: ${selected!['customer_name'] ?? selected!['name']}'),
+            const Text('Full credit only. No cash received. ERPNext invoice will be created after sync.'),
+          ])),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: selected == null ? null : () => Navigator.pop(dialogContext, true), child: const Text('Confirm Credit')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || selected == null || !mounted || !context.mounted) return;
+    try {
+      await ref.read(offlinePaymentProvider.notifier).recordCredit(bill, selected!['name'].toString());
+      if (!mounted || !context.mounted) return;
+      ref.invalidate(cashierBillingProvider);
+      ref.invalidate(tablesProvider);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Credit recorded locally. Pending sync.')));
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
   Future<void> _recordOfflineCash(BuildContext context, CashierBillingResponse billing, CashierBill bill) async {
     final cashModes = billing.modes.where((mode) => mode.isCash).toList();
     if (cashModes.isEmpty) {
@@ -671,7 +720,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     for (final raw in cashRecords.values) {
       final payment = jsonDecode(raw) as Map;
       if (payment['customer'] == bill.customer || payment['sales_order'] == bill.salesOrder) {
-        throw StateError('Cash already received locally. Do not collect again.');
+        throw StateError('Checkout already recorded locally. Do not collect again.');
       }
     }
     final pending = await api.pendingOrders();
@@ -701,11 +750,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     required bool creditFlow,
   }) async {
     if (bill.cashRecorded) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cash already received. Do not collect again.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checkout already recorded. Do not collect again.')));
       return;
     }
     if (bill.localPreview) {
-      if (!creditFlow && bill.offlineCashEligible) {
+      if (creditFlow && bill.offlineCashEligible) {
+        await _recordOfflineCredit(context, billing, bill);
+      } else if (!creditFlow && bill.offlineCashEligible) {
         await _recordOfflineCash(context, billing, bill);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connect to ERPNext and sync all orders before payment.')));
@@ -1798,7 +1849,7 @@ class _BillCardState extends State<_BillCard> {
             ),
             onPressed: !widget.bill.cashRecorded && (isBilling || (widget.bill.localPreview && widget.bill.offlineCashEligible)) ? widget.onPayment : null,
             icon: const Icon(Icons.point_of_sale),
-            label: Text(widget.bill.cashRecorded ? 'Cash Received' : widget.bill.localPreview && widget.bill.offlineCashEligible ? 'Pay Offline' : 'Pay'),
+            label: Text(widget.bill.cashRecorded ? 'Recorded' : widget.bill.localPreview && widget.bill.offlineCashEligible ? 'Pay Offline' : 'Pay'),
           ),
         ),
         const SizedBox(width: 8),
@@ -1811,9 +1862,9 @@ class _BillCardState extends State<_BillCard> {
               disabledForegroundColor: _disabledForeground,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            onPressed: isBilling && !widget.bill.cashRecorded ? widget.onCredit : null,
+            onPressed: !widget.bill.cashRecorded && (isBilling || (widget.bill.localPreview && widget.bill.offlineCashEligible)) ? widget.onCredit : null,
             icon: const Icon(Icons.credit_score),
-            label: const Text('Credit'),
+            label: Text(widget.bill.localPreview ? 'Credit Offline' : 'Credit'),
           ),
         ),
       ],
