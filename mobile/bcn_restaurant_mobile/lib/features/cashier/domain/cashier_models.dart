@@ -105,6 +105,7 @@ class CashierBill {
     required this.grandTotal,
     required this.currency,
     required this.restaurantStatus,
+    this.localPreview = false,
     required this.lastPrintStatus,
     required this.lastPrintJob,
     required this.items,
@@ -125,6 +126,7 @@ class CashierBill {
       grandTotal: _asDouble(json['grand_total']),
       currency: json['currency']?.toString() ?? '',
       restaurantStatus: json['restaurant_status']?.toString() ?? '',
+      localPreview: json['_local_preview'] == true,
       lastPrintStatus: json['last_print_status']?.toString(),
       lastPrintJob: json['last_print_job']?.toString(),
       items: (json['items'] as List? ?? const [])
@@ -153,6 +155,7 @@ class CashierBill {
   final double grandTotal;
   final String currency;
   final String restaurantStatus;
+  final bool localPreview;
   final String? lastPrintStatus;
   final String? lastPrintJob;
   final List<CashierBillItem> items;
