@@ -29,7 +29,38 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
 
   Future<void> recordCredit(CashierBill bill, String customer) => _record(bill, creditCustomer: customer);
 
-  Future<void> _record(CashierBill bill, {CashierPaymentMode? mode, String? creditCustomer}) async {
+  Future<void> recordSettlement(CashierBill bill, List<CashierPaymentTender> tenders,
+      List<CashierPaymentMode> modes, {String? creditCustomer, double creditAmount = 0}) async {
+    if (!creditAmount.isFinite || creditAmount < 0 || creditAmount > bill.grandTotal ||
+        (creditAmount > 0) != (creditCustomer?.trim().isNotEmpty == true)) {
+      throw StateError('Invalid credit amount or customer.');
+    }
+    final seen = <String>{};
+    var cash = 0.0;
+    var nonCash = 0.0;
+    for (final tender in tenders) {
+      final matches = modes.where((mode) => mode.name == tender.modeOfPayment);
+      if (matches.length != 1 || tender.modeOfPayment.trim().toLowerCase() == 'credit' ||
+          !seen.add(tender.modeOfPayment) || !tender.amount.isFinite || tender.amount <= 0) {
+        throw StateError('Invalid or duplicate payment method.');
+      }
+      if (matches.single.isCash) {
+        cash += tender.amount;
+      } else {
+        nonCash += tender.amount;
+      }
+    }
+    final due = bill.grandTotal - creditAmount;
+    if (nonCash > due + 0.01 || cash + nonCash < due - 0.01 ||
+        (due <= 0.01 && tenders.isNotEmpty)) {
+      throw StateError('Payment amounts do not match the bill.');
+    }
+    await _record(bill, creditCustomer: creditCustomer, tenders: tenders,
+      creditAmount: creditAmount);
+  }
+
+  Future<void> _record(CashierBill bill, {CashierPaymentMode? mode, String? creditCustomer,
+      List<CashierPaymentTender>? tenders, double creditAmount = 0}) async {
     if (state.running) throw StateError('Payment sync in progress.');
     final auth = ref.read(authControllerProvider).asData?.value.bootstrap;
     final storage = ref.read(sessionStorageProvider);
@@ -37,7 +68,7 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
     final sid = await storage.readSid();
     if (sid == null || auth?.permissions.cashier != true ||
         !bill.localPreview || !bill.offlineCashEligible || bill.cashRecorded ||
-        bill.offlineModified.isEmpty || (creditCustomer == null ? mode?.isCash != true : creditCustomer.trim().isEmpty) || bill.grandTotal <= 0 ||
+        bill.offlineModified.isEmpty || (tenders == null && (creditCustomer == null ? mode?.isCash != true : creditCustomer.trim().isEmpty)) || bill.grandTotal <= 0 ||
         !bill.grandTotal.isFinite || bill.currency != 'MMK') {
       throw StateError('This bill is not eligible for offline cash payment.');
     }
@@ -53,6 +84,8 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
       'amount': bill.grandTotal,
       'mode_of_payment': mode?.name ?? '',
       'credit_customer': ?creditCustomer,
+      if (tenders != null) 'payments': jsonEncode(tenders.map((tender) => {'mode_of_payment': tender.modeOfPayment, 'amount': tender.amount}).toList()),
+      if (tenders != null) 'credit_amount': creditAmount,
       'received_at': DateTime.now().toUtc().toIso8601String(),
     }, expectedSid: sid);
     ref.invalidate(pendingPaymentCountProvider);
@@ -75,7 +108,7 @@ class OfflinePaymentController extends Notifier<OfflinePaymentState> {
       final records = await storage.pendingPayments();
       if (records.isEmpty) return;
       final ping = await api.postMethod('bcn_sync_offline_payment', data: {'action': 'ping'});
-      if (ping is! Map || ping['ready'] != true || ping['backend_version'] != 2) {
+      if (ping is! Map || ping['ready'] != true || ping['backend_version'] != 3) {
         throw StateError('Offline payment API is not ready.');
       }
       for (final entry in records.entries) {
